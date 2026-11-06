@@ -19,6 +19,7 @@
 - Agent status file: `backend/state/agents-status.json`.
 - Ideas file: `departamentos/marketing/content/ideas.json`.
 - Drafts directory: `departamentos/marketing/content/drafts/`.
+- Reading/writing `ideas.json` always goes through `backend/lib/ideasStore.js` — no module re-implements its own `readIdeas`/`writeIdeas`.
 - Auto-publishing to Instagram/TikTok is out of scope — the Publicador only ever writes a draft file; the founder publishes manually.
 
 ---
@@ -406,7 +407,88 @@ git commit -m "Add statusStore module for reading/writing agent status"
 
 ---
 
-### Task 3: OpenAI client module
+### Task 3: Ideas store module
+
+**Files:**
+- Create: `backend/lib/ideasStore.js`
+- Test: `backend/test/ideasStore.test.js`
+
+**Interfaces:**
+- Produces: `readIdeas(ideasPath) -> Array<{id, texto, estatus, creadaEn}>` (returns `[]` if the file does not exist) and `writeIdeas(ideasPath, ideas) -> void`. Task 5 (Buscador de Tendencias) and Task 6 (Publicador) both import these two functions instead of each defining their own — this is the shared module the Global Constraints section requires.
+
+- [ ] **Step 1: Write the failing tests**
+
+Create `backend/test/ideasStore.test.js`:
+
+```js
+const test = require('node:test');
+const assert = require('node:assert/strict');
+const fs = require('fs');
+const os = require('os');
+const path = require('path');
+const { readIdeas, writeIdeas } = require('../lib/ideasStore');
+
+function tempIdeasPath() {
+  return path.join(os.tmpdir(), `ideas-${Date.now()}-${Math.random()}.json`);
+}
+
+test('readIdeas returns an empty array when the file does not exist', () => {
+  const filePath = tempIdeasPath();
+  assert.deepEqual(readIdeas(filePath), []);
+});
+
+test('writeIdeas then readIdeas returns the same array', () => {
+  const filePath = tempIdeasPath();
+  const ideas = [{ id: 'idea-1', texto: 'una idea', estatus: 'pendiente', creadaEn: '2026-01-01T00:00:00.000Z' }];
+
+  writeIdeas(filePath, ideas);
+
+  assert.deepEqual(readIdeas(filePath), ideas);
+  fs.unlinkSync(filePath);
+});
+```
+
+- [ ] **Step 2: Run tests to verify they fail**
+
+Run: `cd backend && node --test test/ideasStore.test.js`
+Expected: FAIL — `Cannot find module '../lib/ideasStore'`
+
+- [ ] **Step 3: Write the implementation**
+
+Create `backend/lib/ideasStore.js`:
+
+```js
+const fs = require('fs');
+
+function readIdeas(ideasPath) {
+  if (!fs.existsSync(ideasPath)) {
+    return [];
+  }
+  return JSON.parse(fs.readFileSync(ideasPath, 'utf-8'));
+}
+
+function writeIdeas(ideasPath, ideas) {
+  fs.writeFileSync(ideasPath, JSON.stringify(ideas, null, 2));
+}
+
+module.exports = { readIdeas, writeIdeas };
+```
+
+- [ ] **Step 4: Run tests to verify they pass**
+
+Run: `cd backend && node --test test/ideasStore.test.js`
+Expected: PASS — 2 tests passing
+
+- [ ] **Step 5: Commit**
+
+```bash
+git add backend/lib/ideasStore.js backend/test/ideasStore.test.js
+git commit -m "Add ideasStore module for reading/writing ideas.json"
+```
+
+---
+
+### Task 4: OpenAI client module
 
 **Files:**
 - Create: `backend/lib/openaiClient.js`
@@ -511,14 +593,14 @@ git commit -m "Add openaiClient module wrapping OpenAI chat completions"
 
 ---
 
-### Task 4: Buscador de Tendencias agent module
+### Task 5: Buscador de Tendencias agent module
 
 **Files:**
 - Create: `backend/agents/buscadorTendencias.js`
 - Test: `backend/test/buscadorTendencias.test.js`
 
 **Interfaces:**
-- Consumes: `createChatCompletion({ apiKey, model, messages, fetchImpl }) -> Promise<string>` (Task 3, injected directly as a function, not via `fetchImpl`).
+- Consumes: `readIdeas`, `writeIdeas` (Task 3's `backend/lib/ideasStore.js`); `createChatCompletion` (Task 4, injected directly as a function, not via `fetchImpl`).
 - Produces: `runCycle({ contextPath, rolePath, ideasPath, apiKey, model, createChatCompletion }) -> Promise<{ addedIdeas: Array<{id, texto, estatus, creadaEn}> }>` and `chat({ message, saveAsIdea, contextPath, rolePath, ideasPath, apiKey, model, createChatCompletion }) -> Promise<{ reply: string, savedIdea: object|null }>`. Later tasks (scheduler wiring, routes) call these two functions by name.
 
 - [ ] **Step 1: Write the failing tests**
@@ -639,17 +721,7 @@ Create `backend/agents/buscadorTendencias.js`:
 
 ```js
 const fs = require('fs');
-
-function readIdeas(ideasPath) {
-  if (!fs.existsSync(ideasPath)) {
-    return [];
-  }
-  return JSON.parse(fs.readFileSync(ideasPath, 'utf-8'));
-}
-
-function writeIdeas(ideasPath, ideas) {
-  fs.writeFileSync(ideasPath, JSON.stringify(ideas, null, 2));
-}
+const { readIdeas, writeIdeas } = require('../lib/ideasStore');
 
 async function runCycle({ contextPath, rolePath, ideasPath, apiKey, model, createChatCompletion }) {
   const context = fs.readFileSync(contextPath, 'utf-8');
@@ -714,7 +786,7 @@ async function chat({ message, saveAsIdea, contextPath, rolePath, ideasPath, api
   return { reply, savedIdea };
 }
 
-module.exports = { runCycle, chat, readIdeas, writeIdeas };
+module.exports = { runCycle, chat };
 ```
 
 - [ ] **Step 4: Run tests to verify they pass**
@@ -731,15 +803,15 @@ git commit -m "Add Buscador de Tendencias agent: autonomous cycle and chat"
 
 ---
 
-### Task 5: Publicador agent module
+### Task 6: Publicador agent module
 
 **Files:**
 - Create: `backend/agents/publicador.js`
 - Test: `backend/test/publicador.test.js`
 
 **Interfaces:**
-- Consumes: `createChatCompletion` (Task 3).
-- Produces: `runCycle({ contextPath, rolePath, ideasPath, draftsDir, apiKey, model, createChatCompletion }) -> Promise<{ draftCreated: {ideaId, ideaTexto, draftPath} | null }>`, `chat({ message, ideaId, draftsDir, contextPath, rolePath, apiKey, model, createChatCompletion }) -> Promise<{ reply: string }>`, and `draftFileName(ideaId) -> string`. Task 9's server wiring reads `result.draftCreated.ideaId` to store `ultimoIdeaId` in agent status, which the frontend later sends back as `ideaId` when chatting with the Publicador.
+- Consumes: `readIdeas`, `writeIdeas` (Task 3's `backend/lib/ideasStore.js`); `createChatCompletion` (Task 4).
+- Produces: `runCycle({ contextPath, rolePath, ideasPath, draftsDir, apiKey, model, createChatCompletion }) -> Promise<{ draftCreated: {ideaId, ideaTexto, draftPath} | null }>`, `chat({ message, ideaId, draftsDir, contextPath, rolePath, apiKey, model, createChatCompletion }) -> Promise<{ reply: string }>`, and `draftFileName(ideaId) -> string`. Task 10's server wiring reads `result.draftCreated.ideaId` to store `ultimoIdeaId` in agent status, which the frontend later sends back as `ideaId` when chatting with the Publicador.
 
 - [ ] **Step 1: Write the failing tests**
 
@@ -873,17 +945,7 @@ Create `backend/agents/publicador.js`:
 ```js
 const fs = require('fs');
 const path = require('path');
-
-function readIdeas(ideasPath) {
-  if (!fs.existsSync(ideasPath)) {
-    return [];
-  }
-  return JSON.parse(fs.readFileSync(ideasPath, 'utf-8'));
-}
-
-function writeIdeas(ideasPath, ideas) {
-  fs.writeFileSync(ideasPath, JSON.stringify(ideas, null, 2));
-}
+const { readIdeas, writeIdeas } = require('../lib/ideasStore');
 
 function draftFileName(ideaId) {
   return `draft-${ideaId}.md`;
@@ -952,7 +1014,7 @@ async function chat({ message, ideaId, draftsDir, contextPath, rolePath, apiKey,
   return { reply: updatedCopy };
 }
 
-module.exports = { runCycle, chat, readIdeas, writeIdeas, draftFileName };
+module.exports = { runCycle, chat, draftFileName };
 ```
 
 - [ ] **Step 4: Run tests to verify they pass**
@@ -969,7 +1031,7 @@ git commit -m "Add Publicador agent: autonomous draft cycle and chat edits"
 
 ---
 
-### Task 6: Status-wrapped run cycle helper
+### Task 7: Status-wrapped run cycle helper
 
 **Files:**
 - Create: `backend/lib/runWithStatus.js`
@@ -977,7 +1039,7 @@ git commit -m "Add Publicador agent: autonomous draft cycle and chat edits"
 
 **Interfaces:**
 - Consumes: `updateAgentStatus` (Task 2).
-- Produces: `wrapRunCycle({ agentId, statusPath, runCycle, deps, describeSuccess }) -> () => Promise<result>` — a zero-argument async function that sets status to `trabajando` before calling `runCycle(deps)`, merges whatever object `describeSuccess(result)` returns into the agent's status on success (with `error: null`), or sets `estatus: 'error'` with the caught error's message on failure, then rethrows. Task 7's scheduler and Task 9's server wiring consume the returned function directly as an `agentRunner`.
+- Produces: `wrapRunCycle({ agentId, statusPath, runCycle, deps, describeSuccess }) -> () => Promise<result>` — a zero-argument async function that sets status to `trabajando` before calling `runCycle(deps)`, merges whatever object `describeSuccess(result)` returns into the agent's status on success (with `error: null`), or sets `estatus: 'error'` with the caught error's message on failure, then rethrows. Task 8's scheduler and Task 10's server wiring consume the returned function directly as an `agentRunner`.
 
 - [ ] **Step 1: Write the failing tests**
 
@@ -1119,15 +1181,15 @@ git commit -m "Add wrapRunCycle helper to track agent status around a run cycle"
 
 ---
 
-### Task 7: Scheduler module
+### Task 8: Scheduler module
 
 **Files:**
 - Create: `backend/scheduler.js`
 - Test: `backend/test/scheduler.test.js`
 
 **Interfaces:**
-- Consumes: nothing concrete — takes a map of already-wrapped `agentRunners` (functions of shape `() => Promise<any>`, as produced by Task 6's `wrapRunCycle`).
-- Produces: `createScheduler({ intervalMs, agentRunners }) -> { start(), stop(), runAllOnce(): Promise<void>, runOne(agentId): Promise<any>, isRunning(): boolean }`. Task 8's `forzar` route handler calls `scheduler.runOne(agentId)`; Task 9's server start-up calls `scheduler.start()`.
+- Consumes: nothing concrete — takes a map of already-wrapped `agentRunners` (functions of shape `() => Promise<any>`, as produced by Task 7's `wrapRunCycle`).
+- Produces: `createScheduler({ intervalMs, agentRunners }) -> { start(), stop(), runAllOnce(): Promise<void>, runOne(agentId): Promise<any>, isRunning(): boolean }`. Task 9's `forzar` route handler calls `scheduler.runOne(agentId)`; Task 10's server start-up calls `scheduler.start()`.
 
 - [ ] **Step 1: Write the failing tests**
 
@@ -1256,15 +1318,15 @@ git commit -m "Add scheduler module to drive agent autonomous cycles"
 
 ---
 
-### Task 8: Agents API routes
+### Task 9: Agents API routes
 
 **Files:**
 - Create: `backend/routes/agents.js`
 - Test: `backend/test/agentsRoute.test.js`
 
 **Interfaces:**
-- Consumes: an injected `readStatus` function (Task 2's shape), a `scheduler` object exposing `runOne` (Task 7), and a `chatHandlers` map of `agentId -> (body) => Promise<result>` (Task 4/5's `chat` functions, pre-bound with their deps).
-- Produces: `createAgentsRouter({ statusPath, readStatus, scheduler, chatHandlers }) -> express.Router` exposing `GET /status`, `POST /:id/chat`, `POST /:id/forzar`. Also exports the three handler factories (`createStatusHandler`, `createChatHandler`, `createForzarHandler`) for direct unit testing. Task 9 mounts this router at `/api/agents`.
+- Consumes: an injected `readStatus` function (Task 2's shape), a `scheduler` object exposing `runOne` (Task 8), and a `chatHandlers` map of `agentId -> (body) => Promise<result>` (Task 5/6's `chat` functions, pre-bound with their deps).
+- Produces: `createAgentsRouter({ statusPath, readStatus, scheduler, chatHandlers }) -> express.Router` exposing `GET /status`, `POST /:id/chat`, `POST /:id/forzar`. Also exports the three handler factories (`createStatusHandler`, `createChatHandler`, `createForzarHandler`) for direct unit testing. Task 10 mounts this router at `/api/agents`.
 
 - [ ] **Step 1: Write the failing tests**
 
@@ -1456,7 +1518,7 @@ git commit -m "Add agents API routes: status, chat, forzar"
 
 ---
 
-### Task 9: Config module and server wiring
+### Task 10: Config module and server wiring
 
 **Files:**
 - Create: `backend/config.js`
@@ -1464,8 +1526,8 @@ git commit -m "Add agents API routes: status, chat, forzar"
 - Test: `backend/test/config.test.js`
 
 **Interfaces:**
-- Consumes: `createScheduler` (Task 7), `wrapRunCycle` (Task 6), `readStatus` (Task 2), `createChatCompletion` (Task 3), `buscadorTendencias.runCycle`/`chat` (Task 4), `publicador.runCycle`/`chat` (Task 5), `createAgentsRouter` (Task 8).
-- Produces: `loadConfig(env) -> { port, openaiApiKey, openaiModel, agentIntervalHours }` (Task 9 only; nothing downstream depends on it in this plan) and the running Express `app` exported from `server.js` for manual verification.
+- Consumes: `createScheduler` (Task 8), `wrapRunCycle` (Task 7), `readStatus` (Task 2), `createChatCompletion` (Task 4), `buscadorTendencias.runCycle`/`chat` (Task 5), `publicador.runCycle`/`chat` (Task 6), `createAgentsRouter` (Task 9).
+- Produces: `loadConfig(env) -> { port, openaiApiKey, openaiModel, agentIntervalHours }` (Task 10 only; nothing downstream depends on it in this plan) and the running Express `app` exported from `server.js` for manual verification.
 
 - [ ] **Step 1: Write the failing test for config**
 
@@ -1660,15 +1722,15 @@ git commit -m "Wire config and server: mount agents API, start scheduler"
 
 ---
 
-### Task 10: Frontend scaffolding — HTML shell and API client
+### Task 11: Frontend scaffolding — HTML shell and API client
 
 **Files:**
 - Create: `frontend/index.html`
 - Create: `frontend/src/api.js`
 
 **Interfaces:**
-- Produces: `fetchStatus() -> Promise<object>`, `sendChat(agentId, payload) -> Promise<object>`, `forzarCiclo(agentId) -> Promise<object>` — all three `fetch` the `/api/agents` routes mounted in Task 9. Task 12's `main.js` imports all three.
-- Also produces the DOM elements `#scene-container` and `#panel` (with its children) that Task 11's `scene.js` and Task 12's `ui.js` attach to by `id`.
+- Produces: `fetchStatus() -> Promise<object>`, `sendChat(agentId, payload) -> Promise<object>`, `forzarCiclo(agentId) -> Promise<object>` — all three `fetch` the `/api/agents` routes mounted in Task 10. Task 13's `main.js` imports all three.
+- Also produces the DOM elements `#scene-container` and `#panel` (with its children) that Task 12's `scene.js` and Task 13's `ui.js` attach to by `id`.
 
 - [ ] **Step 1: Write the HTML shell**
 
@@ -1766,7 +1828,7 @@ export async function forzarCiclo(agentId) {
 - [ ] **Step 3: Manually verify the shell loads**
 
 Start the backend (`cd backend && node server.js`), then open `http://localhost:3000` in a browser.
-Expected: a blank dark page (no 3D content yet — Task 11 adds it), no console errors about missing `/src/api.js` or `/src/main.js` (a 404 for `main.js` is expected until Task 12 creates it; confirm `api.js` itself loads with no syntax errors by checking the Network tab shows a 200 for it once `main.js` imports it in Task 12).
+Expected: a blank dark page (no 3D content yet — Task 12 adds it). A 404 for `/src/main.js` is expected in the console until Task 13 creates it; confirm `api.js` itself has no syntax errors by checking the Network tab once `main.js` imports it in Task 13.
 
 - [ ] **Step 4: Commit**
 
@@ -1777,14 +1839,14 @@ git commit -m "Add frontend HTML shell and API client"
 
 ---
 
-### Task 11: Three.js office scene
+### Task 12: Three.js office scene
 
 **Files:**
 - Create: `frontend/src/scene.js`
 
 **Interfaces:**
 - Consumes: nothing from earlier frontend tasks directly (loads Three.js itself from a CDN).
-- Produces: `createScene({ container, agents, onAgentClick }) -> { updateStatusColors(statusById) }`. `agents` is `Array<{id: string}>`; `onAgentClick(agentId: string)` fires on click; `updateStatusColors` expects the same shape returned by `fetchStatus()` (Task 10) — `{ [agentId]: { estatus, ... } }`. Task 12's `main.js` creates the scene and calls `updateStatusColors` on every poll.
+- Produces: `createScene({ container, agents, onAgentClick }) -> { updateStatusColors(statusById) }`. `agents` is `Array<{id: string}>`; `onAgentClick(agentId: string)` fires on click; `updateStatusColors` expects the same shape returned by `fetchStatus()` (Task 11) — `{ [agentId]: { estatus, ... } }`. Task 13's `main.js` creates the scene and calls `updateStatusColors` on every poll.
 
 - [ ] **Step 1: Write the scene module**
 
@@ -1876,7 +1938,7 @@ export function createScene({ container, agents, onAgentClick }) {
 With the backend running, temporarily add `<script type="module">import { createScene } from '/src/scene.js'; createScene({ container: document.getElementById('scene-container'), agents: [{id:'buscador-tendencias'},{id:'publicador'}], onAgentClick: (id) => console.log('clicked', id) });</script>` before the `main.js` script tag in `frontend/index.html`, reload the page.
 Expected: a dark room with two gray capsule shapes, mouse drag orbits the camera, clicking a capsule logs `clicked buscador-tendencias` or `clicked publicador` in the browser console.
 
-Remove the temporary script tag afterwards (Task 12 wires this properly through `main.js`).
+Remove the temporary script tag afterwards (Task 13 wires this properly through `main.js`).
 
 - [ ] **Step 3: Commit**
 
@@ -1887,14 +1949,14 @@ git commit -m "Add Three.js Marketing office scene with clickable agent avatars"
 
 ---
 
-### Task 12: Chat/status panel and app bootstrap
+### Task 13: Chat/status panel and app bootstrap
 
 **Files:**
 - Create: `frontend/src/ui.js`
 - Create: `frontend/src/main.js`
 
 **Interfaces:**
-- Consumes: `createScene` (Task 11), `fetchStatus`/`sendChat`/`forzarCiclo` (Task 10).
+- Consumes: `createScene` (Task 12), `fetchStatus`/`sendChat`/`forzarCiclo` (Task 11).
 - Produces: wires the whole frontend together — no other task depends on this one.
 
 - [ ] **Step 1: Write the panel module**
@@ -2042,16 +2104,16 @@ git commit -m "Wire chat/status panel and app bootstrap to the 3D scene"
 
 ---
 
-### Task 13: End-to-end manual validation
+### Task 14: End-to-end manual validation
 
-**Files:** none created — this task only exercises what Tasks 1-12 built.
+**Files:** none created — this task only exercises what Tasks 1-13 built.
 
 **Interfaces:** none produced.
 
 - [ ] **Step 1: Run the full backend test suite**
 
 Run: `cd backend && npm test`
-Expected: all tests across every `backend/test/*.test.js` file pass (statusStore, openaiClient, buscadorTendencias, publicador, runWithStatus, scheduler, agentsRoute, config).
+Expected: all tests across every `backend/test/*.test.js` file pass (statusStore, ideasStore, openaiClient, buscadorTendencias, publicador, runWithStatus, scheduler, agentsRoute, config).
 
 - [ ] **Step 2: Start the server with a short interval for live testing**
 
