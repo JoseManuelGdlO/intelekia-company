@@ -1,15 +1,9 @@
-const AGENT_LABELS = {
-  'buscador-tendencias': 'Buscador de Tendencias',
-  publicador: 'Publicador',
-};
-
 export function createPanel({ onSend, onForzar }) {
   const panel = document.getElementById('panel');
   const title = document.getElementById('panel-title');
   const statusEl = document.getElementById('panel-status');
   const chatLog = document.getElementById('panel-chat-log');
-  const saveIdeaLabel = document.getElementById('panel-save-idea-label');
-  const saveIdeaCheckbox = document.getElementById('panel-save-idea');
+  const saveCheckbox = document.getElementById('panel-save-idea');
   const messageInput = document.getElementById('panel-message');
   const sendButton = document.getElementById('panel-send');
   const forzarButton = document.getElementById('panel-forzar');
@@ -17,10 +11,9 @@ export function createPanel({ onSend, onForzar }) {
 
   let currentAgentId = null;
 
-  function open(agentId, agentStatus) {
+  function open(agentId, label, agentStatus) {
     currentAgentId = agentId;
-    title.textContent = AGENT_LABELS[agentId] || agentId;
-    saveIdeaLabel.style.display = agentId === 'buscador-tendencias' ? 'block' : 'none';
+    title.textContent = label;
     chatLog.innerHTML = '';
     renderStatus(agentStatus);
     panel.classList.add('visible');
@@ -46,7 +39,7 @@ export function createPanel({ onSend, onForzar }) {
     if (!message || !currentAgentId) return;
     appendMessage('Tú', message);
     messageInput.value = '';
-    await onSend(currentAgentId, message, saveIdeaCheckbox.checked);
+    await onSend(currentAgentId, message, saveCheckbox.checked);
   });
 
   forzarButton.addEventListener('click', async () => {
