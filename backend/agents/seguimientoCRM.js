@@ -1,7 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 const { readProspectos, writeProspectos } = require('../lib/prospectosStore');
-const { assertSafeItemId } = require('../lib/validateItemId');
+const { editItemChat } = require('../lib/editItemChat');
 
 function seguimientoFileName(prospectoId) {
   return `seguimiento-${prospectoId}.md`;
@@ -48,29 +48,19 @@ async function runCycle({ contextPath, rolePath, prospectosPath, seguimientosDir
 }
 
 async function chat({ message, itemId, seguimientosDir, contextPath, rolePath, apiKey, model, createChatCompletion }) {
-  assertSafeItemId(itemId, 'No se encontró un mensaje de seguimiento para editar (itemId inválido o faltante)');
-  const seguimientoPath = path.join(seguimientosDir, seguimientoFileName(itemId));
-  const context = fs.readFileSync(contextPath, 'utf-8');
-  const role = fs.readFileSync(rolePath, 'utf-8');
-  const currentMessage = fs.readFileSync(seguimientoPath, 'utf-8');
-
-  const userPrompt =
-    `Contexto de negocio:\n${context}\n\n` +
-    `Mensaje actual:\n${currentMessage}\n\n` +
-    `Instrucción del fundador: ${message}`;
-
-  const updatedMessage = await createChatCompletion({
+  return editItemChat({
+    message,
+    itemId,
+    dir: seguimientosDir,
+    fileNameFor: seguimientoFileName,
+    invalidIdErrorMessage: 'No se encontró un mensaje de seguimiento para editar (itemId inválido o faltante)',
+    contentLabel: 'Mensaje',
+    contextPath,
+    rolePath,
     apiKey,
     model,
-    messages: [
-      { role: 'system', content: role },
-      { role: 'user', content: userPrompt },
-    ],
+    createChatCompletion,
   });
-
-  fs.writeFileSync(seguimientoPath, updatedMessage);
-
-  return { reply: updatedMessage };
 }
 
 function describeSuccess(result) {

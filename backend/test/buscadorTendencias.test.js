@@ -72,7 +72,7 @@ test('chat returns the reply without saving an idea by default', async () => {
   [contextPath, rolePath, ideasPath].forEach((p) => fs.unlinkSync(p));
 });
 
-test('chat saves the reply as a pending idea when saveAsIdea is true', async () => {
+test('chat saves the reply as a pending idea when guardar is true', async () => {
   const contextPath = tempFile('context', '# Intelekia');
   const rolePath = tempFile('role', 'Eres el buscador de tendencias.');
   const ideasPath = tempFile('ideas', JSON.stringify([]));
