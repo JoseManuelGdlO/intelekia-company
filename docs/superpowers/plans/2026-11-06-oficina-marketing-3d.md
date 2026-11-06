@@ -222,7 +222,7 @@ Create `backend/package.json`:
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
-    "test": "node --test test/"
+    "test": "node --test \"test/**/*.test.js\""
   },
   "engines": {
     "node": ">=18"
