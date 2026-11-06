@@ -1,19 +1,6 @@
 const fs = require('fs');
 const { readIdeas, writeIdeas } = require('../lib/ideasStore');
-
-function parseIdeasResponse(raw) {
-  const cleaned = raw.trim().replace(/^```(?:json)?\s*/i, '').replace(/```\s*$/i, '').trim();
-  let parsed;
-  try {
-    parsed = JSON.parse(cleaned);
-  } catch (err) {
-    throw new Error(`La respuesta del modelo no es JSON válido: ${err.message}`);
-  }
-  if (!Array.isArray(parsed)) {
-    throw new Error('La respuesta del modelo no es un arreglo de ideas');
-  }
-  return parsed;
-}
+const { parseJsonArrayResponse } = require('../lib/parseJsonArrayResponse');
 
 async function runCycle({ contextPath, rolePath, ideasPath, apiKey, model, createChatCompletion }) {
   const context = fs.readFileSync(contextPath, 'utf-8');
@@ -35,7 +22,9 @@ async function runCycle({ contextPath, rolePath, ideasPath, apiKey, model, creat
     ],
   });
 
-  const nuevasIdeas = parseIdeasResponse(raw);
+  const nuevasIdeas = parseJsonArrayResponse(raw, {
+    emptyArrayErrorMessage: 'La respuesta del modelo no es un arreglo de ideas',
+  });
 
   const addedIdeas = nuevasIdeas.map((texto, index) => ({
     id: `idea-${Date.now()}-${index}`,
@@ -49,7 +38,7 @@ async function runCycle({ contextPath, rolePath, ideasPath, apiKey, model, creat
   return { addedIdeas };
 }
 
-async function chat({ message, saveAsIdea, contextPath, rolePath, ideasPath, apiKey, model, createChatCompletion }) {
+async function chat({ message, guardar, contextPath, rolePath, ideasPath, apiKey, model, createChatCompletion }) {
   const context = fs.readFileSync(contextPath, 'utf-8');
   const role = fs.readFileSync(rolePath, 'utf-8');
 
@@ -64,7 +53,7 @@ async function chat({ message, saveAsIdea, contextPath, rolePath, ideasPath, api
   });
 
   let savedIdea = null;
-  if (saveAsIdea) {
+  if (guardar) {
     const existingIdeas = readIdeas(ideasPath);
     savedIdea = {
       id: `idea-${Date.now()}`,
@@ -78,4 +67,11 @@ async function chat({ message, saveAsIdea, contextPath, rolePath, ideasPath, api
   return { reply, savedIdea };
 }
 
-module.exports = { runCycle, chat };
+function describeSuccess(result) {
+  return {
+    estatus: 'idle',
+    ultimaAccion: `Encontró ${result.addedIdeas.length} idea(s) nueva(s)`,
+  };
+}
+
+module.exports = { runCycle, chat, describeSuccess };

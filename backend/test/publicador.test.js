@@ -3,7 +3,7 @@ const assert = require('node:assert/strict');
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
-const { runCycle, chat, draftFileName } = require('../agents/publicador');
+const { runCycle, chat, draftFileName, describeSuccess } = require('../agents/publicador');
 
 function tempFile(name, content) {
   const filePath = path.join(os.tmpdir(), `${name}-${Date.now()}-${Math.random()}`);
@@ -85,8 +85,8 @@ test('chat overwrites the draft file with the edited copy', async () => {
   const contextPath = tempFile('context', '# Intelekia');
   const rolePath = tempFile('role', 'Eres el publicador.');
   const draftsDir = tempDir('drafts');
-  const ideaId = 'idea-1';
-  fs.writeFileSync(path.join(draftsDir, draftFileName(ideaId)), 'Caption original');
+  const itemId = 'idea-1';
+  fs.writeFileSync(path.join(draftsDir, draftFileName(itemId)), 'Caption original');
 
   const fakeCreateChatCompletion = async ({ messages }) => {
     assert.match(messages[1].content, /Caption original/);
@@ -96,7 +96,7 @@ test('chat overwrites the draft file with the edited copy', async () => {
 
   const result = await chat({
     message: 'hazlo más corto',
-    ideaId,
+    itemId,
     draftsDir,
     contextPath,
     rolePath,
@@ -106,13 +106,13 @@ test('chat overwrites the draft file with the edited copy', async () => {
   });
 
   assert.equal(result.reply, 'Caption corto');
-  assert.equal(fs.readFileSync(path.join(draftsDir, draftFileName(ideaId)), 'utf-8'), 'Caption corto');
+  assert.equal(fs.readFileSync(path.join(draftsDir, draftFileName(itemId)), 'utf-8'), 'Caption corto');
 
   [contextPath, rolePath].forEach((p) => fs.unlinkSync(p));
   fs.rmSync(draftsDir, { recursive: true, force: true });
 });
 
-test('chat throws a clear error when ideaId is missing', async () => {
+test('chat throws a clear error when itemId is missing', async () => {
   const contextPath = tempFile('context', '# Intelekia');
   const rolePath = tempFile('role', 'Eres el publicador.');
   const draftsDir = tempDir('drafts');
@@ -121,7 +121,7 @@ test('chat throws a clear error when ideaId is missing', async () => {
     () =>
       chat({
         message: 'hazlo más corto',
-        ideaId: undefined,
+        itemId: undefined,
         draftsDir,
         contextPath,
         rolePath,
@@ -131,14 +131,14 @@ test('chat throws a clear error when ideaId is missing', async () => {
           throw new Error('no debería llamarse');
         },
       }),
-    /ideaId inválido o faltante/
+    /itemId inválido o faltante/
   );
 
   [contextPath, rolePath].forEach((p) => fs.unlinkSync(p));
   fs.rmSync(draftsDir, { recursive: true, force: true });
 });
 
-test('chat throws a clear error and avoids filesystem access when ideaId contains path-traversal characters', async () => {
+test('chat throws a clear error and avoids filesystem access when itemId contains path-traversal characters', async () => {
   const contextPath = tempFile('context', '# Intelekia');
   const rolePath = tempFile('role', 'Eres el publicador.');
   const draftsDir = tempDir('drafts');
@@ -148,7 +148,7 @@ test('chat throws a clear error and avoids filesystem access when ideaId contain
     () =>
       chat({
         message: 'hazlo más corto',
-        ideaId: '../../etc/passwd',
+        itemId: '../../etc/passwd',
         draftsDir,
         contextPath,
         rolePath,
@@ -159,7 +159,7 @@ test('chat throws a clear error and avoids filesystem access when ideaId contain
           return 'no debería llegar aquí';
         },
       }),
-    /ideaId inválido o faltante/
+    /itemId inválido o faltante/
   );
 
   assert.equal(createChatCompletionCalled, false);
@@ -167,4 +167,23 @@ test('chat throws a clear error and avoids filesystem access when ideaId contain
 
   [contextPath, rolePath].forEach((p) => fs.unlinkSync(p));
   fs.rmSync(draftsDir, { recursive: true, force: true });
+});
+
+test('describeSuccess reports listo_para_revision with ultimoItemId when a draft was created', () => {
+  const patch = describeSuccess({
+    draftCreated: { ideaId: 'idea-9', ideaTexto: 'una idea', draftPath: '/tmp/x.md' },
+  });
+  assert.deepEqual(patch, {
+    estatus: 'listo_para_revision',
+    ultimaAccion: 'Redactó un draft para: una idea',
+    ultimoItemId: 'idea-9',
+  });
+});
+
+test('describeSuccess reports idle when there was nothing to draft', () => {
+  const patch = describeSuccess({ draftCreated: null });
+  assert.deepEqual(patch, {
+    estatus: 'idle',
+    ultimaAccion: 'Sin ideas pendientes por redactar',
+  });
 });

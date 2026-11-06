@@ -1,6 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 const { readIdeas, writeIdeas } = require('../lib/ideasStore');
+const { assertSafeItemId } = require('../lib/validateItemId');
 
 function draftFileName(ideaId) {
   return `draft-${ideaId}.md`;
@@ -44,11 +45,9 @@ async function runCycle({ contextPath, rolePath, ideasPath, draftsDir, apiKey, m
   };
 }
 
-async function chat({ message, ideaId, draftsDir, contextPath, rolePath, apiKey, model, createChatCompletion }) {
-  if (!ideaId || !/^[\w-]+$/.test(ideaId)) {
-    throw new Error('No se encontró un draft para editar (ideaId inválido o faltante)');
-  }
-  const draftPath = path.join(draftsDir, draftFileName(ideaId));
+async function chat({ message, itemId, draftsDir, contextPath, rolePath, apiKey, model, createChatCompletion }) {
+  assertSafeItemId(itemId, 'No se encontró un draft para editar (itemId inválido o faltante)');
+  const draftPath = path.join(draftsDir, draftFileName(itemId));
   const context = fs.readFileSync(contextPath, 'utf-8');
   const role = fs.readFileSync(rolePath, 'utf-8');
   const currentDraft = fs.readFileSync(draftPath, 'utf-8');
@@ -72,4 +71,14 @@ async function chat({ message, ideaId, draftsDir, contextPath, rolePath, apiKey,
   return { reply: updatedCopy };
 }
 
-module.exports = { runCycle, chat, draftFileName };
+function describeSuccess(result) {
+  return result.draftCreated
+    ? {
+        estatus: 'listo_para_revision',
+        ultimaAccion: `Redactó un draft para: ${result.draftCreated.ideaTexto}`,
+        ultimoItemId: result.draftCreated.ideaId,
+      }
+    : { estatus: 'idle', ultimaAccion: 'Sin ideas pendientes por redactar' };
+}
+
+module.exports = { runCycle, chat, draftFileName, describeSuccess };

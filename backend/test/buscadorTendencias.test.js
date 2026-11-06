@@ -3,7 +3,7 @@ const assert = require('node:assert/strict');
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
-const { runCycle, chat } = require('../agents/buscadorTendencias');
+const { runCycle, chat, describeSuccess } = require('../agents/buscadorTendencias');
 
 function tempFile(name, content) {
   const filePath = path.join(os.tmpdir(), `${name}-${Date.now()}-${Math.random()}`);
@@ -54,7 +54,7 @@ test('chat returns the reply without saving an idea by default', async () => {
 
   const result = await chat({
     message: 'dame una idea sobre dentistas',
-    saveAsIdea: false,
+    guardar: false,
     contextPath,
     rolePath,
     ideasPath,
@@ -81,7 +81,7 @@ test('chat saves the reply as a pending idea when saveAsIdea is true', async () 
 
   const result = await chat({
     message: 'dame una idea sobre dentistas',
-    saveAsIdea: true,
+    guardar: true,
     contextPath,
     rolePath,
     ideasPath,
@@ -166,4 +166,12 @@ test('runCycle throws a clear error when the model returns valid JSON that is no
   );
 
   [contextPath, rolePath, ideasPath].forEach((p) => fs.unlinkSync(p));
+});
+
+test('describeSuccess reports how many ideas were found', () => {
+  const patch = describeSuccess({ addedIdeas: [1, 2, 3] });
+  assert.deepEqual(patch, {
+    estatus: 'idle',
+    ultimaAccion: 'Encontró 3 idea(s) nueva(s)',
+  });
 });
