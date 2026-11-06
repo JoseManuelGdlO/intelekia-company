@@ -3,13 +3,34 @@
     "estatus": "idle",
     "ultimaAccion": "Encontró 5 idea(s) nueva(s)",
     "error": null,
-    "updatedAt": "2026-11-06T20:36:40.057Z"
+    "updatedAt": "2026-11-06T22:32:41.941Z"
   },
   "publicador": {
     "estatus": "listo_para_revision",
-    "ultimaAccion": "Redactó un draft para: ¿Cansado de perder clientes por citas olvidadas? Muestra cómo un bot inteligente puede enviar recordatorios automáticos y mejorar la atención al cliente.",
+    "ultimaAccion": "Redactó un draft para: Comparte una situación graciosa sobre cómo la saturación de WhatsApp causa caos en los negocios y presenta la solución de automatización de mensajes.",
     "error": null,
-    "updatedAt": "2026-11-06T20:37:15.480Z",
-    "ultimoIdeaId": "idea-1793997400056-0"
+    "updatedAt": "2026-11-06T22:32:55.574Z",
+    "ultimoIdeaId": "idea-1793997400056-0",
+    "ultimoItemId": "idea-1793997400056-1"
+  },
+  "buscador-prospectos": {
+    "estatus": "idle",
+    "ultimaAccion": "Encontró 5 prospecto(s) nuevo(s)",
+    "error": null,
+    "updatedAt": "2026-11-06T22:33:13.985Z"
+  },
+  "seguimiento-crm": {
+    "estatus": "listo_para_revision",
+    "ultimaAccion": "Redactó un mensaje para: Café Aromas",
+    "error": null,
+    "updatedAt": "2026-11-06T22:33:33.191Z",
+    "ultimoItemId": "prospecto-1794004393982-0"
+  },
+  "cotizador": {
+    "estatus": "listo_para_revision",
+    "ultimaAccion": "Generó cotización tipo para: Bot de WhatsApp con IA",
+    "error": null,
+    "updatedAt": "2026-11-06T22:33:51.795Z",
+    "ultimoItemId": "bot-de-whatsapp-con-ia"
   }
 }

@@ -1,1 +1,42 @@
-[]
+[
+  {
+    "id": "prospecto-1794004393982-0",
+    "negocio": "Café Aromas",
+    "giro": "Cafetería",
+    "razon": "Necesitan un sistema de gestión de pedidos y reservas para agilizar el servicio y mejorar la atención al cliente.",
+    "estatus": "contactado",
+    "creadoEn": "2026-11-06T22:33:13.982Z"
+  },
+  {
+    "id": "prospecto-1794004393982-1",
+    "negocio": "Clinica Salud Integral",
+    "giro": "Consultorio médico",
+    "razon": "Requieren automatización de recordatorios de citas y gestión de pacientes para reducir la tasa de no presentación.",
+    "estatus": "nuevo",
+    "creadoEn": "2026-11-06T22:33:13.982Z"
+  },
+  {
+    "id": "prospecto-1794004393982-2",
+    "negocio": "Eventos Fantásticos",
+    "giro": "Organización de eventos",
+    "razon": "Buscan una plataforma para gestionar invitados y confirmaciones, optimizando la logística de sus eventos.",
+    "estatus": "nuevo",
+    "creadoEn": "2026-11-06T22:33:13.982Z"
+  },
+  {
+    "id": "prospecto-1794004393982-3",
+    "negocio": "Fitness Plus",
+    "giro": "Gimnasio",
+    "razon": "Necesitan un sistema para automatizar la gestión de horarios de clases y recordatorios para sus miembros.",
+    "estatus": "nuevo",
+    "creadoEn": "2026-11-06T22:33:13.982Z"
+  },
+  {
+    "id": "prospecto-1794004393982-4",
+    "negocio": "Transporte Rápido",
+    "giro": "Logística y transporte",
+    "razon": "Requieren una solución para optimizar la programación de entregas y comunicaciones con sus clientes.",
+    "estatus": "nuevo",
+    "creadoEn": "2026-11-06T22:33:13.982Z"
+  }
+]
