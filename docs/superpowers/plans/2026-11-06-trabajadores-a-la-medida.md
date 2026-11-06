@@ -19,13 +19,102 @@
 - Memory is never compressed automatically — only via an explicit `compressMemory` call.
 - Creating or editing a custom agent must take effect in the running server immediately (no restart) by mutating the existing `departments`/`agentRunners`/`chatHandlers` objects in place, not by replacing them.
 - `GET /api/departments` must never expose `deps`, file paths, or the API key for ANY agent, core or custom — it already sanitizes via `sanitizeDepartments`, which custom agents pass through unchanged since they're pushed into the same `departments` array.
+- Slugifying text into a URL-safe id fragment always goes through `backend/lib/slugify.js` — no module re-implements its own (this already existed once in `backend/agents/cotizador.js`; it is being generalized here rather than duplicated a second time).
 - Creating a department from this feature is out of scope — only adding agents to departments that already exist (`marketing`, `comercial`).
 - Deleting a custom agent is out of scope.
 - Automatic memory compression is out of scope — manual only.
 
 ---
 
-### Task 1: Generic custom agent module
+### Task 1: Shared slugify module
+
+**Files:**
+- Create: `backend/lib/slugify.js`
+- Test: `backend/test/slugify.test.js`
+- Modify: `backend/agents/cotizador.js`
+
+**Interfaces:**
+- Produces: `slugify(texto) -> string`. Task 3's `customAgentsRegistry.js` imports this from the start; `cotizador.js` (already built, in Task 6 of this task group... actually built in the generalization plan) is retrofitted in this same task to import it too instead of keeping its own copy.
+
+- [ ] **Step 1: Write the failing test**
+
+Create `backend/test/slugify.test.js`:
+
+```js
+const test = require('node:test');
+const assert = require('node:assert/strict');
+const { slugify } = require('../lib/slugify');
+
+test('slugify normalizes accents and spaces into a url-safe fragment', () => {
+  assert.equal(slugify('Bot de WhatsApp con IA'), 'bot-de-whatsapp-con-ia');
+  assert.equal(slugify('Automatización de Procesos'), 'automatizacion-de-procesos');
+});
+
+test('slugify produces a url-safe id fragment for a short label', () => {
+  assert.equal(slugify('Objection Handling'), 'objection-handling');
+});
+```
+
+- [ ] **Step 2: Run the test to verify it fails**
+
+Run: `cd backend && node --test test/slugify.test.js`
+Expected: FAIL — `Cannot find module '../lib/slugify'`
+
+- [ ] **Step 3: Write the implementation**
+
+Create `backend/lib/slugify.js`:
+
+```js
+function slugify(texto) {
+  const sinAcentos = texto
+    .normalize('NFD')
+    .split('')
+    .filter((char) => char.charCodeAt(0) < 128)
+    .join('');
+  return sinAcentos
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/(^-|-$)/g, '');
+}
+
+module.exports = { slugify };
+```
+
+- [ ] **Step 4: Run the test to verify it passes**
+
+Run: `cd backend && node --test test/slugify.test.js`
+Expected: PASS — 2 tests passing.
+
+- [ ] **Step 5: Retrofit cotizador.js to use the shared module**
+
+In `backend/agents/cotizador.js`, remove the local `function slugify(texto) { ... }` definition entirely, and add an import at the top instead:
+
+```js
+const { slugify } = require('../lib/slugify');
+```
+
+Leave everything else in the file unchanged — `cotizacionFileName`, `runCycle`, `chat`, `describeSuccess`, and `module.exports = { runCycle, chat, describeSuccess, slugify, cotizacionFileName };` (still re-exporting `slugify`, now imported rather than locally defined, so `backend/test/cotizador.test.js` needs no changes at all).
+
+- [ ] **Step 6: Run cotizador's existing tests to confirm no regression**
+
+Run: `cd backend && node --test test/cotizador.test.js`
+Expected: PASS — all 8 tests still passing, unchanged.
+
+- [ ] **Step 7: Run the full suite**
+
+Run: `cd backend && npm test`
+Expected: PASS — all tests across every module pass.
+
+- [ ] **Step 8: Commit**
+
+```bash
+git add backend/lib/slugify.js backend/test/slugify.test.js backend/agents/cotizador.js
+git commit -m "Extract shared slugify module; retrofit cotizador.js to use it"
+```
+
+---
+
+### Task 2: Generic custom agent module
 
 **Files:**
 - Create: `backend/agents/customAgent.js`
@@ -36,7 +125,7 @@
   - `chat({ message, contextPath, memoryPath, apiKey, model, createChatCompletion }) -> Promise<{ reply }>` — reads existing memory (empty string if the file doesn't exist), includes it as a system message only when non-empty, calls the model, then appends `\n\nTú: <message>\nAgente: <reply>` to the memory file (creating it if needed).
   - `runCycle({ contextPath, notesPath, apiKey, model, createChatCompletion }) -> Promise<{ notaCreada: {id, texto, creadoEn} }>` — reads existing notes (default `[]`), asks the model for one new observation avoiding repeats, appends it, returns it.
   - `describeSuccess(result) -> statusPatch` — `{estatus: 'listo_para_revision', ultimaAccion: 'Nueva observación: <primeros 80 caracteres>', ultimoItemId: result.notaCreada.id}`.
-  Task 2's registry calls all three directly.
+  Task 3's registry calls all three directly.
 
 - [ ] **Step 1: Write the failing tests**
 
@@ -275,15 +364,15 @@ git commit -m "Add generic custom agent module factory with memory-aware chat"
 
 ---
 
-### Task 2: Custom agents registry
+### Task 3: Custom agents registry
 
 **Files:**
 - Create: `backend/lib/customAgentsRegistry.js`
 - Test: `backend/test/customAgentsRegistry.test.js`
 
 **Interfaces:**
-- Consumes: `createCustomAgentModule` (Task 1); an injected `wrapRunCycle`-shaped function (the real one is `backend/lib/runWithStatus.js`'s `wrapRunCycle`, already built).
-- Produces: `createCustomAgentRegistry({rootDir, customAgentsPath, contextPath, config, createChatCompletion, departments, agentRunners, chatHandlers, wrapRunCycle, statusPath}) -> {createAgent, updateAgent, loadAllAtStartup, getMemory, setMemory, compressMemory}`, plus a standalone `slugify(texto) -> string` export. Task 4 (`server.js`) constructs this once and wires its functions into Task 3's routes.
+- Consumes: `createCustomAgentModule` (Task 2); `slugify` (Task 1); an injected `wrapRunCycle`-shaped function (the real one is `backend/lib/runWithStatus.js`'s `wrapRunCycle`, already built).
+- Produces: `createCustomAgentRegistry({rootDir, customAgentsPath, contextPath, config, createChatCompletion, departments, agentRunners, chatHandlers, wrapRunCycle, statusPath}) -> {createAgent, updateAgent, loadAllAtStartup, getMemory, setMemory, compressMemory}`. Task 5 (`server.js`) constructs this once and wires its functions into Task 4's routes.
 
 - [ ] **Step 1: Write the failing tests**
 
@@ -295,7 +384,7 @@ const assert = require('node:assert/strict');
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
-const { createCustomAgentRegistry, slugify } = require('../lib/customAgentsRegistry');
+const { createCustomAgentRegistry } = require('../lib/customAgentsRegistry');
 
 function tempDir(name) {
   const dirPath = path.join(os.tmpdir(), `${name}-${Date.now()}-${Math.random()}`);
@@ -341,10 +430,6 @@ function setup() {
 
   return { registry, rootDir, customAgentsPath, departments, agentRunners, chatHandlers };
 }
-
-test('slugify produces a url-safe id fragment', () => {
-  assert.equal(slugify('Objection Handling'), 'objection-handling');
-});
 
 test('createAgent adds the new agent to the matching department with the right id/label', () => {
   const { registry, departments } = setup();
@@ -564,18 +649,7 @@ Create `backend/lib/customAgentsRegistry.js`:
 const fs = require('fs');
 const path = require('path');
 const { createCustomAgentModule } = require('../agents/customAgent');
-
-function slugify(texto) {
-  const sinAcentos = texto
-    .normalize('NFD')
-    .split('')
-    .filter((char) => char.charCodeAt(0) < 128)
-    .join('');
-  return sinAcentos
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/(^-|-$)/g, '');
-}
+const { slugify } = require('./slugify');
 
 function createCustomAgentRegistry({
   rootDir,
@@ -742,13 +816,13 @@ function createCustomAgentRegistry({
   return { createAgent, updateAgent, loadAllAtStartup, getMemory, setMemory, compressMemory };
 }
 
-module.exports = { createCustomAgentRegistry, slugify };
+module.exports = { createCustomAgentRegistry };
 ```
 
 - [ ] **Step 4: Run tests to verify they pass**
 
 Run: `cd backend && node --test test/customAgentsRegistry.test.js`
-Expected: PASS — 16 tests passing.
+Expected: PASS — 12 tests passing.
 
 - [ ] **Step 5: Commit**
 
@@ -759,15 +833,15 @@ git commit -m "Add custom agents registry: hot create/update/persist, memory rea
 
 ---
 
-### Task 3: Custom-agent routes
+### Task 4: Custom-agent routes
 
 **Files:**
 - Modify: `backend/routes/departments.js`
 - Modify: `backend/test/departmentsRoute.test.js`
 
 **Interfaces:**
-- Consumes: `createCustomAgent`, `updateCustomAgent`, `getMemory`, `setMemory`, `compressMemory` (Task 2's registry functions, injected).
-- Produces: `createDepartmentsRouter` now also mounts `POST /:departmentId/agents`, `PATCH /:departmentId/agents/:agentId`, `GET /:departmentId/agents/:agentId/memory`, `PUT /:departmentId/agents/:agentId/memory`, `POST /:departmentId/agents/:agentId/memory/compress`. Exports grow to include the 5 new handler factories. Task 4 (`server.js`) passes the registry's functions in when constructing the router.
+- Consumes: `createCustomAgent`, `updateCustomAgent`, `getMemory`, `setMemory`, `compressMemory` (Task 3's registry functions, injected).
+- Produces: `createDepartmentsRouter` now also mounts `POST /:departmentId/agents`, `PATCH /:departmentId/agents/:agentId`, `GET /:departmentId/agents/:agentId/memory`, `PUT /:departmentId/agents/:agentId/memory`, `POST /:departmentId/agents/:agentId/memory/compress`. Exports grow to include the 5 new handler factories. Task 5 (`server.js`) passes the registry's functions in when constructing the router.
 
 - [ ] **Step 1: Update the test file to cover the new routes (will fail — handlers don't exist yet)**
 
@@ -1143,13 +1217,13 @@ git commit -m "Add create/update/memory routes for custom agents to routes/depar
 
 ---
 
-### Task 4: Wire server.js to the custom agents registry
+### Task 5: Wire server.js to the custom agents registry
 
 **Files:**
 - Modify: `backend/server.js`
 
 **Interfaces:**
-- Consumes: `createCustomAgentRegistry` (Task 2), the extended `createDepartmentsRouter` (Task 3).
+- Consumes: `createCustomAgentRegistry` (Task 3), the extended `createDepartmentsRouter` (Task 4).
 - Produces: the same running Express app as before, now also able to create/edit custom agents live and expose their memory endpoints.
 
 - [ ] **Step 1: Rewrite server.js**
@@ -1293,16 +1367,16 @@ git commit -m "Wire server.js to the custom agents registry: hot create/update, 
 
 ---
 
-### Task 5: End-to-end manual validation
+### Task 6: End-to-end manual validation
 
-**Files:** none created — this task only exercises what Tasks 1-4 built.
+**Files:** none created — this task only exercises what Tasks 1-5 built.
 
 **Interfaces:** none produced.
 
 - [ ] **Step 1: Run the full backend test suite**
 
 Run: `cd backend && npm test`
-Expected: all tests pass across every file, including the new `customAgent.test.js` and `customAgentsRegistry.test.js`, and the extended `departmentsRoute.test.js`.
+Expected: all tests pass across every file, including the new `slugify.test.js`, `customAgent.test.js`, and `customAgentsRegistry.test.js`, and the extended `departmentsRoute.test.js`.
 
 - [ ] **Step 2: Start the server with a real OPENAI_API_KEY**
 
