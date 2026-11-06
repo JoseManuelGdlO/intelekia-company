@@ -1,14 +1,15 @@
 {
   "buscador-tendencias": {
     "estatus": "idle",
-    "ultimaAccion": "Sin actividad todavía",
+    "ultimaAccion": "Encontró 5 idea(s) nueva(s)",
     "error": null,
-    "updatedAt": null
+    "updatedAt": "2026-11-06T20:36:40.057Z"
   },
   "publicador": {
-    "estatus": "idle",
-    "ultimaAccion": "Sin actividad todavía",
+    "estatus": "listo_para_revision",
+    "ultimaAccion": "Redactó un draft para: ¿Cansado de perder clientes por citas olvidadas? Muestra cómo un bot inteligente puede enviar recordatorios automáticos y mejorar la atención al cliente.",
     "error": null,
-    "updatedAt": null
+    "updatedAt": "2026-11-06T20:37:15.480Z",
+    "ultimoIdeaId": "idea-1793997400056-0"
   }
 }
