@@ -4,7 +4,7 @@
 
 **Goal:** Generalize the backend/frontend so departments and agents come from a declarative registry instead of hardcoded names, migrate Marketing onto it without changing its behavior, and add the Comercial department (3 new agents) as proof it works, per `docs/superpowers/specs/2026-11-06-generalizacion-multidepartamento-comercial-design.md`.
 
-**Architecture:** Every agent module exports `{ runCycle, chat, describeSuccess }`. A new `backend/departments.js` builds a declarative list of departments/agents with their dependencies; `backend/server.js` iterates over it instead of hand-wiring two named agents. A uniform chat payload `{ message, guardar, itemId }` replaces the old agent-specific shapes. The frontend fetches `GET /api/departments` instead of hardcoding an agents array, and `scene.js` renders one room per department instead of one fixed room.
+**Architecture:** Every agent module exports `{ runCycle, chat, describeSuccess }`. Two small shared libraries (`parseJsonArrayResponse`, `validateItemId`) remove duplicated parsing/validation logic across agent modules. A new `backend/departments.js` builds a declarative list of departments/agents with their dependencies; `backend/server.js` iterates over it instead of hand-wiring two named agents. A uniform chat payload `{ message, guardar, itemId }` replaces the old agent-specific shapes. The frontend fetches `GET /api/departments` instead of hardcoding an agents array, and `scene.js` renders one room per department instead of one fixed room.
 
 **Tech Stack:** Same as the Marketing prototype — Node.js >= 18, Express 4, `dotenv`, Node's built-in `node:test`, Three.js via CDN ES modules.
 
@@ -17,12 +17,145 @@
 - Every chat handler receives the same payload shape: `{ message, guardar, itemId }`. Each agent uses only the fields relevant to it and ignores the rest.
 - `itemId` is read by the frontend from `status[agentId].ultimoItemId` (a generic field — not `ultimoIdeaId`, which was Publicador-specific).
 - Reading/writing `departamentos/comercial/content/prospectos.json` always goes through `backend/lib/prospectosStore.js` — no module re-implements its own read/write for it (mirrors the existing `ideasStore.js` rule for Marketing).
+- Parsing a markdown-fenced JSON array from an LLM response always goes through `backend/lib/parseJsonArrayResponse.js` — no agent module re-implements its own fence-stripping/parsing.
+- Validating a safe, path-traversal-free `itemId` always goes through `backend/lib/validateItemId.js` — no agent module re-implements its own regex check.
 - `GET /api/departments` must never expose `deps`, file paths, or the API key — only `id`/`label` per department and per agent.
 - Auto-publishing or real CRM integration remain out of scope — agents only write local files; the founder acts on them manually.
 
 ---
 
-### Task 1: Generalize Marketing's two agents onto the uniform contract
+### Task 1: Shared libraries — JSON array response parser and itemId validator
+
+**Files:**
+- Create: `backend/lib/parseJsonArrayResponse.js`
+- Create: `backend/lib/validateItemId.js`
+- Test: `backend/test/parseJsonArrayResponse.test.js`
+- Test: `backend/test/validateItemId.test.js`
+
+**Interfaces:**
+- Produces: `parseJsonArrayResponse(raw, { emptyArrayErrorMessage }) -> Array<any>` — strips a leading/trailing markdown code fence (with or without a `json` language tag), parses the result as JSON, throws a clear error if parsing fails or the result isn't an array. Task 2 (Buscador de Tendencias) and Task 5 (Buscador de Prospectos) both import this instead of each defining their own copy.
+- Produces: `assertSafeItemId(itemId, errorMessage) -> void` (throws `errorMessage` if `itemId` is falsy or contains characters outside `[\w-]`) and the exported `SAFE_ITEM_ID_PATTERN` regex. Task 2 (Publicador), Task 6 (Seguimiento/CRM), and Task 7 (Cotizador) all import `assertSafeItemId` instead of each writing their own regex check.
+
+- [ ] **Step 1: Write the failing tests for parseJsonArrayResponse**
+
+Create `backend/test/parseJsonArrayResponse.test.js`:
+
+```js
+const test = require('node:test');
+const assert = require('node:assert/strict');
+const { parseJsonArrayResponse } = require('../lib/parseJsonArrayResponse');
+
+test('parses a plain JSON array with no fences', () => {
+  const result = parseJsonArrayResponse('["a", "b"]');
+  assert.deepEqual(result, ['a', 'b']);
+});
+
+test('strips a ```json fenced array before parsing', () => {
+  const result = parseJsonArrayResponse('```json\n["a", "b"]\n```');
+  assert.deepEqual(result, ['a', 'b']);
+});
+
+test('strips a plain ``` fenced array (no language tag) before parsing', () => {
+  const result = parseJsonArrayResponse('```\n["a", "b"]\n```');
+  assert.deepEqual(result, ['a', 'b']);
+});
+
+test('throws wrapping the original error when the response is not valid JSON', () => {
+  assert.throws(() => parseJsonArrayResponse('esto no es json'), /La respuesta del modelo no es JSON válido/);
+});
+
+test('throws with the given message when valid JSON is not an array', () => {
+  assert.throws(
+    () => parseJsonArrayResponse('{}', { emptyArrayErrorMessage: 'mensaje personalizado' }),
+    /mensaje personalizado/
+  );
+});
+
+test('throws with a default message when valid JSON is not an array and no custom message is given', () => {
+  assert.throws(() => parseJsonArrayResponse('{}'), /La respuesta del modelo no es un arreglo/);
+});
+```
+
+- [ ] **Step 2: Write the failing tests for validateItemId**
+
+Create `backend/test/validateItemId.test.js`:
+
+```js
+const test = require('node:test');
+const assert = require('node:assert/strict');
+const { assertSafeItemId } = require('../lib/validateItemId');
+
+test('does not throw for a valid itemId', () => {
+  assert.doesNotThrow(() => assertSafeItemId('idea-123-0', 'no debería lanzarse'));
+});
+
+test('throws the given message when itemId is undefined', () => {
+  assert.throws(() => assertSafeItemId(undefined, 'itemId inválido o faltante'), /itemId inválido o faltante/);
+});
+
+test('throws the given message when itemId contains path-traversal characters', () => {
+  assert.throws(() => assertSafeItemId('../../etc/passwd', 'itemId inválido o faltante'), /itemId inválido o faltante/);
+});
+```
+
+- [ ] **Step 3: Run both test files to confirm they fail**
+
+Run: `cd backend && node --test test/parseJsonArrayResponse.test.js test/validateItemId.test.js`
+Expected: FAIL — `Cannot find module '../lib/parseJsonArrayResponse'` / `'../lib/validateItemId'`
+
+- [ ] **Step 4: Write parseJsonArrayResponse.js**
+
+Create `backend/lib/parseJsonArrayResponse.js`:
+
+```js
+function parseJsonArrayResponse(raw, { emptyArrayErrorMessage } = {}) {
+  const cleaned = raw.trim().replace(/^```(?:json)?\s*/i, '').replace(/```\s*$/i, '').trim();
+  let parsed;
+  try {
+    parsed = JSON.parse(cleaned);
+  } catch (err) {
+    throw new Error(`La respuesta del modelo no es JSON válido: ${err.message}`);
+  }
+  if (!Array.isArray(parsed)) {
+    throw new Error(emptyArrayErrorMessage || 'La respuesta del modelo no es un arreglo');
+  }
+  return parsed;
+}
+
+module.exports = { parseJsonArrayResponse };
+```
+
+- [ ] **Step 5: Write validateItemId.js**
+
+Create `backend/lib/validateItemId.js`:
+
+```js
+const SAFE_ITEM_ID_PATTERN = /^[\w-]+$/;
+
+function assertSafeItemId(itemId, errorMessage) {
+  if (!itemId || !SAFE_ITEM_ID_PATTERN.test(itemId)) {
+    throw new Error(errorMessage);
+  }
+}
+
+module.exports = { assertSafeItemId, SAFE_ITEM_ID_PATTERN };
+```
+
+- [ ] **Step 6: Run both test files to confirm they pass**
+
+Run: `cd backend && node --test test/parseJsonArrayResponse.test.js test/validateItemId.test.js`
+Expected: PASS — 6 tests in parseJsonArrayResponse.test.js, 3 tests in validateItemId.test.js.
+
+- [ ] **Step 7: Commit**
+
+```bash
+git add backend/lib/parseJsonArrayResponse.js backend/lib/validateItemId.js backend/test/parseJsonArrayResponse.test.js backend/test/validateItemId.test.js
+git commit -m "Add shared parseJsonArrayResponse and validateItemId libraries"
+```
+
+---
+
+### Task 2: Generalize Marketing's two agents onto the uniform contract
 
 **Files:**
 - Modify: `backend/agents/buscadorTendencias.js`
@@ -31,30 +164,18 @@
 - Modify: `backend/test/publicador.test.js`
 
 **Interfaces:**
-- Produces: both modules now export `{ runCycle, chat, describeSuccess }`. `buscadorTendencias.chat` now takes `guardar` instead of `saveAsIdea`. `publicador.chat` now takes `itemId` instead of `ideaId`. `publicador.describeSuccess`'s success patch now uses the key `ultimoItemId` instead of `ultimoIdeaId`. Every later task that wires these two agents (Task 7, Task 9) depends on this exact shape.
+- Consumes: `parseJsonArrayResponse` and `assertSafeItemId` (Task 1).
+- Produces: both modules now export `{ runCycle, chat, describeSuccess }`. `buscadorTendencias.chat` now takes `guardar` instead of `saveAsIdea`. `publicador.chat` now takes `itemId` instead of `ideaId`. `publicador.describeSuccess`'s success patch now uses the key `ultimoItemId` instead of `ultimoIdeaId`. Every later task that wires these two agents (Task 8, Task 10) depends on this exact shape.
 
-- [ ] **Step 1: Update the tests to the new contract (will fail against the current implementation)**
+- [ ] **Step 1: Update buscadorTendencias.test.js to the new contract (will fail against the current implementation)**
 
-In `backend/test/buscadorTendencias.test.js`, rename every `saveAsIdea:` key to `guardar:` in the `chat(...)` calls (three occurrences: the `runCycle` test is unaffected, the two `chat` tests each have one). Example of the change in the "chat saves the reply..." test:
+In `backend/test/buscadorTendencias.test.js`, rename `saveAsIdea: false` to `guardar: false` (in the "chat returns the reply without saving" test) and `saveAsIdea: true` to `guardar: true` (in the "chat saves the reply" test) — these are the only two occurrences. Then change the import line and add one new test at the end of the file:
 
 ```js
-  const result = await chat({
-    message: 'dame una idea sobre dentistas',
-    guardar: true,
-    contextPath,
-    rolePath,
-    ideasPath,
-    apiKey: 'test-key',
-    model: 'gpt-4o-mini',
-    createChatCompletion: fakeCreateChatCompletion,
-  });
+const { runCycle, chat, describeSuccess } = require('../agents/buscadorTendencias');
 ```
 
-Do the same for the "chat returns the reply without saving" test (`guardar: false`). Then add one new test at the end of the file:
-
 ```js
-const { describeSuccess } = require('../agents/buscadorTendencias');
-
 test('describeSuccess reports how many ideas were found', () => {
   const patch = describeSuccess({ addedIdeas: [1, 2, 3] });
   assert.deepEqual(patch, {
@@ -64,13 +185,15 @@ test('describeSuccess reports how many ideas were found', () => {
 });
 ```
 
-(Add `describeSuccess` to the existing `require('../agents/buscadorTendencias')` destructure at the top of the file instead of a second `require` line.)
+- [ ] **Step 2: Update publicador.test.js to the new contract (will fail against the current implementation)**
 
-In `backend/test/publicador.test.js`, rename every `ideaId:` key to `itemId:` in the `chat(...)` calls (two occurrences, in the "chat overwrites the draft file" test — both the call and, if present, any local variable named `ideaId` used only for that call can stay named `ideaId` since it's just a JS variable, but the object key passed to `chat` must be `itemId`). Then add two new tests at the end of the file:
+In `backend/test/publicador.test.js`, rename every `ideaId:` object key passed into a `chat(...)` call to `itemId:` — there are exactly 3: in the "chat overwrites the draft file" test (`ideaId,` on its own line, used as a shorthand property), in the "chat throws a clear error when ideaId is missing" test (`ideaId: undefined`), and in the "chat throws a clear error... path-traversal" test (`ideaId: '../../etc/passwd'`). Also rename the two test titles and their regex assertions from `ideaId` to `itemId`: `/ideaId inválido o faltante/` → `/itemId inválido o faltante/` (2 occurrences). Then change the import line and add two new tests at the end of the file:
 
 ```js
-const { describeSuccess } = require('../agents/publicador');
+const { runCycle, chat, draftFileName, describeSuccess } = require('../agents/publicador');
+```
 
+```js
 test('describeSuccess reports listo_para_revision with ultimoItemId when a draft was created', () => {
   const patch = describeSuccess({
     draftCreated: { ideaId: 'idea-9', ideaTexto: 'una idea', draftPath: '/tmp/x.md' },
@@ -91,16 +214,56 @@ test('describeSuccess reports idle when there was nothing to draft', () => {
 });
 ```
 
-- [ ] **Step 2: Run both test files to confirm they fail**
+- [ ] **Step 3: Run both test files to confirm they fail**
 
 Run: `cd backend && node --test test/buscadorTendencias.test.js test/publicador.test.js`
-Expected: FAIL — the `guardar`/`itemId` tests fail because the implementations still read `saveAsIdea`/`ideaId` (so the behavior under the new key names doesn't match), and the `describeSuccess` tests fail with `describeSuccess is not a function` / `undefined`.
+Expected: FAIL — the `guardar`/`itemId` tests fail because the implementations still read `saveAsIdea`/`ideaId`, and the `describeSuccess` tests fail with `describeSuccess is not a function`.
 
-- [ ] **Step 3: Update buscadorTendencias.js**
+- [ ] **Step 4: Update buscadorTendencias.js**
 
-In `backend/agents/buscadorTendencias.js`, rename the `chat` function's `saveAsIdea` parameter to `guardar` (both in the destructured parameter list and the `if (saveAsIdea)` body), add `describeSuccess`, and update the exports:
+Replace the contents of `backend/agents/buscadorTendencias.js` with:
 
 ```js
+const fs = require('fs');
+const { readIdeas, writeIdeas } = require('../lib/ideasStore');
+const { parseJsonArrayResponse } = require('../lib/parseJsonArrayResponse');
+
+async function runCycle({ contextPath, rolePath, ideasPath, apiKey, model, createChatCompletion }) {
+  const context = fs.readFileSync(contextPath, 'utf-8');
+  const role = fs.readFileSync(rolePath, 'utf-8');
+  const existingIdeas = readIdeas(ideasPath);
+  const existingTexts = existingIdeas.map((idea) => idea.texto);
+
+  const userPrompt =
+    `Contexto de negocio:\n${context}\n\n` +
+    `Ideas que ya existen (no las repitas):\n${JSON.stringify(existingTexts)}\n\n` +
+    'Dame entre 3 y 5 ideas nuevas de post/reel.';
+
+  const raw = await createChatCompletion({
+    apiKey,
+    model,
+    messages: [
+      { role: 'system', content: role },
+      { role: 'user', content: userPrompt },
+    ],
+  });
+
+  const nuevasIdeas = parseJsonArrayResponse(raw, {
+    emptyArrayErrorMessage: 'La respuesta del modelo no es un arreglo de ideas',
+  });
+
+  const addedIdeas = nuevasIdeas.map((texto, index) => ({
+    id: `idea-${Date.now()}-${index}`,
+    texto,
+    estatus: 'pendiente',
+    creadaEn: new Date().toISOString(),
+  }));
+
+  writeIdeas(ideasPath, [...existingIdeas, ...addedIdeas]);
+
+  return { addedIdeas };
+}
+
 async function chat({ message, guardar, contextPath, rolePath, ideasPath, apiKey, model, createChatCompletion }) {
   const context = fs.readFileSync(contextPath, 'utf-8');
   const role = fs.readFileSync(rolePath, 'utf-8');
@@ -140,17 +303,60 @@ function describeSuccess(result) {
 module.exports = { runCycle, chat, describeSuccess };
 ```
 
-(`runCycle` itself is unchanged — only `chat`'s parameter name, the new `describeSuccess` function, and `module.exports` change.)
+- [ ] **Step 5: Update publicador.js**
 
-- [ ] **Step 4: Update publicador.js**
-
-In `backend/agents/publicador.js`, rename the `chat` function's `ideaId` parameter to `itemId` (both in the destructured parameter list and everywhere it's used to build `draftPath`), add `describeSuccess`, and update the exports:
+Replace the contents of `backend/agents/publicador.js` with:
 
 ```js
-async function chat({ message, itemId, draftsDir, contextPath, rolePath, apiKey, model, createChatCompletion }) {
-  if (!itemId || !/^[\w-]+$/.test(itemId)) {
-    throw new Error('No se encontró un draft para editar (itemId inválido o faltante)');
+const fs = require('fs');
+const path = require('path');
+const { readIdeas, writeIdeas } = require('../lib/ideasStore');
+const { assertSafeItemId } = require('../lib/validateItemId');
+
+function draftFileName(ideaId) {
+  return `draft-${ideaId}.md`;
+}
+
+async function runCycle({ contextPath, rolePath, ideasPath, draftsDir, apiKey, model, createChatCompletion }) {
+  const ideas = readIdeas(ideasPath);
+  const pendiente = ideas.find((idea) => idea.estatus === 'pendiente');
+
+  if (!pendiente) {
+    return { draftCreated: null };
   }
+
+  const context = fs.readFileSync(contextPath, 'utf-8');
+  const role = fs.readFileSync(rolePath, 'utf-8');
+
+  const userPrompt = `Contexto de negocio:\n${context}\n\nIdea a convertir en post:\n${pendiente.texto}`;
+
+  const copy = await createChatCompletion({
+    apiKey,
+    model,
+    messages: [
+      { role: 'system', content: role },
+      { role: 'user', content: userPrompt },
+    ],
+  });
+
+  fs.mkdirSync(draftsDir, { recursive: true });
+  const draftPath = path.join(draftsDir, draftFileName(pendiente.id));
+  fs.writeFileSync(draftPath, copy);
+
+  const updatedIdeas = ideas.map((idea) => (idea.id === pendiente.id ? { ...idea, estatus: 'redactada' } : idea));
+  writeIdeas(ideasPath, updatedIdeas);
+
+  return {
+    draftCreated: {
+      ideaId: pendiente.id,
+      ideaTexto: pendiente.texto,
+      draftPath,
+    },
+  };
+}
+
+async function chat({ message, itemId, draftsDir, contextPath, rolePath, apiKey, model, createChatCompletion }) {
+  assertSafeItemId(itemId, 'No se encontró un draft para editar (itemId inválido o faltante)');
   const draftPath = path.join(draftsDir, draftFileName(itemId));
   const context = fs.readFileSync(contextPath, 'utf-8');
   const role = fs.readFileSync(rolePath, 'utf-8');
@@ -188,35 +394,33 @@ function describeSuccess(result) {
 module.exports = { runCycle, chat, draftFileName, describeSuccess };
 ```
 
-(`runCycle` is unchanged.)
-
-- [ ] **Step 5: Run both test files to confirm they pass**
+- [ ] **Step 6: Run both test files to confirm they pass**
 
 Run: `cd backend && node --test test/buscadorTendencias.test.js test/publicador.test.js`
-Expected: PASS — 4 tests in buscadorTendencias.test.js, 6 tests in publicador.test.js.
+Expected: PASS — 7 tests in buscadorTendencias.test.js, 7 tests in publicador.test.js.
 
-- [ ] **Step 6: Run the full suite to confirm no other regression**
+- [ ] **Step 7: Run the full suite to confirm no other regression**
 
 Run: `cd backend && npm test`
-Expected: PASS — 34 tests (no change in count yet; `server.js` still calls these with the old field names until Task 9, which is fine since `server.js` has no automated test).
+Expected: PASS — all tests (no change in overall behavior; `server.js` still calls these with the old field names until Task 10, which is fine since `server.js` has no automated test).
 
-- [ ] **Step 7: Commit**
+- [ ] **Step 8: Commit**
 
 ```bash
 git add backend/agents/buscadorTendencias.js backend/agents/publicador.js backend/test/buscadorTendencias.test.js backend/test/publicador.test.js
-git commit -m "Move describeSuccess into agent modules; rename chat params to the uniform {guardar, itemId} contract"
+git commit -m "Generalize Marketing agents: describeSuccess export, uniform {guardar, itemId} contract, shared libs"
 ```
 
 ---
 
-### Task 2: Prospectos store module
+### Task 3: Prospectos store module
 
 **Files:**
 - Create: `backend/lib/prospectosStore.js`
 - Test: `backend/test/prospectosStore.test.js`
 
 **Interfaces:**
-- Produces: `readProspectos(prospectosPath) -> Array<object>` (returns `[]` if the file doesn't exist), `writeProspectos(prospectosPath, prospectos) -> void`. Task 4 (Buscador de Prospectos) and Task 5 (Seguimiento/CRM) both import these instead of defining their own.
+- Produces: `readProspectos(prospectosPath) -> Array<object>` (returns `[]` if the file doesn't exist), `writeProspectos(prospectosPath, prospectos) -> void`. Task 5 (Buscador de Prospectos) and Task 6 (Seguimiento/CRM) both import these instead of defining their own.
 
 - [ ] **Step 1: Write the failing tests**
 
@@ -292,7 +496,7 @@ git commit -m "Add prospectosStore module for reading/writing prospectos.json"
 
 ---
 
-### Task 3: Comercial content scaffolding
+### Task 4: Comercial content scaffolding
 
 **Files:**
 - Create: `departamentos/comercial/agentes/buscador-prospectos.md`
@@ -304,7 +508,7 @@ git commit -m "Add prospectosStore module for reading/writing prospectos.json"
 - Create: `departamentos/comercial/content/cotizaciones-tipo/.gitkeep`
 
 **Interfaces:**
-- Produces: the on-disk paths Tasks 4-6 read from — the three role files, `prospectos.json` (empty array), `servicios.json` (the fixed service list the Cotizador iterates over), and the two output directories.
+- Produces: the on-disk paths Tasks 5-7 read from — the three role files, `prospectos.json` (empty array), `servicios.json` (the fixed service list the Cotizador iterates over), and the two output directories.
 
 - [ ] **Step 1: Create the directories**
 
@@ -428,15 +632,15 @@ git commit -m "Scaffold Comercial department: agent roles, prospectos/servicios 
 
 ---
 
-### Task 4: Buscador de Prospectos agent module
+### Task 5: Buscador de Prospectos agent module
 
 **Files:**
 - Create: `backend/agents/buscadorProspectos.js`
 - Test: `backend/test/buscadorProspectos.test.js`
 
 **Interfaces:**
-- Consumes: `readProspectos`, `writeProspectos` (Task 2).
-- Produces: `runCycle({contextPath, rolePath, prospectosPath, apiKey, model, createChatCompletion}) -> Promise<{addedProspectos: Array<{id, negocio, giro, razon, estatus, creadoEn}>}>`, `chat({message, guardar, contextPath, rolePath, prospectosPath, apiKey, model, createChatCompletion}) -> Promise<{reply, savedProspecto: object|null}>`, `describeSuccess(result) -> statusPatch`. Task 7 (departments registry) references this module's `runCycle`/`chat`/`describeSuccess`.
+- Consumes: `readProspectos`, `writeProspectos` (Task 3); `parseJsonArrayResponse` (Task 1).
+- Produces: `runCycle({contextPath, rolePath, prospectosPath, apiKey, model, createChatCompletion}) -> Promise<{addedProspectos: Array<{id, negocio, giro, razon, estatus, creadoEn}>}>`, `chat({message, guardar, contextPath, rolePath, prospectosPath, apiKey, model, createChatCompletion}) -> Promise<{reply, savedProspecto: object|null}>`, `describeSuccess(result) -> statusPatch`. Task 8 (departments registry) references this module's `runCycle`/`chat`/`describeSuccess`.
 
 - [ ] **Step 1: Write the failing tests**
 
@@ -603,20 +807,7 @@ Create `backend/agents/buscadorProspectos.js`:
 ```js
 const fs = require('fs');
 const { readProspectos, writeProspectos } = require('../lib/prospectosStore');
-
-function parseProspectosResponse(raw) {
-  const cleaned = raw.trim().replace(/^```(?:json)?\s*/i, '').replace(/```\s*$/i, '').trim();
-  let parsed;
-  try {
-    parsed = JSON.parse(cleaned);
-  } catch (err) {
-    throw new Error(`La respuesta del modelo no es JSON válido: ${err.message}`);
-  }
-  if (!Array.isArray(parsed)) {
-    throw new Error('La respuesta del modelo no es un arreglo de prospectos');
-  }
-  return parsed;
-}
+const { parseJsonArrayResponse } = require('../lib/parseJsonArrayResponse');
 
 async function runCycle({ contextPath, rolePath, prospectosPath, apiKey, model, createChatCompletion }) {
   const context = fs.readFileSync(contextPath, 'utf-8');
@@ -638,7 +829,9 @@ async function runCycle({ contextPath, rolePath, prospectosPath, apiKey, model, 
     ],
   });
 
-  const nuevos = parseProspectosResponse(raw);
+  const nuevos = parseJsonArrayResponse(raw, {
+    emptyArrayErrorMessage: 'La respuesta del modelo no es un arreglo de prospectos',
+  });
 
   const addedProspectos = nuevos.map((p, index) => ({
     id: `prospecto-${Date.now()}-${index}`,
@@ -709,14 +902,14 @@ git commit -m "Add Buscador de Prospectos agent: autonomous cycle and chat"
 
 ---
 
-### Task 5: Seguimiento/CRM agent module
+### Task 6: Seguimiento/CRM agent module
 
 **Files:**
 - Create: `backend/agents/seguimientoCRM.js`
 - Test: `backend/test/seguimientoCRM.test.js`
 
 **Interfaces:**
-- Consumes: `readProspectos`, `writeProspectos` (Task 2).
+- Consumes: `readProspectos`, `writeProspectos` (Task 3); `assertSafeItemId` (Task 1).
 - Produces: `runCycle({contextPath, rolePath, prospectosPath, seguimientosDir, apiKey, model, createChatCompletion}) -> Promise<{mensajeCreado: {prospectoId, prospectoNegocio, seguimientoPath} | null}>`, `chat({message, itemId, seguimientosDir, contextPath, rolePath, apiKey, model, createChatCompletion}) -> Promise<{reply}>`, `describeSuccess(result) -> statusPatch`, `seguimientoFileName(prospectoId) -> string`.
 
 - [ ] **Step 1: Write the failing tests**
@@ -890,6 +1083,7 @@ Create `backend/agents/seguimientoCRM.js`:
 const fs = require('fs');
 const path = require('path');
 const { readProspectos, writeProspectos } = require('../lib/prospectosStore');
+const { assertSafeItemId } = require('../lib/validateItemId');
 
 function seguimientoFileName(prospectoId) {
   return `seguimiento-${prospectoId}.md`;
@@ -936,9 +1130,7 @@ async function runCycle({ contextPath, rolePath, prospectosPath, seguimientosDir
 }
 
 async function chat({ message, itemId, seguimientosDir, contextPath, rolePath, apiKey, model, createChatCompletion }) {
-  if (!itemId || !/^[\w-]+$/.test(itemId)) {
-    throw new Error('No se encontró un mensaje de seguimiento para editar (itemId inválido o faltante)');
-  }
+  assertSafeItemId(itemId, 'No se encontró un mensaje de seguimiento para editar (itemId inválido o faltante)');
   const seguimientoPath = path.join(seguimientosDir, seguimientoFileName(itemId));
   const context = fs.readFileSync(contextPath, 'utf-8');
   const role = fs.readFileSync(rolePath, 'utf-8');
@@ -990,14 +1182,14 @@ git commit -m "Add Seguimiento/CRM agent: autonomous outreach drafts and chat ed
 
 ---
 
-### Task 6: Cotizador agent module
+### Task 7: Cotizador agent module
 
 **Files:**
 - Create: `backend/agents/cotizador.js`
 - Test: `backend/test/cotizador.test.js`
 
 **Interfaces:**
-- Consumes: nothing from `ideasStore`/`prospectosStore` — reads `servicios.json` directly with `fs`.
+- Consumes: `assertSafeItemId` (Task 1).
 - Produces: `runCycle({contextPath, rolePath, serviciosPath, cotizacionesDir, apiKey, model, createChatCompletion}) -> Promise<{plantillaCreada: {servicio, cotizacionPath, slug} | null}>`, `chat({message, itemId, cotizacionesDir, contextPath, rolePath, apiKey, model, createChatCompletion}) -> Promise<{reply}>`, `describeSuccess(result) -> statusPatch`, `slugify(texto) -> string`, `cotizacionFileName(servicio) -> string`.
 
 - [ ] **Step 1: Write the failing tests**
@@ -1147,6 +1339,31 @@ test('chat with a valid itemId includes the matching template as reference', asy
   fs.rmSync(cotizacionesDir, { recursive: true, force: true });
 });
 
+test('chat throws a clear error when itemId is present but unsafe', async () => {
+  const contextPath = tempFile('context', '# Intelekia');
+  const rolePath = tempFile('role', 'Eres el cotizador.');
+  const cotizacionesDir = tempDir('cotizaciones');
+
+  await assert.rejects(
+    chat({
+      message: 'hola',
+      itemId: '../../etc/passwd',
+      cotizacionesDir,
+      contextPath,
+      rolePath,
+      apiKey: 'test-key',
+      model: 'gpt-4o-mini',
+      createChatCompletion: async () => {
+        throw new Error('no debería llamarse');
+      },
+    }),
+    /itemId inválido/
+  );
+
+  [contextPath, rolePath].forEach((p) => fs.unlinkSync(p));
+  fs.rmSync(cotizacionesDir, { recursive: true, force: true });
+});
+
 test('describeSuccess reports listo_para_revision with ultimoItemId when a template was created', () => {
   const patch = describeSuccess({ plantillaCreada: { servicio: 'Servicio A', cotizacionPath: '/tmp/x.md', slug: 'servicio-a' } });
   assert.deepEqual(patch, {
@@ -1174,6 +1391,7 @@ Create `backend/agents/cotizador.js`:
 ```js
 const fs = require('fs');
 const path = require('path');
+const { assertSafeItemId } = require('../lib/validateItemId');
 
 function readServicios(serviciosPath) {
   return JSON.parse(fs.readFileSync(serviciosPath, 'utf-8'));
@@ -1233,9 +1451,7 @@ async function chat({ message, itemId, cotizacionesDir, contextPath, rolePath, a
 
   let plantilla = '';
   if (itemId) {
-    if (!/^[\w-]+$/.test(itemId)) {
-      throw new Error('itemId inválido');
-    }
+    assertSafeItemId(itemId, 'itemId inválido');
     const plantillaPath = path.join(cotizacionesDir, `cotizacion-${itemId}.md`);
     if (fs.existsSync(plantillaPath)) {
       plantilla = fs.readFileSync(plantillaPath, 'utf-8');
@@ -1275,7 +1491,7 @@ module.exports = { runCycle, chat, describeSuccess, slugify, cotizacionFileName 
 - [ ] **Step 4: Run to confirm it passes**
 
 Run: `cd backend && node --test test/cotizador.test.js`
-Expected: PASS — 7 tests passing.
+Expected: PASS — 8 tests passing.
 
 - [ ] **Step 5: Commit**
 
@@ -1286,7 +1502,7 @@ git commit -m "Add Cotizador agent: template-library autonomous cycle and person
 
 ---
 
-### Task 7: Departments registry
+### Task 8: Departments registry
 
 **Files:**
 - Create: `backend/departments.js`
@@ -1294,7 +1510,7 @@ git commit -m "Add Cotizador agent: template-library autonomous cycle and person
 
 **Interfaces:**
 - Consumes: all five agent modules (`buscadorTendencias`, `publicador`, `buscadorProspectos`, `seguimientoCRM`, `cotizador`) by `require`.
-- Produces: `buildDepartments({rootDir, config, createChatCompletion}) -> Array<{id, label, agents: Array<{id, label, module, deps}>}>`. Task 9 (`server.js`) and Task 8 (`routes/departments.js`, indirectly via `server.js`) consume this.
+- Produces: `buildDepartments({rootDir, config, createChatCompletion}) -> Array<{id, label, agents: Array<{id, label, module, deps}>}>`. Task 10 (`server.js`) and Task 9 (`routes/departments.js`, indirectly via `server.js`) consume this.
 
 - [ ] **Step 1: Write the failing tests**
 
@@ -1496,14 +1712,14 @@ git commit -m "Add departments registry: declarative list of departments/agents 
 
 ---
 
-### Task 8: Departments API route
+### Task 9: Departments API route
 
 **Files:**
 - Create: `backend/routes/departments.js`
 - Test: `backend/test/departmentsRoute.test.js`
 
 **Interfaces:**
-- Consumes: a `departments` array shaped like Task 7's `buildDepartments` output.
+- Consumes: a `departments` array shaped like Task 8's `buildDepartments` output.
 - Produces: `createDepartmentsRouter({departments}) -> express.Router` exposing `GET /` (mounted at `/api/departments` by `server.js`), plus `sanitizeDepartments(departments) -> Array<{id, label, agents: Array<{id, label}>}>` and `createDepartmentsHandler({departments})` exported for direct testing.
 
 - [ ] **Step 1: Write the failing tests**
@@ -1616,13 +1832,13 @@ git commit -m "Add departments API route: sanitized GET /api/departments"
 
 ---
 
-### Task 9: Refactor server.js onto the departments registry
+### Task 10: Refactor server.js onto the departments registry
 
 **Files:**
 - Modify: `backend/server.js`
 
 **Interfaces:**
-- Consumes: `buildDepartments` (Task 7), `createDepartmentsRouter` (Task 8), `wrapRunCycle` (existing), `createScheduler` (existing), `createAgentsRouter` (existing).
+- Consumes: `buildDepartments` (Task 8), `createDepartmentsRouter` (Task 9), `wrapRunCycle` (existing), `createScheduler` (existing), `createAgentsRouter` (existing).
 - Produces: the same running Express app as before, now built generically from the registry, plus the new `/api/departments` route mounted.
 
 - [ ] **Step 1: Rewrite server.js**
@@ -1720,13 +1936,13 @@ git commit -m "Refactor server.js to build agents from the departments registry 
 
 ---
 
-### Task 10: Frontend API client — add fetchDepartments
+### Task 11: Frontend API client — add fetchDepartments
 
 **Files:**
 - Modify: `frontend/src/api.js`
 
 **Interfaces:**
-- Produces: `fetchDepartments() -> Promise<Array<{id, label, agents: Array<{id, label}>}>>`. Task 12's `main.js` calls this on load.
+- Produces: `fetchDepartments() -> Promise<Array<{id, label, agents: Array<{id, label}>}>>`. Task 13's `main.js` calls this on load.
 
 - [ ] **Step 1: Edit api.js**
 
@@ -1770,7 +1986,7 @@ git commit -m "Add fetchDepartments to the frontend API client"
 
 ---
 
-### Task 11: Three.js scene — multiple rooms from departments
+### Task 12: Three.js scene — multiple rooms from departments
 
 **Files:**
 - Modify: `frontend/src/scene.js`
@@ -1902,7 +2118,7 @@ git commit -m "Generalize scene.js to render one room per department instead of 
 
 ---
 
-### Task 12: Panel and bootstrap — uniform chat contract, department-driven labels
+### Task 13: Panel and bootstrap — uniform chat contract, department-driven labels
 
 **Files:**
 - Modify: `frontend/src/ui.js`
@@ -1910,7 +2126,7 @@ git commit -m "Generalize scene.js to render one room per department instead of 
 - Modify: `frontend/index.html`
 
 **Interfaces:**
-- Consumes: `createScene` (Task 11), `fetchDepartments`/`fetchStatus`/`sendChat`/`forzarCiclo` (Task 10 + existing).
+- Consumes: `createScene` (Task 12), `fetchDepartments`/`fetchStatus`/`sendChat`/`forzarCiclo` (Task 11 + existing).
 - Produces: wires the whole frontend together on the new registry-driven system — no other task depends on this one.
 
 - [ ] **Step 1: Edit index.html — make the save checkbox generic and always visible**
@@ -2098,16 +2314,16 @@ git commit -m "Wire frontend to the departments registry with a uniform chat con
 
 ---
 
-### Task 13: End-to-end manual validation
+### Task 14: End-to-end manual validation
 
-**Files:** none created — this task only exercises what Tasks 1-12 built.
+**Files:** none created — this task only exercises what Tasks 1-13 built.
 
 **Interfaces:** none produced.
 
 - [ ] **Step 1: Run the full backend test suite**
 
 Run: `cd backend && npm test`
-Expected: all tests pass across every file (the original 9 Marketing-era files plus `prospectosStore`, `buscadorProspectos`, `seguimientoCRM`, `cotizador`, `departments`, `departmentsRoute`).
+Expected: all tests pass across every file (the original Marketing-era files plus `parseJsonArrayResponse`, `validateItemId`, `prospectosStore`, `buscadorProspectos`, `seguimientoCRM`, `cotizador`, `departments`, `departmentsRoute`).
 
 - [ ] **Step 2: Start the server with a real OPENAI_API_KEY**
 
@@ -2122,7 +2338,7 @@ curl -X POST http://localhost:3000/api/agents/buscador-tendencias/forzar
 curl -X POST http://localhost:3000/api/agents/publicador/forzar
 ```
 
-Expected: identical behavior to the original Marketing validation — ideas generated, a draft created, status fields present including `ultimoItemId` (renamed from `ultimoItemId`'s predecessor `ultimoIdeaId` — confirm the field is now literally named `ultimoItemId` in the `/api/agents/status` response).
+Expected: identical behavior to the original Marketing validation — ideas generated, a draft created, status fields present including `ultimoItemId` (confirm the field is now literally named `ultimoItemId` in the `/api/agents/status` response, not `ultimoIdeaId`).
 
 - [ ] **Step 4: Validate the 3 Comercial agents live**
 
