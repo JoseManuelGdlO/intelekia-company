@@ -8,41 +8,54 @@ const STATUS_COLORS = {
   error: 0xcc3333,
 };
 
-export function createScene({ container, agents, onAgentClick }) {
+const ROOM_SIZE = 6;
+const ROOM_SPACING = 10;
+const AVATAR_GAP = 1.5;
+
+export function createScene({ container, departments, onAgentClick }) {
   const scene = new THREE.Scene();
   scene.background = new THREE.Color(0x202030);
 
-  const camera = new THREE.PerspectiveCamera(60, container.clientWidth / container.clientHeight, 0.1, 100);
-  camera.position.set(0, 4, 7);
+  const worldWidth = Math.max(departments.length - 1, 0) * ROOM_SPACING;
+
+  const camera = new THREE.PerspectiveCamera(60, container.clientWidth / container.clientHeight, 0.1, 200);
+  camera.position.set(worldWidth / 2, 8, 14);
 
   const renderer = new THREE.WebGLRenderer({ antialias: true });
   renderer.setSize(container.clientWidth, container.clientHeight);
   container.appendChild(renderer.domElement);
 
   const controls = new OrbitControls(camera, renderer.domElement);
-  controls.target.set(0, 1, 0);
+  controls.target.set(worldWidth / 2, 1, 0);
 
   const light = new THREE.HemisphereLight(0xffffff, 0x444444, 1.2);
   scene.add(light);
 
-  const floor = new THREE.Mesh(
-    new THREE.PlaneGeometry(10, 10),
-    new THREE.MeshStandardMaterial({ color: 0x555566 })
-  );
-  floor.rotation.x = -Math.PI / 2;
-  scene.add(floor);
-
   const avatarMeshes = {};
 
-  agents.forEach((agent, index) => {
-    const mesh = new THREE.Mesh(
-      new THREE.CapsuleGeometry(0.4, 1, 4, 8),
-      new THREE.MeshStandardMaterial({ color: STATUS_COLORS.idle })
+  departments.forEach((department, roomIndex) => {
+    const roomCenterX = roomIndex * ROOM_SPACING;
+
+    const floor = new THREE.Mesh(
+      new THREE.PlaneGeometry(ROOM_SIZE, ROOM_SIZE),
+      new THREE.MeshStandardMaterial({ color: 0x555566 })
     );
-    mesh.position.set(index === 0 ? -1.5 : 1.5, 1, 0);
-    mesh.userData.agentId = agent.id;
-    scene.add(mesh);
-    avatarMeshes[agent.id] = mesh;
+    floor.rotation.x = -Math.PI / 2;
+    floor.position.set(roomCenterX, 0, 0);
+    scene.add(floor);
+
+    const agentCount = department.agents.length;
+    department.agents.forEach((agent, agentIndex) => {
+      const offset = agentIndex - (agentCount - 1) / 2;
+      const mesh = new THREE.Mesh(
+        new THREE.CapsuleGeometry(0.4, 1, 4, 8),
+        new THREE.MeshStandardMaterial({ color: STATUS_COLORS.idle })
+      );
+      mesh.position.set(roomCenterX + offset * AVATAR_GAP, 1, 0);
+      mesh.userData.agentId = agent.id;
+      scene.add(mesh);
+      avatarMeshes[agent.id] = mesh;
+    });
   });
 
   const raycaster = new THREE.Raycaster();
