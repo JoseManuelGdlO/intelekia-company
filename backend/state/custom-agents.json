@@ -1,0 +1,10 @@
+[
+  {
+    "id": "custom-objection-handling-1794008522407",
+    "departmentId": "comercial",
+    "label": "Objection Handling",
+    "context": "Responde SIEMPRE en una sola oraci�n muy breve, sin importar la pregunta.",
+    "autonomous": false,
+    "createdAt": "2026-11-06T23:42:02.407Z"
+  }
+]
