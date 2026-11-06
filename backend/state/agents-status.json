@@ -1,0 +1,14 @@
+{
+  "buscador-tendencias": {
+    "estatus": "idle",
+    "ultimaAccion": "Sin actividad todavía",
+    "error": null,
+    "updatedAt": null
+  },
+  "publicador": {
+    "estatus": "idle",
+    "ultimaAccion": "Sin actividad todavía",
+    "error": null,
+    "updatedAt": null
+  }
+}

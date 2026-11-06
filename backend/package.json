@@ -1,0 +1,18 @@
+{
+  "name": "intelekia-marketing-office",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Prototipo de oficina de Marketing en 3D con agentes de IA",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "test": "node --test test/"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "dotenv": "^16.4.5",
+    "express": "^4.19.2"
+  }
+}
