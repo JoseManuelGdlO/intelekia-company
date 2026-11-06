@@ -45,6 +45,9 @@ async function runCycle({ contextPath, rolePath, ideasPath, draftsDir, apiKey, m
 }
 
 async function chat({ message, ideaId, draftsDir, contextPath, rolePath, apiKey, model, createChatCompletion }) {
+  if (!ideaId || !/^[\w-]+$/.test(ideaId)) {
+    throw new Error('No se encontró un draft para editar (ideaId inválido o faltante)');
+  }
   const draftPath = path.join(draftsDir, draftFileName(ideaId));
   const context = fs.readFileSync(contextPath, 'utf-8');
   const role = fs.readFileSync(rolePath, 'utf-8');

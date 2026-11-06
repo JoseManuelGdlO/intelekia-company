@@ -1,6 +1,20 @@
 const fs = require('fs');
 const { readIdeas, writeIdeas } = require('../lib/ideasStore');
 
+function parseIdeasResponse(raw) {
+  const cleaned = raw.trim().replace(/^```(?:json)?\s*/i, '').replace(/```\s*$/i, '').trim();
+  let parsed;
+  try {
+    parsed = JSON.parse(cleaned);
+  } catch (err) {
+    throw new Error(`La respuesta del modelo no es JSON válido: ${err.message}`);
+  }
+  if (!Array.isArray(parsed)) {
+    throw new Error('La respuesta del modelo no es un arreglo de ideas');
+  }
+  return parsed;
+}
+
 async function runCycle({ contextPath, rolePath, ideasPath, apiKey, model, createChatCompletion }) {
   const context = fs.readFileSync(contextPath, 'utf-8');
   const role = fs.readFileSync(rolePath, 'utf-8');
@@ -21,7 +35,7 @@ async function runCycle({ contextPath, rolePath, ideasPath, apiKey, model, creat
     ],
   });
 
-  const nuevasIdeas = JSON.parse(raw);
+  const nuevasIdeas = parseIdeasResponse(raw);
 
   const addedIdeas = nuevasIdeas.map((texto, index) => ({
     id: `idea-${Date.now()}-${index}`,

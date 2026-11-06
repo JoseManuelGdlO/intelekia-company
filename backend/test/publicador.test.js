@@ -111,3 +111,60 @@ test('chat overwrites the draft file with the edited copy', async () => {
   [contextPath, rolePath].forEach((p) => fs.unlinkSync(p));
   fs.rmSync(draftsDir, { recursive: true, force: true });
 });
+
+test('chat throws a clear error when ideaId is missing', async () => {
+  const contextPath = tempFile('context', '# Intelekia');
+  const rolePath = tempFile('role', 'Eres el publicador.');
+  const draftsDir = tempDir('drafts');
+
+  await assert.rejects(
+    () =>
+      chat({
+        message: 'hazlo más corto',
+        ideaId: undefined,
+        draftsDir,
+        contextPath,
+        rolePath,
+        apiKey: 'test-key',
+        model: 'gpt-4o-mini',
+        createChatCompletion: async () => {
+          throw new Error('no debería llamarse');
+        },
+      }),
+    /ideaId inválido o faltante/
+  );
+
+  [contextPath, rolePath].forEach((p) => fs.unlinkSync(p));
+  fs.rmSync(draftsDir, { recursive: true, force: true });
+});
+
+test('chat throws a clear error and avoids filesystem access when ideaId contains path-traversal characters', async () => {
+  const contextPath = tempFile('context', '# Intelekia');
+  const rolePath = tempFile('role', 'Eres el publicador.');
+  const draftsDir = tempDir('drafts');
+  let createChatCompletionCalled = false;
+
+  await assert.rejects(
+    () =>
+      chat({
+        message: 'hazlo más corto',
+        ideaId: '../../etc/passwd',
+        draftsDir,
+        contextPath,
+        rolePath,
+        apiKey: 'test-key',
+        model: 'gpt-4o-mini',
+        createChatCompletion: async () => {
+          createChatCompletionCalled = true;
+          return 'no debería llegar aquí';
+        },
+      }),
+    /ideaId inválido o faltante/
+  );
+
+  assert.equal(createChatCompletionCalled, false);
+  assert.deepEqual(fs.readdirSync(draftsDir), []);
+
+  [contextPath, rolePath].forEach((p) => fs.unlinkSync(p));
+  fs.rmSync(draftsDir, { recursive: true, force: true });
+});

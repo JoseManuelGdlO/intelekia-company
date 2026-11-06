@@ -98,3 +98,72 @@ test('chat saves the reply as a pending idea when saveAsIdea is true', async () 
 
   [contextPath, rolePath, ideasPath].forEach((p) => fs.unlinkSync(p));
 });
+
+test('runCycle parses ideas when the model wraps the JSON array in markdown fences', async () => {
+  const contextPath = tempFile('context', '# Intelekia');
+  const rolePath = tempFile('role', 'Eres el buscador de tendencias.');
+  const ideasPath = tempFile('ideas', JSON.stringify([]));
+
+  const fakeCreateChatCompletion = async () => '```json\n["idea uno", "idea dos"]\n```';
+
+  const result = await runCycle({
+    contextPath,
+    rolePath,
+    ideasPath,
+    apiKey: 'test-key',
+    model: 'gpt-4o-mini',
+    createChatCompletion: fakeCreateChatCompletion,
+  });
+
+  assert.equal(result.addedIdeas.length, 2);
+  assert.equal(result.addedIdeas[0].texto, 'idea uno');
+  assert.equal(result.addedIdeas[1].texto, 'idea dos');
+
+  [contextPath, rolePath, ideasPath].forEach((p) => fs.unlinkSync(p));
+});
+
+test('runCycle throws a clear error when the model returns non-JSON text', async () => {
+  const contextPath = tempFile('context', '# Intelekia');
+  const rolePath = tempFile('role', 'Eres el buscador de tendencias.');
+  const ideasPath = tempFile('ideas', JSON.stringify([]));
+
+  const fakeCreateChatCompletion = async () => 'esto no es json en absoluto';
+
+  await assert.rejects(
+    () =>
+      runCycle({
+        contextPath,
+        rolePath,
+        ideasPath,
+        apiKey: 'test-key',
+        model: 'gpt-4o-mini',
+        createChatCompletion: fakeCreateChatCompletion,
+      }),
+    /La respuesta del modelo no es JSON válido/
+  );
+
+  [contextPath, rolePath, ideasPath].forEach((p) => fs.unlinkSync(p));
+});
+
+test('runCycle throws a clear error when the model returns valid JSON that is not an array', async () => {
+  const contextPath = tempFile('context', '# Intelekia');
+  const rolePath = tempFile('role', 'Eres el buscador de tendencias.');
+  const ideasPath = tempFile('ideas', JSON.stringify([]));
+
+  const fakeCreateChatCompletion = async () => '{}';
+
+  await assert.rejects(
+    () =>
+      runCycle({
+        contextPath,
+        rolePath,
+        ideasPath,
+        apiKey: 'test-key',
+        model: 'gpt-4o-mini',
+        createChatCompletion: fakeCreateChatCompletion,
+      }),
+    /La respuesta del modelo no es un arreglo de ideas/
+  );
+
+  [contextPath, rolePath, ideasPath].forEach((p) => fs.unlinkSync(p));
+});
