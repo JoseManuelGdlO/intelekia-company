@@ -822,7 +822,7 @@ module.exports = { createCustomAgentRegistry };
 - [ ] **Step 4: Run tests to verify they pass**
 
 Run: `cd backend && node --test test/customAgentsRegistry.test.js`
-Expected: PASS — 12 tests passing.
+Expected: PASS — 14 tests passing.
 
 - [ ] **Step 5: Commit**
 
