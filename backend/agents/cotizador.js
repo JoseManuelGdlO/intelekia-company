@@ -1,21 +1,10 @@
 const fs = require('fs');
 const path = require('path');
 const { assertSafeItemId } = require('../lib/validateItemId');
+const { slugify } = require('../lib/slugify');
 
 function readServicios(serviciosPath) {
   return JSON.parse(fs.readFileSync(serviciosPath, 'utf-8'));
-}
-
-function slugify(texto) {
-  const sinAcentos = texto
-    .normalize('NFD')
-    .split('')
-    .filter((char) => char.charCodeAt(0) < 128)
-    .join('');
-  return sinAcentos
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/(^-|-$)/g, '');
 }
 
 function cotizacionFileName(servicio) {
