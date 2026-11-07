@@ -40,3 +40,30 @@ test('createChatCompletion throws when the response is not ok', async () => {
     /OpenAI request failed: 401/
   );
 });
+
+test('createChatCompletionMessage envía herramientas y devuelve tool_calls', async () => {
+  const { createChatCompletionMessage } = require('../lib/openaiClient');
+  const fakeFetch = async (url, options) => {
+    const body = JSON.parse(options.body);
+    assert.equal(body.tools.length, 1);
+    assert.equal(body.tool_choice, 'none');
+    return { ok: true, json: async () => ({ choices: [{ message: { content: null, tool_calls: [{ id: 'x' }] } }] }) };
+  };
+  const message = await createChatCompletionMessage({
+    apiKey: 'k',
+    model: 'm',
+    messages: [],
+    tools: [{ type: 'function', function: { name: 'f' } }],
+    toolChoice: 'none',
+    fetchImpl: fakeFetch,
+  });
+  assert.equal(message.tool_calls[0].id, 'x');
+});
+
+test('createChatCompletion no envía tools cuando no hay', async () => {
+  const fakeFetch = async (url, options) => {
+    assert.equal('tools' in JSON.parse(options.body), false);
+    return { ok: true, json: async () => ({ choices: [{ message: { content: 'ok' } }] }) };
+  };
+  assert.equal(await createChatCompletion({ apiKey: 'k', model: 'm', messages: [], fetchImpl: fakeFetch }), 'ok');
+});

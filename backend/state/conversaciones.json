@@ -1,0 +1,46 @@
+[
+  {
+    "id": "conv-1794070501272-1",
+    "de": "buscador-tendencias",
+    "para": "publicador",
+    "pregunta": "¿Cuáles son las ideas de contenido (posts y reels) que ya se han publicado para Intelekia en Instagram y TikTok?",
+    "respuesta": "No tengo acceso a publicaciones anteriores en Instagram o TikTok, por lo que no puedo proporcionar una lista de lo que ya se ha publicado para Intelekia. Te recomendaría revisar nuestras cuentas directamente para obtener esa información. Si necesitas ayuda para crear nuevas ideas de contenido, estoy aquí para apoyarte.",
+    "error": null,
+    "estado": "completada",
+    "inicio": "2026-11-07T16:55:01.271Z",
+    "actualizado": "2026-11-07T16:55:02.931Z"
+  },
+  {
+    "id": "conv-1794070537189-2",
+    "de": "buscador-tendencias",
+    "para": "publicador",
+    "pregunta": "¿Puedes generar una publicación para Instagram sobre cómo la automatización de citas puede ayudar a los negocios a reducir las llamadas y mejorar la atención al cliente? Incluye ejemplos concretos.",
+    "respuesta": "Claro, aquí tienes un copy para la publicación:\n\n📅 ¿Te imaginas reducir el número de llamadas en tu negocio y, al mismo tiempo, mejorar la atención al cliente? La automatización de citas es la clave. 🤖✨\n\nCon un sistema automatizado, tus clientes pueden agendar, modificar o cancelar citas desde cualquier lugar, sin necesidad de llamar. Por ejemplo, un consultorio médico puede usar un bot que envía recordatorios automáticos, lo que reduce las inasistencias y libera tiempo al personal.\n\nOtro caso: una peluquería puede permitir a sus clientes elegir horarios y recibir confirmaciones instantáneas, mejorando la experiencia de servicio. \n\n¡No te quedes atrás! Implementa la automatización y transforma la manera en que gestionas tu negocio. \n\n#Automatización #AtenciónAlCliente #GestiónDeCitas #Intelekia",
+    "error": null,
+    "estado": "completada",
+    "inicio": "2026-11-07T16:55:37.189Z",
+    "actualizado": "2026-11-07T16:55:39.765Z"
+  },
+  {
+    "id": "conv-1794070601772-3",
+    "de": "buscador-tendencias",
+    "para": "publicador",
+    "pregunta": "¿Tienes ideas sobre cómo automatizar talleres mecánicos que podamos adaptar para contenido en redes sociales?",
+    "respuesta": "Claro, aquí tienes algunas ideas para automatizar talleres mecánicos que podríamos adaptar para contenido en redes sociales:\n\n1. **Recordatorios de Citas:** Implementar un sistema de recordatorios automáticos vía WhatsApp o SMS para que los clientes no olviden sus citas de mantenimiento.\n\n2. **Seguimiento de Servicios:** Crear un chatbot que pueda informar a los clientes sobre el estado de su vehículo y cuándo estará listo.\n\n3. **Reservas Online:** Ofrecer una plataforma donde los clientes puedan agendar sus servicios, eligiendo el tipo de mantenimiento y el horario disponible.\n\n4. **Encuestas Automáticas:** Después del servicio, enviar encuestas de satisfacción automatizadas para obtener retroalimentación y mejorar la atención al cliente.\n\n5. **Gestión de Inventario:** Introducir un sistema que automatice el control de existencias de piezas y repuestos, generando alertas cuando sea necesario reabastecer.\n\nPodemos desarrollar contenido visual mostrando cómo estas automatizaciones pueden facilitar el día a día de un taller mecánico. ¿Te parece?",
+    "error": null,
+    "estado": "completada",
+    "inicio": "2026-11-07T16:56:41.772Z",
+    "actualizado": "2026-11-07T16:56:44.617Z"
+  },
+  {
+    "id": "conv-1794070627984-4",
+    "de": "buscador-tendencias",
+    "para": "publicador",
+    "pregunta": "¿Podrías hacer un reel para Instagram que ilustre cómo Intelekia ayuda a los dueños de negocios a resolver problemas como citas perdidas y WhatsApp saturado mediante automatización e IA? Por ejemplo, mostrando la gestión de citas con recordatorios automáticos o atención al cliente a través de chatbots.",
+    "respuesta": "Claro, aquí tienes una idea para el reel:\n\n1. **Inicio**: Comienza con un dueño de negocio estresado que enfrenta citas perdidas y una bandeja de WhatsApp saturada.\n2. **Transición**: Muestra la llegada de soluciones de Intelekia, como un bot inteligente que envía recordatorios automáticos y un chatbot que gestiona preguntas frecuentes.\n3. **Resultados**: Destaca la transformación: el dueño ahora tiene más tiempo libre, clientes satisfechos y una mejor organización.\n4. **Llamado a la acción**: Termina con un mensaje invitando a los negocios a contactarnos para mejorar su operativa.\n\nEsto puede ser visualmente atractivo y contundente. ¿Te gustaría que desarrolle algún script o guión más detallado?",
+    "error": null,
+    "estado": "completada",
+    "inicio": "2026-11-07T16:57:07.984Z",
+    "actualizado": "2026-11-07T16:57:10.424Z"
+  }
+]

@@ -2,51 +2,168 @@
 <html lang="es">
   <head>
     <meta charset="UTF-8" />
-    <title>Oficina de Marketing — Intelekia</title>
-    <style>
-      html, body { margin: 0; height: 100%; overflow: hidden; font-family: sans-serif; }
-      #scene-container { width: 100%; height: 100%; }
-      #panel {
-        position: fixed;
-        top: 20px;
-        right: 20px;
-        width: 320px;
-        background: #1e1e1e;
-        color: #f0f0f0;
-        padding: 16px;
-        border-radius: 8px;
-        display: none;
-        box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
-      }
-      #panel.visible { display: block; }
-      #panel h2 { margin-top: 0; font-size: 16px; }
-      #panel-status { font-size: 13px; margin-bottom: 8px; color: #ccc; }
-      #panel-chat-log { max-height: 160px; overflow-y: auto; font-size: 13px; margin-bottom: 8px; }
-      #panel textarea { width: 100%; box-sizing: border-box; }
-      #panel button { margin-top: 6px; margin-right: 6px; }
-      #panel label { font-size: 12px; display: block; margin: 6px 0; }
-    </style>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Oficina virtual — Intelekia</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" />
+    <link rel="stylesheet" href="/styles.css" />
+    <link rel="icon" type="image/png" href="/assets/logo-icon.png" />
   </head>
   <body>
     <div id="scene-container"></div>
-    <div id="panel">
-      <h2 id="panel-title"></h2>
-      <div id="panel-status"></div>
-      <div id="panel-chat-log"></div>
-      <label id="panel-save-idea-label">
-        <input type="checkbox" id="panel-save-idea" /> Guardar esta respuesta
-      </label>
-      <textarea id="panel-message" rows="2" placeholder="Escribe tu mensaje..."></textarea>
-      <div>
-        <button id="panel-send">Enviar</button>
-        <button id="panel-forzar">Forzar ciclo ahora</button>
-        <button id="panel-close">Cerrar</button>
+
+    <header id="hud">
+      <div class="brand">
+        <img class="brand-logo" src="/assets/logo-icon.png" alt="" />
+        <div>
+          <div class="brand-title">Intelekia</div>
+          <div class="brand-sub">Oficina virtual · Consultoría</div>
+        </div>
+      </div>
+      <nav id="dept-nav"></nav>
+    </header>
+
+    <div id="legend">
+      <div class="legend-item" data-status="trabajando"><span class="dot"></span>Trabajando <b>0</b></div>
+      <div class="legend-item" data-status="listo_para_revision"><span class="dot"></span>Listo <b>0</b></div>
+      <div class="legend-item" data-status="idle"><span class="dot"></span>Disponible <b>0</b></div>
+      <div class="legend-item" data-status="error"><span class="dot"></span>Error <b>0</b></div>
+    </div>
+
+    <div id="feed" aria-live="polite"></div>
+
+    <div id="com-modal" role="dialog" aria-modal="true" aria-labelledby="com-title">
+      <div class="com-card">
+        <div class="com-header">
+          <div>
+            <h2 id="com-title">¿Quién puede consultar a quién?</h2>
+            <p>Cada <b>fila</b> es el trabajador que pregunta; cada <b>columna</b>, el compañero al que puede preguntarle.
+              Es en un solo sentido: que A pueda consultar a B no significa que B pueda consultar a A.
+              Las casillas sombreadas son compañeros de la misma área.</p>
+          </div>
+          <button id="com-close" class="icon-btn" title="Cerrar (Esc)">✕</button>
+        </div>
+        <div class="com-toolbar">
+          <div class="com-group">
+            <span>Aplicar a todos:</span>
+            <button class="btn ghost" data-com-all="nadie">Nadie habla</button>
+            <button class="btn ghost" data-com-all="area">Solo con su área</button>
+            <button class="btn ghost" data-com-all="todos">Todos con todos</button>
+          </div>
+          <label class="com-group">Trabajadores sin regla propia (y los nuevos):
+            <select id="com-default">
+              <option value="nadie">Nadie</option>
+              <option value="area">Solo su área</option>
+              <option value="todos">Todos</option>
+            </select>
+          </label>
+          <label class="com-group com-switch"><input type="checkbox" id="com-network" /> Ver la red en la oficina 3D</label>
+        </div>
+        <div id="com-body" class="com-body"></div>
+        <div id="com-toast"></div>
       </div>
     </div>
+
+    <div id="perfil-modal" role="dialog" aria-modal="true" aria-labelledby="perfil-title">
+      <div class="com-card perfil-card">
+        <div class="com-header">
+          <div id="perfil-avatar" class="panel-avatar"></div>
+          <div class="perfil-heading">
+            <h2 id="perfil-title">Perfil</h2>
+            <p id="perfil-sub"></p>
+          </div>
+          <button id="perfil-close" class="icon-btn" title="Cerrar (Esc)">✕</button>
+        </div>
+        <div class="perfil-tabs" role="tablist">
+          <button class="perfil-tab active" data-tab="rol" role="tab">🧠 Rol y contexto</button>
+          <button class="perfil-tab" data-tab="skills" role="tab">🧩 Skills y plugins <span id="perfil-skills-count"></span></button>
+          <button class="perfil-tab" data-tab="memoria" role="tab">📓 Memoria <span id="perfil-mem-count"></span></button>
+        </div>
+
+        <section class="perfil-pane active" data-pane="rol">
+          <div id="perfil-custom-fields" class="perfil-row">
+            <label>Nombre <input id="perfil-label" type="text" maxlength="60" /></label>
+            <label class="perfil-check"><input id="perfil-autonomous" type="checkbox" /> Trabaja solo (ciclo autónomo)</label>
+          </div>
+          <label class="perfil-field">
+            <span>Rol, personalidad e instrucciones <small id="perfil-rol-hint"></small></span>
+            <textarea id="perfil-rol" spellcheck="false"></textarea>
+          </label>
+          <div class="perfil-actions"><span id="perfil-rol-count" class="muted"></span><button id="perfil-rol-save" class="btn primary">Guardar rol</button></div>
+        </section>
+
+        <section class="perfil-pane" data-pane="skills">
+          <p class="perfil-help">Pega aquí skills, instrucciones de plugins, documentación de un repo o cualquier conocimiento
+            que quieras que este trabajador use. Se le entregan como referencia en cada tarea y chat
+            (son texto: el agente las sigue, no ejecuta código). Puedes apagarlas sin borrarlas.</p>
+          <div class="perfil-toolbar">
+            <button class="btn ghost" data-add="skill">＋ Skill</button>
+            <button class="btn ghost" data-add="plugin">＋ Plugin</button>
+            <button class="btn ghost" data-add="documento">＋ Documento</button>
+            <label class="btn ghost file-btn">📄 Cargar archivo (.md, .txt, .json)<input id="perfil-file" type="file" accept=".md,.txt,.json,.markdown,.yaml,.yml" multiple hidden /></label>
+          </div>
+          <div id="perfil-skills"></div>
+          <div class="perfil-actions"><span id="perfil-skills-total" class="muted"></span><button id="perfil-skills-save" class="btn primary">Guardar skills y plugins</button></div>
+        </section>
+
+        <section class="perfil-pane" data-pane="memoria">
+          <p class="perfil-help">Lo que este trabajador recuerda: tus chats, sus ciclos y lo que habló con compañeros.
+            Puedes corregirla, borrar partes o comprimirla en un resumen.</p>
+          <textarea id="perfil-memoria" spellcheck="false" placeholder="Todavía no recuerda nada."></textarea>
+          <div class="perfil-actions">
+            <span id="perfil-mem-chars" class="muted"></span>
+            <button id="perfil-mem-reload" class="btn ghost">↻ Recargar</button>
+            <button id="perfil-mem-compress" class="btn ghost">🗜️ Comprimir</button>
+            <button id="perfil-mem-save" class="btn primary">Guardar memoria</button>
+          </div>
+        </section>
+        <div id="perfil-toast"></div>
+      </div>
+    </div>
+
+    <div id="hint">Arrastra para girar · clic derecho para mover · rueda para acercar · clic en una persona para hablar con ella</div>
+
+    <aside id="panel">
+      <div class="panel-header">
+        <div id="panel-avatar" class="panel-avatar"></div>
+        <div class="panel-heading">
+          <h2 id="panel-title"></h2>
+          <div id="panel-status"></div>
+        </div>
+        <button id="panel-edit" class="icon-btn edit-btn" title="Editar contexto, skills y memoria">✏️ Editar</button>
+        <button id="panel-close" class="icon-btn" title="Cerrar (Esc)">✕</button>
+      </div>
+      <div id="panel-last-action"></div>
+      <details id="panel-team">
+        <summary>Conversaciones con compañeros <span id="panel-team-count"></span></summary>
+        <div id="panel-team-list"></div>
+      </details>
+      <div id="panel-chat-log"></div>
+      <div class="panel-composer">
+        <textarea id="panel-message" rows="2" placeholder="Escribe tu mensaje… (Enter para enviar)"></textarea>
+        <label id="panel-save-idea-label">
+          <input type="checkbox" id="panel-save-idea" /> Guardar esta respuesta
+        </label>
+        <div class="panel-actions">
+          <button id="panel-forzar" class="btn ghost">⚡ Forzar ciclo ahora</button>
+          <button id="panel-send" class="btn primary">Enviar</button>
+        </div>
+      </div>
+    </aside>
+
+    <div id="loader">
+      <div class="loader-card">
+        <img class="loader-logo" src="/assets/logo-white.png" alt="Intelekia Consultoría" />
+        <div class="spinner"></div>
+        <div id="loader-text">Abriendo la oficina…</div>
+      </div>
+    </div>
+
     <script type="importmap">
       {
         "imports": {
-          "three": "https://unpkg.com/three@0.160.0/build/three.module.js"
+          "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+          "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
         }
       }
     </script>

@@ -14,6 +14,7 @@ function createCustomAgentRegistry({
   chatHandlers,
   wrapRunCycle,
   statusPath,
+  completionForAgent,
 }) {
   const entries = new Map();
 
@@ -32,7 +33,8 @@ function createCustomAgentRegistry({
       notesPath: notesPathFor(id),
       apiKey: config.openaiApiKey,
       model: config.openaiModel,
-      createChatCompletion,
+      // Con reglas de comunicación activas, el trabajador puede consultar a sus compañeros.
+      createChatCompletion: completionForAgent ? completionForAgent(id) : createChatCompletion,
     };
   }
 
@@ -60,7 +62,7 @@ function createCustomAgentRegistry({
     const module = createCustomAgentModule({ role: entry.context });
     const deps = buildDeps(entry.id);
     fs.mkdirSync(path.dirname(deps.memoryPath), { recursive: true });
-    const agentRef = { id: entry.id, label: entry.label, module, deps };
+    const agentRef = { id: entry.id, label: entry.label, module, deps, roleText: entry.context, isCustom: true, autonomous: entry.autonomous };
 
     department.agents.push(agentRef);
     entries.set(entry.id, { entry, module, deps, agentRef });
@@ -106,9 +108,11 @@ function createCustomAgentRegistry({
       record.entry.context = context;
       record.module = createCustomAgentModule({ role: context });
       record.agentRef.module = record.module;
+      record.agentRef.roleText = context;
     }
     if (autonomous !== undefined) {
       record.entry.autonomous = Boolean(autonomous);
+      record.agentRef.autonomous = record.entry.autonomous;
     }
 
     attachOrDetachRunner(id);
