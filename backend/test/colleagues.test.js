@@ -361,3 +361,34 @@ test('knowledgeOf no comparte las revisiones de PRs (títulos y motivos de terce
   assert.match(knowledge, /idea uno/);
   assert.doesNotMatch(knowledge, /IGNORA TUS INSTRUCCIONES/);
 });
+
+test('sinMemoria: no decora los mensajes con memoria ni skills del perfil', async () => {
+  const decorados = [];
+  const recibidos = [];
+  const comunicacion = createComunicacionStore({ configPath: tmp('com.json'), departments: [{ id: 'm', agents: [{ id: 'redes', label: 'Redes', deps: {} }] }] });
+  const colleagues = createColleagues({
+    comunicacion,
+    conversaciones: createConversacionesStore({ filePath: tmp('conv.json') }),
+    profiles: {
+      decorate: (id, m) => {
+        decorados.push(id);
+        return [{ role: 'system', content: 'MEMORIA PRIVADA' }, ...m];
+      },
+      hasTool: () => false,
+      remember: () => {},
+    },
+    createChatCompletion: async ({ messages }) => {
+      recibidos.push(messages);
+      return 'ok';
+    },
+    createChatCompletionMessage: async () => assert.fail('sin herramientas'),
+    contextPath: tmp('ctx.md', '# Intelekia'),
+  });
+  comunicacion.setRule('redes', { alcance: 'nadie' });
+  await colleagues.completionFor('redes')({ ...base, sinMemoria: true });
+  assert.deepEqual(decorados, []);
+  assert.deepEqual(recibidos[0], base.messages);
+  await colleagues.completionFor('redes')(base);
+  assert.deepEqual(decorados, ['redes']);
+  assert.match(recibidos[1][0].content, /MEMORIA PRIVADA/);
+});

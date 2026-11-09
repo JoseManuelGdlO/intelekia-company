@@ -184,9 +184,10 @@ function createColleagues({
   }
 
   function completionFor(agentId) {
-    return async function completionWithColleagues({ apiKey, model, messages: original, ajustarHerramientas, maxRondas }) {
-      // Skills, plugins y memoria del perfil del agente.
-      const messages = profiles ? profiles.decorate(agentId, original) : original;
+    return async function completionWithColleagues({ apiKey, model, messages: original, ajustarHerramientas, maxRondas, sinMemoria = false }) {
+      // Skills, plugins y memoria del perfil del agente. Con sinMemoria (p. ej. respuestas públicas
+      // en redes) no se agregan: la memoria incluye charlas privadas con el fundador.
+      const messages = profiles && !sinMemoria ? profiles.decorate(agentId, original) : original;
 
       const tools = [];
       const handlers = {};
