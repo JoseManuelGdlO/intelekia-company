@@ -74,3 +74,33 @@ test('responder usa /comments en Facebook y /replies en Instagram', async () => 
   await assert.rejects(meta.responder({ red: 'tiktok', comentarioId: 'x', mensaje: 'y' }), /Red desconocida/);
   await assert.rejects(meta.responder({ red: 'facebook', comentarioId: 'x', mensaje: '  ' }), /vacío/);
 });
+
+test('errores de red se envuelven en un mensaje claro', async () => {
+  const meta = createMeta({ config: CONFIG, fetchImpl: async () => { throw new Error('ECONNRESET'); } });
+  await assert.rejects(meta.responder({ red: 'facebook', comentarioId: 'a', mensaje: 'hi' }), /Meta: no se pudo conectar \(ECONNRESET\)/);
+});
+
+test('el fetch recibe una señal de timeout', async () => {
+  let signal;
+  const meta = createMeta({ config: CONFIG, fetchImpl: async (u, o) => { signal = o.signal; return { ok: true, status: 200, json: async () => ({}) }; } });
+  await meta.responder({ red: 'facebook', comentarioId: 'a', mensaje: 'hi' });
+  assert.ok(signal instanceof AbortSignal);
+});
+
+test('los ids se codifican en la ruta', async () => {
+  const urls = [];
+  const meta = createMeta({ config: CONFIG, fetchImpl: async (u) => { urls.push(u); return { ok: true, status: 200, json: async () => ({}) }; } });
+  await meta.responder({ red: 'facebook', comentarioId: 'a/b?c', mensaje: 'hi' });
+  assert.match(urls[0], /\/a%2Fb%3Fc\/comments$/);
+});
+
+test('desde inválido lanza error', async () => {
+  const meta = createMeta({ config: CONFIG, fetchImpl: fakeFetch(RUTAS) });
+  await assert.rejects(meta.comentariosRecientes({ desde: 'ayer' }), /desde debe ser una fecha válida/);
+  await assert.rejects(meta.comentariosRecientes({ desde: new Date('x') }), /desde debe ser una fecha válida/);
+});
+
+test('respuesta HTTP 500 sin JSON se reporta con el código', async () => {
+  const meta = createMeta({ config: CONFIG, fetchImpl: async () => ({ ok: false, status: 500, json: async () => { throw new Error('no json'); } }) });
+  await assert.rejects(meta.responder({ red: 'facebook', comentarioId: 'a', mensaje: 'hi' }), /respuesta 500/);
+});

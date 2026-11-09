@@ -5,8 +5,10 @@
  */
 const GRAPH = 'https://graph.facebook.com';
 const MAX_COMENTARIOS_POR_PUBLICACION = 50;
+const TIMEOUT_MS = 20000;
+const enc = encodeURIComponent;
 
-function createMeta({ config, fetchImpl = (...a) => fetch(...a) }) {
+function createMeta({ config, fetchImpl = (...a) => fetch(...a), timeoutMs = TIMEOUT_MS }) {
   const { pageToken, pageId, igUserId, apiVersion = 'v21.0' } = config || {};
 
   function estado() {
@@ -19,12 +21,17 @@ function createMeta({ config, fetchImpl = (...a) => fetch(...a) }) {
     const url = new URL(`${GRAPH}/${apiVersion}/${ruta}`);
     Object.entries(params).forEach(([k, v]) => url.searchParams.set(k, String(v)));
     const headers = { Authorization: `Bearer ${pageToken}` };
-    const opts = { method, headers };
+    const opts = { method, headers, signal: AbortSignal.timeout(timeoutMs) };
     if (body) {
       headers['Content-Type'] = 'application/json';
       opts.body = JSON.stringify(body);
     }
-    const res = await fetchImpl(url.toString(), opts);
+    let res;
+    try {
+      res = await fetchImpl(url.toString(), opts);
+    } catch (err) {
+      throw new Error(`Meta: no se pudo conectar (${err.message})`);
+    }
     const data = await res.json().catch(() => ({}));
     if (!res.ok || data.error) throw new Error(`Meta: ${data.error?.message || `respuesta ${res.status}`}`);
     return data;
@@ -35,11 +42,11 @@ function createMeta({ config, fetchImpl = (...a) => fetch(...a) }) {
   const iso = (valor) => fechaDe(valor).toISOString();
 
   async function comentariosFacebook(desde, maxPublicaciones) {
-    const posts = (await api(`${pageId}/posts`, { params: { fields: 'id,message,permalink_url', limit: maxPublicaciones } })).data || [];
+    const posts = (await api(`${enc(pageId)}/posts`, { params: { fields: 'id,message,permalink_url', limit: maxPublicaciones } })).data || [];
     const lista = [];
     for (const post of posts) {
       const comentarios = (
-        await api(`${post.id}/comments`, {
+        await api(`${enc(post.id)}/comments`, {
           params: { fields: 'id,message,from,created_time', filter: 'toplevel', order: 'reverse_chronological', limit: MAX_COMENTARIOS_POR_PUBLICACION },
         })
       ).data || [];
@@ -62,11 +69,11 @@ function createMeta({ config, fetchImpl = (...a) => fetch(...a) }) {
   }
 
   async function comentariosInstagram(desde, maxPublicaciones) {
-    const cuenta = await api(igUserId, { params: { fields: 'username' } });
-    const media = (await api(`${igUserId}/media`, { params: { fields: 'id,caption,permalink', limit: maxPublicaciones } })).data || [];
+    const cuenta = await api(enc(igUserId), { params: { fields: 'username' } });
+    const media = (await api(`${enc(igUserId)}/media`, { params: { fields: 'id,caption,permalink', limit: maxPublicaciones } })).data || [];
     const lista = [];
     for (const m of media) {
-      const comentarios = (await api(`${m.id}/comments`, { params: { fields: 'id,text,username,timestamp', limit: MAX_COMENTARIOS_POR_PUBLICACION } })).data || [];
+      const comentarios = (await api(`${enc(m.id)}/comments`, { params: { fields: 'id,text,username,timestamp', limit: MAX_COMENTARIOS_POR_PUBLICACION } })).data || [];
       comentarios
         .filter((c) => c.username !== cuenta.username && fechaDe(c.timestamp) >= desde)
         .forEach((c) =>
@@ -87,6 +94,7 @@ function createMeta({ config, fetchImpl = (...a) => fetch(...a) }) {
 
   /** Comentarios de las últimas publicaciones; si una red falla, devuelve la otra y reporta el error. */
   async function comentariosRecientes({ desde, maxPublicaciones = 10 }) {
+    if (!(desde instanceof Date) || Number.isNaN(desde.getTime())) throw new Error('desde debe ser una fecha válida');
     const e = estado();
     if (!e.ok) throw new Error(e.motivo);
     const comentarios = [];
@@ -112,8 +120,8 @@ function createMeta({ config, fetchImpl = (...a) => fetch(...a) }) {
   async function responder({ red, comentarioId, mensaje }) {
     const texto = String(mensaje || '').trim();
     if (!texto) throw new Error('El mensaje de respuesta está vacío');
-    if (red === 'facebook') return api(`${comentarioId}/comments`, { method: 'POST', body: { message: texto } });
-    if (red === 'instagram') return api(`${comentarioId}/replies`, { method: 'POST', body: { message: texto } });
+    if (red === 'facebook') return api(`${enc(comentarioId)}/comments`, { method: 'POST', body: { message: texto } });
+    if (red === 'instagram') return api(`${enc(comentarioId)}/replies`, { method: 'POST', body: { message: texto } });
     throw new Error(`Red desconocida: ${red}`);
   }
 
