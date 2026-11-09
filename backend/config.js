@@ -18,6 +18,13 @@ function loadConfig(env = process.env) {
     agentIntervalHours: Number(env.AGENT_INTERVAL_HOURS || 6),
     // Revisor de PRs: cuenta de GitHub cuyos repos vigila (el token va en GITHUB_TOKEN, lo usa el plugin).
     githubOwner: env.GITHUB_OWNER || '',
+    // Respuestas en Redes: Graph API de Meta (token de página de larga duración).
+    meta: {
+      pageToken: env.META_PAGE_TOKEN || '',
+      pageId: env.META_PAGE_ID || '',
+      igUserId: env.META_IG_USER_ID || '',
+      apiVersion: env.META_API_VERSION || 'v21.0',
+    },
     // Base de datos externa que los agentes pueden consultar en SOLO LECTURA.
     db: {
       host: env.DB_HOST || '',

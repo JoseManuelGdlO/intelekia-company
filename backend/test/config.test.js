@@ -44,3 +44,9 @@ test('loadConfig lee GITHUB_OWNER para el revisor de PRs', () => {
   assert.equal(loadConfig({ GITHUB_OWNER: 'JoseManuelGdlO' }).githubOwner, 'JoseManuelGdlO');
   assert.equal(loadConfig({}).githubOwner, '');
 });
+
+test('loadConfig lee la configuración de Meta', () => {
+  const c = loadConfig({ META_PAGE_TOKEN: 't', META_PAGE_ID: 'p', META_IG_USER_ID: 'i' });
+  assert.deepEqual(c.meta, { pageToken: 't', pageId: 'p', igUserId: 'i', apiVersion: 'v21.0' });
+  assert.equal(loadConfig({ META_API_VERSION: 'v22.0' }).meta.apiVersion, 'v22.0');
+});
