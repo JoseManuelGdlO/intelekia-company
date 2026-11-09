@@ -166,10 +166,18 @@ export function createPerfilEditor({ accentOf, onSaved }) {
     $('perfil-label').value = perfil.label;
     $('perfil-autonomous').checked = Boolean(perfil.autonomous);
     $('perfil-rol').value = perfil.rol;
+    $('perfil-autonomia').checked = perfil.autonomia === 'autonomo';
+    fillAutonomiaHint();
     fillCiclo();
     $('perfil-rol-hint').textContent = isCustom
       ? 'Contexto que le diste al crearlo.'
       : 'Se guarda en su archivo de rol (departamentos/…/agentes). Ojo: si pide un formato de salida específico, consérvalo.';
+  }
+
+  function fillAutonomiaHint() {
+    $('perfil-autonomia-hint').textContent = $('perfil-autonomia').checked
+      ? 'Ejecuta sus acciones sin pedirte permiso (lo delicado igual te lo pasa a ✋ Aprobaciones).'
+      : '✋ Supervisado: todo lo que quiera hacer llega a ✋ Aprobaciones para que tú decidas.';
   }
 
   async function fillCiclo() {
@@ -234,6 +242,7 @@ export function createPerfilEditor({ accentOf, onSaved }) {
     setBusy(button, true);
     try {
       const patch = { rol: $('perfil-rol').value };
+      patch.autonomia = $('perfil-autonomia').checked ? 'autonomo' : 'supervisado';
       if (cicloDirty) patch.cicloHoras = cicloValor;
       if (perfil.tipo === 'custom') {
         patch.label = $('perfil-label').value;
@@ -695,6 +704,10 @@ export function createPerfilEditor({ accentOf, onSaved }) {
   );
   $('perfil-autonomous').addEventListener('change', () => {
     dirty.rol = true;
+  });
+  $('perfil-autonomia').addEventListener('change', () => {
+    dirty.rol = true;
+    fillAutonomiaHint();
   });
   $('perfil-ciclo').addEventListener('input', () => {
     const v = $('perfil-ciclo').value;

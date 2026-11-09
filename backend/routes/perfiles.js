@@ -17,8 +17,8 @@ function createPerfilesRouter({ profiles }) {
   router.put(
     '/:agentId',
     wrap((req) => {
-      const { rol, label, autonomous, skills, herramientas, cicloHoras, instalados } = req.body || {};
-      return profiles.updateProfile(req.params.agentId, { rol, label, autonomous, skills, herramientas, cicloHoras, instalados });
+      const { rol, label, autonomous, skills, herramientas, cicloHoras, instalados, autonomia } = req.body || {};
+      return profiles.updateProfile(req.params.agentId, { rol, label, autonomous, skills, herramientas, cicloHoras, instalados, autonomia });
     })
   );
   router.get('/:agentId/memoria', wrap((req) => ({ content: profiles.getMemory(req.params.agentId) })));

@@ -163,3 +163,15 @@ test('instalados: se guardan por agente, se validan y salen en el perfil', () =>
   assert.throws(() => profiles.updateProfile('a', { instalados: { skills: 'x' } }), /lista de ids/);
   assert.throws(() => profiles.updateProfile('a', { instalados: [] }), /objeto/);
 });
+
+test('autonomia: por defecto supervisado, se guarda y se valida', () => {
+  const { profiles } = setup();
+  assert.equal(profiles.autonomiaOf('publicador'), 'supervisado');
+  assert.equal(profiles.getProfile('publicador').autonomia, 'supervisado');
+  const p = profiles.updateProfile('publicador', { autonomia: 'autonomo' });
+  assert.equal(p.autonomia, 'autonomo');
+  assert.equal(profiles.autonomiaOf('publicador'), 'autonomo');
+  assert.equal(profiles.autonomiaOf('custom-x'), 'supervisado');
+  assert.throws(() => profiles.updateProfile('publicador', { autonomia: 'a veces' }), /autonomo.*supervisado/);
+  assert.throws(() => profiles.autonomiaOf('nadie'), /desconocido/);
+});
