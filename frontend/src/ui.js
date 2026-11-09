@@ -283,7 +283,7 @@ export function createPanel({ onSend, onForzar, onClose, onEdit }) {
 
   window.addEventListener('keydown', (e) => {
     // Si hay un editor abierto encima, Escape cierra ese editor, no el panel.
-    if (e.key === 'Escape' && currentAgentId && !document.querySelector('#perfil-modal.visible, #com-modal.visible, #mail-modal.visible')) close();
+    if (e.key === 'Escape' && currentAgentId && !document.querySelector('#perfil-modal.visible, #com-modal.visible, #mail-modal.visible, #apr-modal.visible')) close();
   });
 
   return { open, close, setTitle, renderStatus, renderTeam, renderActividad, renderCiclo, appendMessage, getCurrentAgentId: () => currentAgentId };

@@ -203,3 +203,13 @@ export const quitarPlugin = (id) => sendJson(`${INSTALABLES_URL}/plugins/${encod
 export async function fetchRevisionesPR() {
   return jsonOrThrow(await fetch('/api/revisiones-pr'));
 }
+
+const APROBACIONES_URL = '/api/aprobaciones';
+
+export async function fetchAprobaciones(params = {}) {
+  const qs = new URLSearchParams(params);
+  return jsonOrThrow(await fetch(`${APROBACIONES_URL}?${qs}`));
+}
+
+export const aprobarAprobacion = (id, body) => sendJson(`${APROBACIONES_URL}/${encodeURIComponent(id)}/aprobar`, 'POST', body);
+export const descartarAprobacion = (id) => sendJson(`${APROBACIONES_URL}/${encodeURIComponent(id)}/descartar`, 'POST');

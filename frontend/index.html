@@ -22,6 +22,7 @@
       </div>
       <nav id="dept-nav"></nav>
       <button id="mail-inbox-btn" class="chip chip-mail" hidden>✉️ Correos <span id="mail-inbox-count" class="count-badge" hidden></span></button>
+      <button id="apr-inbox-btn" class="chip chip-mail">✋ Aprobaciones <span id="apr-inbox-count" class="count-badge" hidden></span></button>
     </header>
 
     <div id="mail-modal" role="dialog" aria-modal="true" aria-labelledby="mail-modal-title">
@@ -44,6 +45,25 @@
         <div id="mail-toast"></div>
       </div>
     </div>
+
+    <div id="apr-modal" role="dialog" aria-modal="true" aria-labelledby="apr-modal-title">
+      <div class="com-card mail-card">
+        <div class="com-header">
+          <div>
+            <h2 id="apr-modal-title">✋ Aprobaciones</h2>
+            <p>Lo que tus trabajadores supervisados quieren hacer, y lo delicado que te escalaron.
+              Revisa, edita si quieres y decide <b>Aprobar</b> o <b>Descartar</b>.</p>
+          </div>
+          <button id="apr-modal-close" class="icon-btn" title="Cerrar (Esc)">✕</button>
+        </div>
+        <div class="mail-list">
+          <h3 class="mail-section">Por aprobar <span id="apr-pending-count"></span></h3>
+          <div id="apr-pending" class="mail-pending"></div>
+          <h3 class="mail-section">Resueltas recientemente</h3>
+          <div id="apr-done"></div>
+        </div>
+        <div id="apr-toast"></div>
+      </div>
 
     <div id="legend">
       <div class="legend-item" data-status="trabajando"><span class="dot"></span>Trabajando <b>0</b></div>
