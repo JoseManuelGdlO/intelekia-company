@@ -1,0 +1,21 @@
+{
+  "seguimiento-crm": {
+    "herramientas": {
+      "baseDatos": true
+    }
+  },
+  "pm": {
+    "herramientas": {
+      "baseDatos": false,
+      "correo": true
+    },
+    "instalados": {
+      "skills": [
+        "internal-comms"
+      ],
+      "plugins": [
+        "deepwiki"
+      ]
+    }
+  }
+}

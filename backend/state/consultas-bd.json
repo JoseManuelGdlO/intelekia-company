@@ -1,0 +1,194 @@
+[
+  {
+    "fecha": "2026-11-07T21:02:50.892Z",
+    "agentId": "seguimiento-crm",
+    "sql": "SELECT p.name AS proyecto, t.title, bc.name AS estado, u.name AS responsable,\n       DATE(t.dueDate) AS vence, DATEDIFF(CURDATE(), DATE(t.dueDate)) AS dias_retraso,\n       t.assigneeConfirmed AS confirmada,\n       COALESCE((SELECT MAX(a.createdAt) FROM TaskActivities a WHERE a.taskId = t.id), t.updatedAt) AS ultimo_movimiento\nFROM Tasks t\nJOIN BoardColumns bc ON bc.id = t.columnId\nLEFT JOIN Projects p ON p.id = t.projectId\nLEFT JOIN Users u ON u.id = t.assigneeId\nWHERE bc.name <> 'Entregadas' AND p.status IN ('trabajando','parado')\nORDER BY t.dueDate IS NULL, t.dueDate\nLIMIT 200",
+    "motivo": "Obtener tareas abiertas, con estado, responsable, retraso y último movimiento.",
+    "filas": 12,
+    "error": null
+  },
+  {
+    "fecha": "2026-11-07T21:02:51.137Z",
+    "agentId": "seguimiento-crm",
+    "sql": "SELECT p.name, p.status,\n       SUM(bc.name <> 'Entregadas') AS abiertas,\n       SUM(bc.name = 'Entregadas') AS entregadas,\n       SUM(bc.name <> 'Entregadas' AND t.dueDate < NOW()) AS vencidas,\n       SUM(bc.name = 'Por revisar') AS por_revisar,\n       DATEDIFF(NOW(), GREATEST(p.updatedAt, COALESCE(MAX(t.updatedAt), p.updatedAt))) AS dias_sin_actividad\nFROM Projects p\nLEFT JOIN Tasks t ON t.projectId = p.id\nLEFT JOIN BoardColumns bc ON bc.id = t.columnId\nWHERE p.status IN ('trabajando','parado')\nGROUP BY p.id\nORDER BY vencidas DESC, dias_sin_actividad DESC\nLIMIT 200",
+    "motivo": "Obtener estado de salud por proyecto.",
+    "filas": 14,
+    "error": null
+  },
+  {
+    "fecha": "2026-11-07T21:02:51.373Z",
+    "agentId": "seguimiento-crm",
+    "sql": "SELECT u.name, COUNT(t.id) AS abiertas, SUM(t.dueDate < NOW()) AS vencidas\nFROM Users u\nJOIN Tasks t ON t.assigneeId = u.id\nJOIN BoardColumns bc ON bc.id = t.columnId\nWHERE bc.name <> 'Entregadas'\nGROUP BY u.id\nORDER BY abiertas DESC",
+    "motivo": "Obtener carga de trabajo por persona.",
+    "filas": 3,
+    "error": null
+  },
+  {
+    "fecha": "2026-11-07T21:02:51.605Z",
+    "agentId": "seguimiento-crm",
+    "sql": "SELECT p.name AS proyecto, n.title, n.remindAt\nFROM Notes n\nLEFT JOIN Projects p ON p.id = n.projectId\nWHERE n.isReminder = 1 AND n.notifiedAt IS NULL AND n.remindAt <= NOW() + INTERVAL 3 DAY\nORDER BY n.remindAt\nLIMIT 50",
+    "motivo": "Obtener recordatorios pendientes.",
+    "filas": 0,
+    "error": null
+  },
+  {
+    "fecha": "2026-11-07T21:03:29.191Z",
+    "agentId": "seguimiento-crm",
+    "sql": "SELECT p.name AS proyecto, t.title, bc.name AS estado, u.name AS responsable,\n       DATE(t.dueDate) AS vence, DATEDIFF(CURDATE(), DATE(t.dueDate)) AS dias_retraso,\n       t.assigneeConfirmed AS confirmada,\n       COALESCE((SELECT MAX(a.createdAt) FROM TaskActivities a WHERE a.taskId = t.id), t.updatedAt) AS ultimo_movimiento\nFROM Tasks t\nJOIN BoardColumns bc ON bc.id = t.columnId\nLEFT JOIN Projects p ON p.id = t.projectId\nLEFT JOIN Users u ON u.id = t.assigneeId\nWHERE bc.name <> 'Entregadas' AND p.status IN ('trabajando','parado')\nORDER BY t.dueDate IS NULL, t.dueDate\nLIMIT 200",
+    "motivo": "Identificar tareas abiertas con retrasos y estado",
+    "filas": 12,
+    "error": null
+  },
+  {
+    "fecha": "2026-11-07T21:03:29.427Z",
+    "agentId": "seguimiento-crm",
+    "sql": "SELECT p.name, p.status,\n       SUM(bc.name <> 'Entregadas') AS abiertas,\n       SUM(bc.name = 'Entregadas') AS entregadas,\n       SUM(bc.name <> 'Entregadas' AND t.dueDate < NOW()) AS vencidas,\n       SUM(bc.name = 'Por revisar') AS por_revisar,\n       DATEDIFF(NOW(), GREATEST(p.updatedAt, COALESCE(MAX(t.updatedAt), p.updatedAt))) AS dias_sin_actividad\nFROM Projects p\nLEFT JOIN Tasks t ON t.projectId = p.id\nLEFT JOIN BoardColumns bc ON bc.id = t.columnId\nWHERE p.status IN ('trabajando','parado')\nGROUP BY p.id\nORDER BY vencidas DESC, dias_sin_actividad DESC\nLIMIT 200",
+    "motivo": "Obtener estado general de proyectos activos",
+    "filas": 14,
+    "error": null
+  },
+  {
+    "fecha": "2026-11-07T21:03:29.664Z",
+    "agentId": "seguimiento-crm",
+    "sql": "SELECT u.name, COUNT(t.id) AS abiertas, SUM(t.dueDate < NOW()) AS vencidas\nFROM Users u\nJOIN Tasks t ON t.assigneeId = u.id\nJOIN BoardColumns bc ON bc.id = t.columnId\nWHERE bc.name <> 'Entregadas'\nGROUP BY u.id\nORDER BY abiertas DESC",
+    "motivo": "Evaluar carga del equipo",
+    "filas": 3,
+    "error": null
+  },
+  {
+    "fecha": "2026-11-07T21:30:15.215Z",
+    "agentId": "seguimiento-crm",
+    "sql": "[interna] tickets atrasados por responsable",
+    "motivo": "tickets atrasados por responsable",
+    "filas": 6,
+    "error": null
+  },
+  {
+    "fecha": "2026-11-07T21:30:29.759Z",
+    "agentId": "seguimiento-crm",
+    "sql": "SELECT p.name AS proyecto, t.title, bc.name AS estado, u.name AS responsable,\n       DATE(t.dueDate) AS vence, DATEDIFF(CURDATE(), DATE(t.dueDate)) AS dias_retraso,\n       t.assigneeConfirmed AS confirmada,\n       COALESCE((SELECT MAX(a.createdAt) FROM TaskActivities a WHERE a.taskId = t.id), t.updatedAt) AS ultimo_movimiento\nFROM Tasks t\nJOIN BoardColumns bc ON bc.id = t.columnId\nLEFT JOIN Projects p ON p.id = t.projectId\nLEFT JOIN Users u ON u.id = t.assigneeId\nWHERE bc.name <> 'Entregadas' AND p.status IN ('trabajando','parado')\nORDER BY t.dueDate IS NULL, t.dueDate\nLIMIT 200",
+    "motivo": "Detección de tareas vencidas y estancadas.",
+    "filas": 12,
+    "error": null
+  },
+  {
+    "fecha": "2026-11-07T21:30:29.991Z",
+    "agentId": "seguimiento-crm",
+    "sql": "SELECT p.name, p.status,\n       SUM(bc.name <> 'Entregadas') AS abiertas,\n       SUM(bc.name = 'Entregadas') AS entregadas,\n       SUM(bc.name <> 'Entregadas' AND t.dueDate < NOW()) AS vencidas,\n       SUM(bc.name = 'Por revisar') AS por_revisar,\n       DATEDIFF(NOW(), GREATEST(p.updatedAt, COALESCE(MAX(t.updatedAt), p.updatedAt))) AS dias_sin_actividad\nFROM Projects p\nLEFT JOIN Tasks t ON t.projectId = p.id\nLEFT JOIN BoardColumns bc ON bc.id = t.columnId\nWHERE p.status IN ('trabajando','parado')\nGROUP BY p.id\nORDER BY vencidas DESC, dias_sin_actividad DESC\nLIMIT 200",
+    "motivo": "Revisión del estado y la salud de los proyectos.",
+    "filas": 14,
+    "error": null
+  },
+  {
+    "fecha": "2026-11-07T21:30:30.224Z",
+    "agentId": "seguimiento-crm",
+    "sql": "SELECT u.name, COUNT(t.id) AS abiertas, SUM(t.dueDate < NOW()) AS vencidas\nFROM Users u\nJOIN Tasks t ON t.assigneeId = u.id\nJOIN BoardColumns bc ON bc.id = t.columnId\nWHERE bc.name <> 'Entregadas'\nGROUP BY u.id\nORDER BY abiertas DESC",
+    "motivo": "Carga de tareas en el equipo.",
+    "filas": 3,
+    "error": null
+  },
+  {
+    "fecha": "2026-11-07T21:30:30.453Z",
+    "agentId": "seguimiento-crm",
+    "sql": "SELECT p.name AS proyecto, n.title, n.remindAt\nFROM Notes n\nLEFT JOIN Projects p ON p.id = n.projectId\nWHERE n.isReminder = 1 AND n.notifiedAt IS NULL AND n.remindAt <= NOW() + INTERVAL 3 DAY\nORDER BY n.remindAt\nLIMIT 50",
+    "motivo": "Detección de recordatorios próximos.",
+    "filas": 0,
+    "error": null
+  },
+  {
+    "fecha": "2026-11-07T21:39:12.074Z",
+    "agentId": "seguimiento-crm",
+    "sql": "[interna] tickets atrasados por responsable",
+    "motivo": "tickets atrasados por responsable",
+    "filas": 0,
+    "error": "connect ETIMEDOUT"
+  },
+  {
+    "fecha": "2026-11-07T21:40:08.016Z",
+    "agentId": "seguimiento-crm",
+    "sql": "[interna] tickets atrasados por responsable",
+    "motivo": "tickets atrasados por responsable",
+    "filas": 0,
+    "error": "connect ETIMEDOUT"
+  },
+  {
+    "fecha": "2026-11-07T21:44:42.652Z",
+    "agentId": "seguimiento-crm",
+    "sql": "[interna] tickets atrasados por responsable",
+    "motivo": "tickets atrasados por responsable",
+    "filas": 6,
+    "error": null
+  },
+  {
+    "fecha": "2026-11-07T21:44:46.166Z",
+    "agentId": "seguimiento-crm",
+    "sql": "SELECT p.name AS proyecto, t.title, bc.name AS estado, u.name AS responsable, DATE(t.dueDate) AS vence, DATEDIFF(CURDATE(), DATE(t.dueDate)) AS dias_retraso, t.assigneeConfirmed AS confirmada, COALESCE((SELECT MAX(a.createdAt) FROM TaskActivities a WHERE a.taskId = t.id), t.updatedAt) AS ultimo_movimiento FROM Tasks t JOIN BoardColumns bc ON bc.id = t.columnId LEFT JOIN Projects p ON p.id = t.projectId LEFT JOIN Users u ON u.id = t.assigneeId WHERE bc.name <> 'Entregadas' AND p.status IN ('trabajando','parado') ORDER BY t.dueDate IS NULL, t.dueDate LIMIT 200",
+    "motivo": "Obtener tareas abiertas y pendientes para el seguimiento de proyectos.",
+    "filas": 12,
+    "error": null
+  },
+  {
+    "fecha": "2026-11-07T21:44:49.969Z",
+    "agentId": "seguimiento-crm",
+    "sql": "SELECT p.name, p.status, SUM(bc.name <> 'Entregadas') AS abiertas, SUM(bc.name = 'Entregadas') AS entregadas, SUM(bc.name <> 'Entregadas' AND t.dueDate < NOW()) AS vencidas, SUM(bc.name = 'Por revisar') AS por_revisar, DATEDIFF(NOW(), GREATEST(p.updatedAt, COALESCE(MAX(t.updatedAt), p.updatedAt))) AS dias_sin_actividad FROM Projects p LEFT JOIN Tasks t ON t.projectId = p.id LEFT JOIN BoardColumns bc ON bc.id = t.columnId WHERE p.status IN ('trabajando','parado') GROUP BY p.id ORDER BY vencidas DESC, dias_sin_actividad DESC LIMIT 200",
+    "motivo": "Obtener la salud de los proyectos.",
+    "filas": 14,
+    "error": null
+  },
+  {
+    "fecha": "2026-11-07T21:44:51.940Z",
+    "agentId": "seguimiento-crm",
+    "sql": "SELECT u.name, COUNT(t.id) AS abiertas, SUM(t.dueDate < NOW()) AS vencidas FROM Users u JOIN Tasks t ON t.assigneeId = u.id JOIN BoardColumns bc ON bc.id = t.columnId WHERE bc.name <> 'Entregadas' GROUP BY u.id ORDER BY abiertas DESC",
+    "motivo": "Obtener carga actual del equipo.",
+    "filas": 3,
+    "error": null
+  },
+  {
+    "fecha": "2026-11-07T21:44:54.342Z",
+    "agentId": "seguimiento-crm",
+    "sql": "SELECT p.name AS proyecto, n.title, n.remindAt FROM Notes n LEFT JOIN Projects p ON p.id = n.projectId WHERE n.isReminder = 1 AND n.notifiedAt IS NULL AND n.remindAt <= NOW() + INTERVAL 3 DAY ORDER BY n.remindAt LIMIT 50",
+    "motivo": "Obtener recordatorios pendientes.",
+    "filas": 0,
+    "error": null
+  },
+  {
+    "fecha": "2026-11-08T22:29:28.582Z",
+    "agentId": "seguimiento-crm",
+    "sql": "[interna] tickets atrasados por responsable",
+    "motivo": "tickets atrasados por responsable",
+    "filas": 6,
+    "error": null
+  },
+  {
+    "fecha": "2026-11-08T22:45:04.536Z",
+    "agentId": "seguimiento-crm",
+    "sql": "SELECT p.name AS proyecto, t.title, bc.name AS estado, u.name AS responsable,\n       DATE(t.dueDate) AS vence, DATEDIFF(CURDATE(), DATE(t.dueDate)) AS dias_retraso,\n       t.assigneeConfirmed AS confirmada,\n       COALESCE((SELECT MAX(a.createdAt) FROM TaskActivities a WHERE a.taskId = t.id), t.updatedAt) AS ultimo_movimiento\nFROM Tasks t\nJOIN BoardColumns bc ON bc.id = t.columnId\nLEFT JOIN Projects p ON p.id = t.projectId\nLEFT JOIN Users u ON u.id = t.assigneeId\nWHERE bc.name <> 'Entregadas' AND p.status IN ('trabajando','parado')\nORDER BY t.dueDate IS NULL, t.dueDate\nLIMIT 200",
+    "motivo": "Obtener tareas abiertas con estado, responsable, retraso y último movimiento.",
+    "filas": 12,
+    "error": null
+  },
+  {
+    "fecha": "2026-11-08T22:45:08.289Z",
+    "agentId": "seguimiento-crm",
+    "sql": "SELECT p.name, p.status,\n       SUM(bc.name <> 'Entregadas') AS abiertas,\n       SUM(bc.name = 'Entregadas') AS entregadas,\n       SUM(bc.name <> 'Entregadas' AND t.dueDate < NOW()) AS vencidas,\n       SUM(bc.name = 'Por revisar') AS por_revisar,\n       DATEDIFF(NOW(), GREATEST(p.updatedAt, COALESCE(MAX(t.updatedAt), p.updatedAt))) AS dias_sin_actividad\nFROM Projects p\nLEFT JOIN Tasks t ON t.projectId = p.id\nLEFT JOIN BoardColumns bc ON bc.id = t.columnId\nWHERE p.status IN ('trabajando','parado')\nGROUP BY p.id\nORDER BY vencidas DESC, dias_sin_actividad DESC\nLIMIT 200",
+    "motivo": "Obtener salud de los proyectos en estado 'trabajando' o 'parado'.",
+    "filas": 14,
+    "error": null
+  },
+  {
+    "fecha": "2026-11-08T22:45:10.781Z",
+    "agentId": "seguimiento-crm",
+    "sql": "SELECT u.name, COUNT(t.id) AS abiertas, SUM(t.dueDate < NOW()) AS vencidas\nFROM Users u\nJOIN Tasks t ON t.assigneeId = u.id\nJOIN BoardColumns bc ON bc.id = t.columnId\nWHERE bc.name <> 'Entregadas'\nGROUP BY u.id\nORDER BY abiertas DESC",
+    "motivo": "Obtener la carga de trabajo del equipo.",
+    "filas": 3,
+    "error": null
+  },
+  {
+    "fecha": "2026-11-08T22:45:13.629Z",
+    "agentId": "seguimiento-crm",
+    "sql": "SELECT p.name AS proyecto, n.title, n.remindAt\nFROM Notes n\nLEFT JOIN Projects p ON p.id = n.projectId\nWHERE n.isReminder = 1 AND n.notifiedAt IS NULL AND n.remindAt <= NOW() + INTERVAL 3 DAY\nORDER BY n.remindAt\nLIMIT 50",
+    "motivo": "Obtener recordatorios pendientes sin notificar.",
+    "filas": 0,
+    "error": null
+  }
+]

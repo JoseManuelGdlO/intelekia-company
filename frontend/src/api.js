@@ -114,3 +114,89 @@ export async function saveMemoria(agentId, content) {
 export async function comprimirMemoria(agentId) {
   return jsonOrThrow(await fetch(`${PERFILES_URL}/${encodeURIComponent(agentId)}/memoria/comprimir`, { method: 'POST' }));
 }
+
+const BASE_DATOS_URL = '/api/base-datos';
+
+export async function fetchBaseDatosEstado() {
+  return jsonOrThrow(await fetch(`${BASE_DATOS_URL}/estado`));
+}
+
+export async function probarBaseDatos() {
+  return jsonOrThrow(await fetch(`${BASE_DATOS_URL}/probar`, { method: 'POST' }));
+}
+
+export async function fetchConsultasBD({ agentId, limite } = {}) {
+  const params = new URLSearchParams();
+  if (agentId) params.set('agentId', agentId);
+  if (limite) params.set('limite', String(limite));
+  return jsonOrThrow(await fetch(`${BASE_DATOS_URL}/consultas?${params}`));
+}
+
+const CORREO_URL = '/api/correo';
+
+export async function fetchCorreoEstado() {
+  return jsonOrThrow(await fetch(`${CORREO_URL}/estado`));
+}
+
+export async function saveCorreoConfig({ permitidos, limiteDiario }) {
+  return jsonOrThrow(
+    await fetch(`${CORREO_URL}/config`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ permitidos, limiteDiario }),
+    })
+  );
+}
+
+export async function probarCorreo() {
+  return jsonOrThrow(await fetch(`${CORREO_URL}/probar`, { method: 'POST' }));
+}
+
+export async function fetchCorreos({ estado, agentId, limite } = {}) {
+  const params = new URLSearchParams();
+  if (estado) params.set('estado', estado);
+  if (agentId) params.set('agentId', agentId);
+  if (limite) params.set('limite', String(limite));
+  return jsonOrThrow(await fetch(`${CORREO_URL}/correos?${params}`));
+}
+
+export async function aprobarCorreo(id, cambios = {}) {
+  return jsonOrThrow(
+    await fetch(`${CORREO_URL}/correos/${encodeURIComponent(id)}/aprobar`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(cambios),
+    })
+  );
+}
+
+export async function descartarCorreo(id) {
+  return jsonOrThrow(await fetch(`${CORREO_URL}/correos/${encodeURIComponent(id)}/descartar`, { method: 'POST' }));
+}
+
+export async function fetchActividad(agentId, { desde, limite } = {}) {
+  const params = new URLSearchParams();
+  if (desde) params.set('desde', desde);
+  if (limite) params.set('limite', String(limite));
+  return jsonOrThrow(await fetch(`${BASE_URL}/${encodeURIComponent(agentId)}/actividad?${params}`));
+}
+
+export async function fetchCiclos() {
+  return jsonOrThrow(await fetch(`${BASE_URL}/ciclos`));
+}
+
+const INSTALABLES_URL = '/api/instalables';
+
+export async function fetchInstalables() {
+  return jsonOrThrow(await fetch(INSTALABLES_URL));
+}
+
+async function sendJson(url, method, body) {
+  return jsonOrThrow(await fetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: body ? JSON.stringify(body) : undefined }));
+}
+
+export const instalarSkill = (url) => sendJson(`${INSTALABLES_URL}/skills`, 'POST', { url });
+export const quitarSkillInstalada = (id) => sendJson(`${INSTALABLES_URL}/skills/${encodeURIComponent(id)}`, 'DELETE');
+export const instalarPlugin = (datos) => sendJson(`${INSTALABLES_URL}/plugins`, 'POST', datos);
+export const probarPlugin = (id) => sendJson(`${INSTALABLES_URL}/plugins/${encodeURIComponent(id)}/probar`, 'POST');
+export const quitarPlugin = (id) => sendJson(`${INSTALABLES_URL}/plugins/${encodeURIComponent(id)}`, 'DELETE');

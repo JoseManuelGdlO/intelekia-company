@@ -21,7 +21,29 @@
         </div>
       </div>
       <nav id="dept-nav"></nav>
+      <button id="mail-inbox-btn" class="chip chip-mail" hidden>✉️ Correos <span id="mail-inbox-count" class="count-badge" hidden></span></button>
     </header>
+
+    <div id="mail-modal" role="dialog" aria-modal="true" aria-labelledby="mail-modal-title">
+      <div class="com-card mail-card">
+        <div class="com-header">
+          <div>
+            <h2 id="mail-modal-title">✉️ Correos de los agentes</h2>
+            <p>Arriba, los que esperan tu aprobación (destinatarios fuera de tu lista o por encima del límite diario):
+              revísalos y decide <b>Enviar</b> o <b>Descartar</b>. Abajo, todo lo que ya salió.
+              Nota: los correos que envían los agentes no se guardan en la carpeta "Enviados" de tu buzón.</p>
+          </div>
+          <button id="mail-modal-close" class="icon-btn" title="Cerrar (Esc)">✕</button>
+        </div>
+        <div class="mail-list">
+          <h3 class="mail-section">Por aprobar <span id="mail-pending-count"></span></h3>
+          <div id="mail-pending" class="mail-pending"></div>
+          <h3 class="mail-section">Enviados <span id="mail-sent-count"></span></h3>
+          <div id="mail-sent"></div>
+        </div>
+        <div id="mail-toast"></div>
+      </div>
+    </div>
 
     <div id="legend">
       <div class="legend-item" data-status="trabajando"><span class="dot"></span>Trabajando <b>0</b></div>
@@ -77,6 +99,7 @@
         <div class="perfil-tabs" role="tablist">
           <button class="perfil-tab active" data-tab="rol" role="tab">🧠 Rol y contexto</button>
           <button class="perfil-tab" data-tab="skills" role="tab">🧩 Skills y plugins <span id="perfil-skills-count"></span></button>
+          <button class="perfil-tab" data-tab="herramientas" role="tab">🔌 Herramientas <span id="perfil-tools-count"></span></button>
           <button class="perfil-tab" data-tab="memoria" role="tab">📓 Memoria <span id="perfil-mem-count"></span></button>
         </div>
 
@@ -84,6 +107,12 @@
           <div id="perfil-custom-fields" class="perfil-row">
             <label>Nombre <input id="perfil-label" type="text" maxlength="60" /></label>
             <label class="perfil-check"><input id="perfil-autonomous" type="checkbox" /> Trabaja solo (ciclo autónomo)</label>
+          </div>
+          <div id="perfil-ciclo-row" class="perfil-row ciclo-row">
+            <label class="ciclo-field">⏱️ Ciclo automático: cada
+              <input id="perfil-ciclo" type="number" min="0" max="720" step="0.5" /> horas</label>
+            <button id="perfil-ciclo-default" class="btn ghost small" type="button">Usar valor por defecto</button>
+            <span id="perfil-ciclo-hint" class="muted"></span>
           </div>
           <label class="perfil-field">
             <span>Rol, personalidad e instrucciones <small id="perfil-rol-hint"></small></span>
@@ -93,6 +122,28 @@
         </section>
 
         <section class="perfil-pane" data-pane="skills">
+          <div class="inst-box">
+            <h3 class="inst-title">📦 Instalados desde internet <span id="inst-count" class="muted"></span></h3>
+            <p class="perfil-help">Skills de GitHub (carpetas con <code>SKILL.md</code>, p. ej. <code>anthropics/skills</code>) y plugins
+              (servidores MCP). Se instalan una vez para toda la oficina; marca los que usa este trabajador y guarda.</p>
+            <div id="inst-list"></div>
+            <div class="inst-forms">
+              <div class="inst-form">
+                <b>🧩 Instalar skill</b>
+                <input id="inst-skill-url" type="url" placeholder="https://github.com/anthropics/skills/tree/main/skills/internal-comms" />
+                <button id="inst-skill-btn" class="btn ghost small" type="button">Instalar skill</button>
+              </div>
+              <div class="inst-form">
+                <b>🔌 Instalar plugin (MCP)</b>
+                <input id="inst-plugin-nombre" type="text" placeholder="Nombre (opcional), ej. DeepWiki" />
+                <input id="inst-plugin-url" type="text" placeholder="URL https://… o paquete npm, ej. @modelcontextprotocol/server-memory" />
+                <small class="muted">Un paquete npm se ejecuta en esta computadora con npx: instala solo paquetes de autores confiables.</small>
+                <button id="inst-plugin-btn" class="btn ghost small" type="button">Conectar plugin</button>
+              </div>
+            </div>
+            <div class="perfil-actions"><span id="inst-result" class="muted"></span><button id="inst-save" class="btn primary">Guardar asignación</button></div>
+          </div>
+          <h3 class="inst-title">✍️ Instrucciones propias</h3>
           <p class="perfil-help">Pega aquí skills, instrucciones de plugins, documentación de un repo o cualquier conocimiento
             que quieras que este trabajador use. Se le entregan como referencia en cada tarea y chat
             (son texto: el agente las sigue, no ejecuta código). Puedes apagarlas sin borrarlas.</p>
@@ -104,6 +155,73 @@
           </div>
           <div id="perfil-skills"></div>
           <div class="perfil-actions"><span id="perfil-skills-total" class="muted"></span><button id="perfil-skills-save" class="btn primary">Guardar skills y plugins</button></div>
+        </section>
+
+        <section class="perfil-pane" data-pane="herramientas">
+          <p class="perfil-help">Conexiones reales que este trabajador puede usar por sí mismo cuando las necesite,
+            en su ciclo automático y en el chat contigo.</p>
+          <div class="tool-card">
+            <div class="tool-head">
+              <div class="tool-icon">🗄️</div>
+              <div class="tool-title">
+                <b>Base de datos <span id="bd-nombre"></span></b>
+                <span id="bd-estado" class="tool-badge"></span>
+              </div>
+              <label class="tool-switch"><input type="checkbox" id="bd-activa" /> <span>Permitir consultar</span></label>
+            </div>
+            <ul class="tool-rules">
+              <li><b>Solo lectura:</b> solo puede hacer SELECT; cada consulta corre en una transacción que MySQL bloquea para escrituras.</li>
+              <li><b>Tablas permitidas:</b> <span id="bd-tablas"></span></li>
+              <li><b>Nunca ve:</b> <span id="bd-bloqueadas"></span></li>
+              <li>Máximo 200 filas y 8 segundos por consulta. Todo queda registrado abajo.</li>
+            </ul>
+            <div id="bd-root-warning" class="tool-warning" hidden>⚠️ La conexión usa el usuario <b>root</b>. Crea un usuario MySQL de solo lectura y ponlo en <code>DB_USER</code> / <code>DB_PASSWORD</code> del archivo <code>backend/.env</code>.</div>
+            <div id="bd-config-help" class="tool-warning" hidden>Falta configurar la conexión: agrega <code>DB_HOST</code>, <code>DB_NAME</code>, <code>DB_USER</code> y <code>DB_PASSWORD</code> en <code>backend/.env</code> y reinicia el servidor.</div>
+            <div class="perfil-actions">
+              <span id="bd-test-result" class="muted"></span>
+              <button id="bd-probar" class="btn ghost">Probar conexión</button>
+            </div>
+          </div>
+
+          <div class="tool-card">
+            <div class="tool-head">
+              <div class="tool-icon">✉️</div>
+              <div class="tool-title">
+                <b>Correo <span id="mail-remitente"></span></b>
+                <span id="mail-estado" class="tool-badge"></span>
+              </div>
+              <label class="tool-switch"><input type="checkbox" id="mail-activo" /> <span>Permitir enviar correos</span></label>
+            </div>
+            <ul class="tool-rules">
+              <li><b>Envío directo</b> solo si todos los destinatarios están en la lista permitida. Cualquier otro queda en <b>✉️ Por aprobar</b> (arriba) para que tú decidas.</li>
+              <li>Máximo <b id="mail-limite-txt"></b> correos directos al día (hoy van <b id="mail-hoy"></b>). Nunca repite el mismo correo en 12 h.</li>
+              <li>Cada correo lleva la firma configurada en <code>SMTP_FIRMA</code> (por defecto aclara que lo envía un asistente de IA).</li>
+              <li id="mail-bcc-line">Copia oculta (CCO) de cada envío a: <b id="mail-bcc"></b></li>
+            </ul>
+            <div id="mail-config-help" class="tool-warning" hidden>Falta configurar el correo: agrega <code>SMTP_HOST</code> (Hostinger: <code>smtp.hostinger.com</code>), <code>SMTP_PORT=465</code>, <code>SMTP_USER</code> y <code>SMTP_PASSWORD</code> en <code>backend/.env</code> y reinicia el servidor.</div>
+            <div class="mail-config">
+              <label class="perfil-field">
+                <span>Destinatarios permitidos <small>Compartido por todos los agentes. Uno por línea: correo exacto o dominio completo (ej. @intelekia.cloud).</small></span>
+                <textarea id="mail-permitidos" rows="4" spellcheck="false" placeholder="@intelekia.cloud&#10;javier@gmail.com"></textarea>
+              </label>
+              <label class="mail-limit">Límite diario <input id="mail-limite" type="number" min="0" max="500" /></label>
+            </div>
+            <div class="perfil-actions">
+              <span id="mail-test-result" class="muted"></span>
+              <button id="mail-probar" class="btn ghost">Probar conexión</button>
+            </div>
+          </div>
+
+          <div class="perfil-actions sticky-save"><button id="perfil-tools-save" class="btn primary">Guardar herramientas</button></div>
+
+          <div class="tool-log">
+            <div class="tool-log-head"><b>Correos de este trabajador</b><button id="mail-log-reload" class="btn ghost small">↻</button></div>
+            <div id="mail-log"></div>
+          </div>
+          <div class="tool-log">
+            <div class="tool-log-head"><b>Últimas consultas a la base de datos</b><button id="bd-log-reload" class="btn ghost small">↻</button></div>
+            <div id="bd-log"></div>
+          </div>
         </section>
 
         <section class="perfil-pane" data-pane="memoria">
@@ -134,6 +252,11 @@
         <button id="panel-close" class="icon-btn" title="Cerrar (Esc)">✕</button>
       </div>
       <div id="panel-last-action"></div>
+      <div id="panel-ciclo"></div>
+      <details id="panel-activity" open>
+        <summary>🧠 Actividad <span id="panel-activity-live" class="live-badge" hidden>● EN VIVO</span> <span id="panel-activity-count"></span></summary>
+        <div id="panel-activity-list"></div>
+      </details>
       <details id="panel-team">
         <summary>Conversaciones con compañeros <span id="panel-team-count"></span></summary>
         <div id="panel-team-list"></div>

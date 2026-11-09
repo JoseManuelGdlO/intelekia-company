@@ -80,6 +80,27 @@ export function createScene({ container, departments, onAgentClick }) {
   const agents = {};
   const pickables = [];
 
+  // Registro compartido para que las personas no se encimen: posiciones y lugares de café.
+  const people = new Map(); // agentId -> character
+  const spotOwners = new Map(); // roomId -> [{ pos, owner }]
+  function crowdFor(agentId, roomId) {
+    return {
+      others: () => [...people].filter(([id]) => id !== agentId).map(([, c]) => c.root.position),
+      reserveSpot() {
+        const libres = (spotOwners.get(roomId) || []).filter((s) => !s.owner);
+        if (!libres.length) return null;
+        const s = libres[Math.floor(Math.random() * libres.length)];
+        s.owner = agentId;
+        return s.pos.clone();
+      },
+      releaseSpot() {
+        (spotOwners.get(roomId) || []).forEach((s) => {
+          if (s.owner === agentId) s.owner = null;
+        });
+      },
+    };
+  }
+
   departments.forEach((department, index) => {
     const theme = themeFor(department.id, index);
     const { width } = sizes[index];
@@ -87,10 +108,17 @@ export function createScene({ container, departments, onAgentClick }) {
     cursor += width + ROOM_GAP;
     scene.add(room.group);
     rooms.push({ id: department.id, ...room });
+    spotOwners.set(department.id, (room.spots || []).map((pos) => ({ pos, owner: null })));
 
     room.seats.forEach(({ agent, seat, route, screen, led, pickTargets }) => {
-      const character = createCharacter({ agentId: agent.id, rng: seededRandom(hashString(agent.id) ^ 0x9e3779b9), accent: theme.accent });
+      const character = createCharacter({
+        agentId: agent.id,
+        rng: seededRandom(hashString(agent.id) ^ 0x9e3779b9),
+        accent: theme.accent,
+        crowd: crowdFor(agent.id, department.id),
+      });
       character.setSeat(seat, route);
+      people.set(agent.id, character);
       scene.add(character.root);
 
       const tagEl = createAgentTag(agent.label, theme.accent);

@@ -169,3 +169,136 @@ test('con perfiles, decora los mensajes y guarda la consulta en la memoria de am
   assert.match(remembered[0].texto, /Consulté a Buscador de Prospectos: ¿giros\?\nMe respondió: cafeterías/);
   assert.match(remembered[1].texto, /Publicador me consultó/);
 });
+
+test('con la herramienta de base de datos activada, el agente consulta y recibe los datos', async () => {
+  const { DB_TOOL_NAME } = require('../lib/colleagues');
+  const departments = [{ id: 'comercial', agents: [{ id: 'seguimiento', label: 'Seguimiento', deps: {} }] }];
+  const comunicacion = createComunicacionStore({ configPath: tmp('com.json'), departments });
+  const queries = [];
+  const database = {
+    isConfigured: () => true,
+    status: () => ({ baseDatos: 'admin-intelekia' }),
+    schema: async () => 'Tasks(id, title)',
+    MAX_ROWS: 200,
+    query: async (sql, opts) => {
+      queries.push({ sql, ...opts });
+      return { rows: [{ title: 'Subir app' }], total: 1, truncado: false };
+    },
+    formatForModel: (r) => JSON.stringify(r.rows),
+  };
+  let enabled = true;
+  const profiles = { decorate: (id, m) => m, remember: () => {}, hasTool: () => enabled };
+  let round = 0;
+  const colleagues = createColleagues({
+    comunicacion,
+    conversaciones: createConversacionesStore({ filePath: tmp('conv.json') }),
+    createChatCompletion: async () => 'sin herramientas',
+    createChatCompletionMessage: async ({ tools, messages }) => {
+      round += 1;
+      assert.equal(tools.length, 1);
+      assert.equal(tools[0].function.name, DB_TOOL_NAME);
+      assert.match(tools[0].function.description, /Tasks\(id, title\)/);
+      if (round === 1) {
+        return { tool_calls: [{ id: 'q1', function: { name: DB_TOOL_NAME, arguments: JSON.stringify({ sql: 'SELECT title FROM Tasks', motivo: 'ver pendientes' }) } }] };
+      }
+      assert.equal(messages.at(-1).content, '[{"title":"Subir app"}]');
+      return { content: 'Pendiente: Subir app' };
+    },
+    contextPath: tmp('ctx.md', '# Intelekia'),
+    profiles,
+    database,
+  });
+
+  assert.equal(await colleagues.completionFor('seguimiento')(base), 'Pendiente: Subir app');
+  assert.deepEqual(queries, [{ sql: 'SELECT title FROM Tasks', agentId: 'seguimiento', motivo: 'ver pendientes' }]);
+
+  enabled = false;
+  assert.equal(await colleagues.completionFor('seguimiento')(base), 'sin herramientas');
+});
+
+test('con la herramienta de correo activada, el agente envía y sabe si salió o quedó por aprobar', async () => {
+  const { EMAIL_TOOL_NAME } = require('../lib/colleagues');
+  const departments = [{ id: 'administracion', agents: [{ id: 'pm', label: 'PM', deps: {} }] }];
+  const comunicacion = createComunicacionStore({ configPath: tmp('com.json'), departments });
+  const enviados = [];
+  const mailer = {
+    isConfigured: () => true,
+    status: () => ({ remitente: 'pm@intelekia.cloud', permitidos: ['@intelekia.cloud'] }),
+    enviar: async (args) => {
+      enviados.push(args);
+      return args.para[0].endsWith('@intelekia.cloud')
+        ? { estado: 'enviado', para: args.para, asunto: args.asunto }
+        : { estado: 'por_aprobar', motivo: 'fuera de la lista' };
+    },
+  };
+  const resultados = [];
+  let round = 0;
+  const colleagues = createColleagues({
+    comunicacion,
+    conversaciones: createConversacionesStore({ filePath: tmp('conv.json') }),
+    createChatCompletion: async () => 'sin herramientas',
+    createChatCompletionMessage: async ({ tools, messages }) => {
+      round += 1;
+      assert.equal(tools[0].function.name, EMAIL_TOOL_NAME);
+      assert.match(tools[0].function.description, /@intelekia\.cloud/);
+      if (round === 1) {
+        return {
+          tool_calls: [
+            { id: 'e1', function: { name: EMAIL_TOOL_NAME, arguments: JSON.stringify({ para: ['javier@intelekia.cloud'], asunto: 'TLO', cuerpo: 'Hola' }) } },
+            { id: 'e2', function: { name: EMAIL_TOOL_NAME, arguments: JSON.stringify({ para: ['cliente@x.com'], asunto: 'Avance', cuerpo: 'Hola' }) } },
+          ],
+        };
+      }
+      resultados.push(...messages.filter((m) => m.role === 'tool').map((m) => m.content));
+      return { content: 'Listo' };
+    },
+    contextPath: tmp('ctx.md', '# Intelekia'),
+    profiles: { decorate: (id, m) => m, remember: () => {}, hasTool: (id, h) => h === 'correo' },
+    mailer,
+  });
+  assert.equal(await colleagues.completionFor('pm')(base), 'Listo');
+  assert.equal(enviados.length, 2);
+  assert.equal(enviados[0].agentId, 'pm');
+  assert.match(resultados[0], /Correo enviado a javier@intelekia\.cloud/);
+  assert.match(resultados[1], /NO se envió.*por aprobar/);
+});
+
+test('la bitácora registra en vivo lo que piensa y hace el agente (y lo que responde su compañero)', async () => {
+  const { createActividadStore } = require('../lib/actividad');
+  const actividad = createActividadStore();
+  const departments = [
+    { id: 'marketing', agents: [{ id: 'publicador', label: 'Publicador', deps: {} }] },
+    { id: 'comercial', agents: [{ id: 'prospectos', label: 'Buscador de Prospectos', deps: {} }] },
+  ];
+  const comunicacion = createComunicacionStore({ configPath: tmp('com.json'), departments });
+  comunicacion.setRule('publicador', { alcance: 'todos' });
+  let round = 0;
+  const colleagues = createColleagues({
+    comunicacion,
+    conversaciones: createConversacionesStore({ filePath: tmp('conv.json') }),
+    createChatCompletion: async () => 'Cafeterías',
+    createChatCompletionMessage: async ({ messages }) => {
+      round += 1;
+      assert.match(messages[1].content, /escribe en una sola frase qué vas a hacer/);
+      if (round === 1) {
+        return {
+          content: 'Voy a preguntar qué giros responden mejor.',
+          tool_calls: [{ id: 'c1', function: { name: TOOL_NAME, arguments: JSON.stringify({ agente_id: 'prospectos', pregunta: '¿Qué giros?' }) } }],
+        };
+      }
+      return { content: 'Post para cafeterías' };
+    },
+    contextPath: tmp('ctx.md', '# Intelekia'),
+    actividad,
+  });
+  await colleagues.completionFor('publicador')(base);
+  assert.deepEqual(actividad.list('publicador').map((e) => [e.tipo, e.texto]), [
+    ['pensando', '💭 Pensando qué hacer…'],
+    ['nota', '🗒️ Voy a preguntar qué giros responden mejor.'],
+    ['herramienta', '🤝 Le pregunta a Buscador de Prospectos: ¿Qué giros?'],
+    ['resultado', 'Buscador de Prospectos respondió: Cafeterías'],
+    ['pensando', '💭 Analizando lo que obtuvo (paso 2)…'],
+    ['respuesta', '💬 Post para cafeterías'],
+  ]);
+  assert.deepEqual(actividad.list('prospectos').map((e) => e.tipo), ['chat', 'respuesta']);
+});

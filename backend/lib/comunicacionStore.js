@@ -10,7 +10,8 @@ const path = require('path');
  *   - todos:         a cualquier agente de cualquier departamento
  *   - personalizado: solo a los ids de `permitidos` (de su área o de otras)
  *
- * Los agentes sin regla propia usan `porDefecto`.
+ * Los agentes sin regla propia usan su `comunicacionPorDefecto` (si lo declaran, p. ej. el PM)
+ * o, si no, el `porDefecto` general.
  */
 const ALCANCES = ['nadie', 'area', 'todos', 'personalizado'];
 const DEFAULT_CONFIG = { porDefecto: 'area', reglas: {} };
@@ -45,7 +46,8 @@ function createComunicacionStore({ configPath, departments }) {
     if (rule && ALCANCES.includes(rule.alcance)) {
       return { alcance: rule.alcance, permitidos: Array.isArray(rule.permitidos) ? rule.permitidos : [] };
     }
-    return { alcance: config.porDefecto, permitidos: [], heredada: true };
+    const own = findAgent(agentId)?.agent.comunicacionPorDefecto;
+    return { alcance: own && own !== 'personalizado' && ALCANCES.includes(own) ? own : config.porDefecto, permitidos: [], heredada: true };
   }
 
   /** Ids de los agentes que `agentId` puede consultar ahora mismo. */
@@ -112,6 +114,10 @@ function createComunicacionStore({ configPath, departments }) {
   function setAll(alcance) {
     const config = setDefault(alcance);
     config.reglas = {};
+    // Los agentes con su propio valor por defecto (p. ej. el PM) también reciben la regla elegida.
+    allAgents().forEach(({ agent }) => {
+      if (agent.comunicacionPorDefecto) config.reglas[agent.id] = { alcance, permitidos: [] };
+    });
     write(config);
     return config;
   }

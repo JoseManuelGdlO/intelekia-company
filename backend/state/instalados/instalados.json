@@ -1,0 +1,98 @@
+{
+  "skills": [
+    {
+      "id": "internal-comms",
+      "nombre": "internal-comms",
+      "descripcion": "A set of resources to help me write all kinds of internal communications, using the formats that my company likes to use. Claude should use this skill whenever asked to write some sort of internal communications (status reports, leadership updates, 3P updates, company newsletters, FAQs, incident reports, project updates, etc.).",
+      "licencia": "Complete terms in LICENSE.txt",
+      "fuente": "https://github.com/anthropics/skills/tree/main/skills/internal-comms",
+      "archivos": [
+        "LICENSE.txt",
+        "SKILL.md",
+        "examples/3p-updates.md",
+        "examples/company-newsletter.md",
+        "examples/faq-answers.md",
+        "examples/general-comms.md"
+      ],
+      "instaladoEn": "2026-11-08T14:39:52.523Z"
+    }
+  ],
+  "plugins": [
+    {
+      "id": "deepwiki",
+      "transporte": "http",
+      "url": "https://mcp.deepwiki.com/mcp",
+      "nombre": "DeepWiki",
+      "instaladoEn": "2026-11-08T14:39:52.540Z",
+      "herramientas": [
+        {
+          "nombre": "ask_wiki_question",
+          "descripcion": "Ask any question about a GitHub repository's codebase and get an AI-powered answer\ngrounded in its DeepWiki.",
+          "esquema": {
+            "type": "object",
+            "properties": {
+              "repoName": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "items": {
+                      "type": "string"
+                    },
+                    "type": "array"
+                  }
+                ],
+                "description": "GitHub repository or list of repositories (max 10) in owner/repo format."
+              },
+              "question": {
+                "description": "The question to ask about the repository.",
+                "type": "string"
+              }
+            },
+            "required": [
+              "repoName",
+              "question"
+            ],
+            "additionalProperties": false
+          }
+        },
+        {
+          "nombre": "read_wiki_contents",
+          "descripcion": "View documentation about a GitHub repository.",
+          "esquema": {
+            "type": "object",
+            "properties": {
+              "repoName": {
+                "description": "GitHub repository in owner/repo format (e.g. \"facebook/react\").",
+                "type": "string"
+              }
+            },
+            "required": [
+              "repoName"
+            ],
+            "additionalProperties": false
+          }
+        },
+        {
+          "nombre": "read_wiki_structure",
+          "descripcion": "Get a list of documentation topics for a GitHub repository.",
+          "esquema": {
+            "type": "object",
+            "properties": {
+              "repoName": {
+                "description": "GitHub repository in owner/repo format (e.g. \"facebook/react\").",
+                "type": "string"
+              }
+            },
+            "required": [
+              "repoName"
+            ],
+            "additionalProperties": false
+          }
+        }
+      ],
+      "probadoEn": "2026-11-08T14:39:53.382Z"
+    }
+  ]
+}

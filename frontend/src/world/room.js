@@ -163,20 +163,23 @@ export function buildRoom({ department, theme, centerX }) {
     }));
 
     const seat = new THREE.Vector3(centerX + x, 0, z);
-    const coffeeX = laneX + (i % 3) * 0.5;
+    // Ruta hasta la entrada de la zona de café; el lugar exacto se reserva al salir (spots).
     const route = [
       new THREE.Vector3(seat.x + 0.62, 0, z),
       new THREE.Vector3(seat.x + 0.62, 0, z - 0.95),
       new THREE.Vector3(laneX, 0, z - 0.95),
-      new THREE.Vector3(laneX, 0, spotZ),
-      new THREE.Vector3(coffeeX, 0, spotZ),
+      new THREE.Vector3(laneX, 0, spotZ + 0.72),
     ];
     return { agent, seat, route, screen, led: desk.led, pickTargets: [desk.group, chair] };
   });
 
+  // Lugares de la zona de café, separados para que dos personas nunca queden encimadas.
+  const spots = [0, 1, 2].map((k) => new THREE.Vector3(laneX + k * 0.75, 0, spotZ));
+
   return {
     group,
     seats,
+    spots,
     width: W,
     depth: D,
     center: new THREE.Vector3(centerX, 0, 0),

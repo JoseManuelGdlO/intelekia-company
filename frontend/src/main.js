@@ -1,14 +1,17 @@
 import { createScene } from './scene.js';
 import { createPanel } from './ui.js';
-import { fetchStatus, fetchDepartments, sendChat, forzarCiclo, fetchComunicacion, fetchConversaciones } from './api.js';
+import { fetchStatus, fetchDepartments, sendChat, forzarCiclo, fetchComunicacion, fetchConversaciones, fetchActividad, fetchCiclos } from './api.js';
+import { fechaCorta } from './fechas.js';
 import { createComunicacionEditor } from './comunicacionEditor.js';
 import { createPerfilEditor } from './perfilEditor.js';
+import { createCorreoBandeja } from './correoBandeja.js';
 import { themeFor, hex } from './world/materials.js';
 import { loadBrandAssets } from './world/brand.js';
 
 const POLL_INTERVAL_MS = 4000;
 const TALK_POLL_INTERVAL_MS = 2000;
 const FEED_MAX = 4;
+const ACTIVIDAD_POLL_MS = 1500;
 
 let latestStatus = {};
 const agentLabels = {};
@@ -45,6 +48,7 @@ const panel = createPanel({
   },
   onClose: () => {
     if (scene) scene.setSelected(null);
+    seguirActividad(null);
   },
   onEdit: (agentId) => perfilEditor.open(agentId),
 });
@@ -68,6 +72,46 @@ function updateLegend() {
   document.querySelectorAll('#legend .legend-item').forEach((item) => {
     item.querySelector('b').textContent = counts[item.dataset.status] ?? 0;
   });
+}
+
+// --- Bitácora de actividad del agente abierto en el panel (en vivo) ---
+const actividadState = { agentId: null, eventos: [], cursor: null, timer: null, cargando: false };
+const TIPOS_CIERRE = new Set(['fin', 'respuesta', 'error']);
+
+function agenteEnVivo() {
+  const { agentId, eventos } = actividadState;
+  if (!agentId) return false;
+  if (latestStatus[agentId]?.estatus === 'trabajando') return true;
+  const ultimo = eventos[eventos.length - 1];
+  return Boolean(ultimo && !TIPOS_CIERRE.has(ultimo.tipo) && Date.now() - new Date(ultimo.fecha).getTime() < 120000);
+}
+
+async function pollActividad() {
+  const { agentId } = actividadState;
+  if (!agentId || actividadState.cargando) return;
+  actividadState.cargando = true;
+  try {
+    const nuevos = await fetchActividad(agentId, actividadState.cursor ? { desde: actividadState.cursor } : { limite: 80 });
+    if (agentId !== actividadState.agentId) return; // se cambió de agente mientras cargaba
+    if (nuevos.length) {
+      actividadState.eventos = [...actividadState.eventos, ...nuevos].slice(-150);
+      actividadState.cursor = nuevos[nuevos.length - 1].fecha;
+    }
+    panel.renderActividad(actividadState.eventos, { enVivo: agenteEnVivo() });
+  } catch (err) {
+    console.error('No se pudo leer la actividad', err);
+  } finally {
+    actividadState.cargando = false;
+  }
+}
+
+function seguirActividad(agentId) {
+  clearInterval(actividadState.timer);
+  Object.assign(actividadState, { agentId, eventos: [], cursor: null, timer: null });
+  if (!agentId) return;
+  panel.renderActividad([], {});
+  pollActividad();
+  actividadState.timer = setInterval(pollActividad, ACTIVIDAD_POLL_MS);
 }
 
 // --- Comunicación entre agentes ---
@@ -96,6 +140,7 @@ function showInFeed(conv) {
     const who = item.querySelector('.who');
     who.append(labelOf(conv.de), Object.assign(document.createElement('span'), { className: 'arrow', textContent: '→' }), labelOf(conv.para));
     item.querySelector('.q').textContent = conv.pregunta;
+    item.querySelector('.who').append(Object.assign(document.createElement('span'), { className: 'feed-time', textContent: fechaCorta(conv.inicio) }));
     feed.prepend(item);
     feedItems.set(conv.id, item);
     while (feed.children.length > FEED_MAX) {
@@ -115,6 +160,31 @@ function showInFeed(conv) {
     }, 8600);
   }
 }
+
+function showMailInFeed(item) {
+  const feed = document.getElementById('feed');
+  const node = document.createElement('div');
+  node.className = `feed-item mail ${item.estado === 'enviado' ? 'done' : item.estado === 'error' ? 'error' : ''}`;
+  node.innerHTML = '<span class="tag"></span><div class="who"></div><div class="q"></div>';
+  node.querySelector('.tag').textContent =
+    item.estado === 'enviado' ? 'correo enviado ✓' : item.estado === 'error' ? 'correo con error' : '✉️ por aprobar';
+  const who = node.querySelector('.who');
+  who.append(`✉️ ${labelOf(item.agentId)}`, Object.assign(document.createElement('span'), { className: 'arrow', textContent: '→' }), item.para.join(', '));
+  node.querySelector('.q').textContent = item.asunto;
+  who.append(Object.assign(document.createElement('span'), { className: 'feed-time', textContent: fechaCorta(item.enviadoEn || item.creadoEn) }));
+  if (item.estado === 'por_aprobar') {
+    node.style.pointerEvents = 'auto';
+    node.style.cursor = 'pointer';
+    node.title = 'Abrir la bandeja de correos por aprobar';
+    node.addEventListener('click', () => correoBandeja.open());
+  }
+  feed.prepend(node);
+  while (feed.children.length > FEED_MAX) feed.lastElementChild.remove();
+  setTimeout(() => node.classList.add('fade'), 12000);
+  setTimeout(() => node.remove(), 12600);
+}
+
+const correoBandeja = createCorreoBandeja({ labelOf, onCorreo: showMailInFeed });
 
 function mergeConversations(list, { animate }) {
   list.forEach((conv) => {
@@ -174,8 +244,12 @@ async function refreshStatus() {
     }
     if (panel.getCurrentAgentId()) {
       panel.renderStatus(latestStatus[panel.getCurrentAgentId()]);
+      fetchCiclos()
+        .then((ciclos) => panel.renderCiclo(ciclos[panel.getCurrentAgentId()]))
+        .catch(() => panel.renderCiclo(null));
     }
     updateLegend();
+    correoBandeja.refresh();
   } catch (err) {
     console.error('No se pudo actualizar el estatus', err);
   }
@@ -237,6 +311,7 @@ async function bootstrap() {
       scene.focusAgent(agentId);
       panel.open(agentId, agentLabels[agentId] || agentId, latestStatus[agentId], agentAccents[agentId]);
       renderPanelTeam();
+      seguirActividad(agentId);
     },
   });
   buildDepartmentNav(departments);

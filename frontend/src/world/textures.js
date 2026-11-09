@@ -206,7 +206,7 @@ export function whiteboardTexture(kind, accent, rng) {
   ctx.fillRect(0, 0, 768, 480);
   ctx.fillStyle = '#273043';
   ctx.font = `700 40px ${FONT}`;
-  const titles = { notes: 'Ideas de contenido', chart: 'Pipeline de ventas', kanban: 'Sprint actual' };
+  const titles = { notes: 'Ideas de contenido', chart: 'Pipeline de ventas', kanban: 'Sprint actual', team: 'Seguimiento del equipo' };
   ctx.fillText(titles[kind] || titles.kanban, 36, 64);
   ctx.strokeStyle = hex(accent);
   ctx.lineWidth = 5;

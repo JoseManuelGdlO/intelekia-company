@@ -38,5 +38,85 @@
     "razon": "Requieren una solución para optimizar la programación de entregas y comunicaciones con sus clientes.",
     "estatus": "nuevo",
     "creadoEn": "2026-11-06T22:33:13.982Z"
+  },
+  {
+    "id": "prospecto-1794170701759-0",
+    "negocio": "Estudio de Fotografía Luz y Sombra",
+    "giro": "Fotografía y video",
+    "razon": "Podrían beneficiarse de la automatización de citas y gestión de clientes para optimizar su flujo de trabajo.",
+    "estatus": "nuevo",
+    "creadoEn": "2026-11-08T20:45:01.759Z"
+  },
+  {
+    "id": "prospecto-1794170701759-1",
+    "negocio": "Tienda de Ropa Trendy",
+    "giro": "Comercio minorista",
+    "razon": "Necesitan un sistema de comercio electrónico y automatización para gestionar pedidos y reservas.",
+    "estatus": "nuevo",
+    "creadoEn": "2026-11-08T20:45:01.759Z"
+  },
+  {
+    "id": "prospecto-1794170701759-2",
+    "negocio": "Consultorio Odontológico Sonrisas Brillantes",
+    "giro": "Salud dental",
+    "razon": "Requieren recordatorios automáticos de citas para reducir faltas y mejorar la atención al cliente.",
+    "estatus": "nuevo",
+    "creadoEn": "2026-11-08T20:45:01.759Z"
+  },
+  {
+    "id": "prospecto-1794170701759-3",
+    "negocio": "Servicios de Catering Gourmet",
+    "giro": "Catering y eventos",
+    "razon": "Pueden beneficiarse de una plataforma para gestionar reservas y confirmar eventos mediante WhatsApp.",
+    "estatus": "nuevo",
+    "creadoEn": "2026-11-08T20:45:01.759Z"
+  },
+  {
+    "id": "prospecto-1794170701759-4",
+    "negocio": "Agencia de Viajes Viajes Inolvidables",
+    "giro": "Turismo y viajes",
+    "razon": "Pueden mejorar su atención al cliente mediante chatbots y automatización de seguimiento de viajeros.",
+    "estatus": "nuevo",
+    "creadoEn": "2026-11-08T20:45:01.759Z"
+  },
+  {
+    "id": "prospecto-1794192361942-0",
+    "negocio": "Consultorio Ginecológico Bienestar",
+    "giro": "Consultorio médico",
+    "razon": "Podría beneficiarse de la automatización de recordatorios para citas y gestión de pacientes.",
+    "estatus": "nuevo",
+    "creadoEn": "2026-11-09T02:46:01.942Z"
+  },
+  {
+    "id": "prospecto-1794192361942-1",
+    "negocio": "Nutrición Saludable",
+    "giro": "Consultorio de nutrición",
+    "razon": "Requiere un sistema para gestión de citas y seguimiento de pacientes que optimice su tiempo.",
+    "estatus": "nuevo",
+    "creadoEn": "2026-11-09T02:46:01.942Z"
+  },
+  {
+    "id": "prospecto-1794192361942-2",
+    "negocio": "Talleres Creativos",
+    "giro": "Centro de actividades educativas",
+    "razon": "Necesita una plataforma para gestionar inscripciones y comunicarse con los participantes de manera eficiente.",
+    "estatus": "nuevo",
+    "creadoEn": "2026-11-09T02:46:01.942Z"
+  },
+  {
+    "id": "prospecto-1794192361942-3",
+    "negocio": "Tienda de Mascotas Pet Lovers",
+    "giro": "Comercio minorista",
+    "razon": "Podría mejorar la atención al cliente y gestión de pedidos mediante chatbots integrados.",
+    "estatus": "nuevo",
+    "creadoEn": "2026-11-09T02:46:01.942Z"
+  },
+  {
+    "id": "prospecto-1794192361942-4",
+    "negocio": "Agencia de Marketing Digital Éxito",
+    "giro": "Agencia de servicios",
+    "razon": "Puede beneficiarse de automatización en la generación de reportes y seguimiento de clientes.",
+    "estatus": "nuevo",
+    "creadoEn": "2026-11-09T02:46:01.942Z"
   }
 ]

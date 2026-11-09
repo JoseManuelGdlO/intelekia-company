@@ -3,34 +3,41 @@
     "estatus": "idle",
     "ultimaAccion": "Encontró 5 idea(s) nueva(s)",
     "error": null,
-    "updatedAt": "2026-11-06T22:32:41.941Z"
+    "updatedAt": "2026-11-09T02:45:47.825Z"
   },
   "publicador": {
     "estatus": "listo_para_revision",
-    "ultimaAccion": "Redactó un draft para: Comparte una situación graciosa sobre cómo la saturación de WhatsApp causa caos en los negocios y presenta la solución de automatización de mensajes.",
+    "ultimaAccion": "Redactó un draft para: Ilustra el proceso de un cliente que deja de esperar respuestas y, en cambio, recibe atención instantánea gracias a chatbots, resaltando la diferencia del antes y el después.",
     "error": null,
-    "updatedAt": "2026-11-06T22:32:55.574Z",
+    "updatedAt": "2026-11-09T02:45:50.640Z",
     "ultimoIdeaId": "idea-1793997400056-0",
-    "ultimoItemId": "idea-1793997400056-1"
+    "ultimoItemId": "idea-1793997400056-4"
   },
   "buscador-prospectos": {
     "estatus": "idle",
     "ultimaAccion": "Encontró 5 prospecto(s) nuevo(s)",
     "error": null,
-    "updatedAt": "2026-11-06T22:33:13.985Z"
+    "updatedAt": "2026-11-09T02:46:01.945Z"
   },
   "seguimiento-crm": {
     "estatus": "listo_para_revision",
-    "ultimaAccion": "Redactó un mensaje para: Café Aromas",
+    "ultimaAccion": "Reporte de seguimiento: La operación sigue siendo crítica, con varias tareas vencidas y proyectos sin actividad reciente. Se requieren acciones urgentes para evitar mayores retrasos. · Atrasados al PM: 1 correo enviado, 1 con error",
     "error": null,
-    "updatedAt": "2026-11-06T22:33:33.191Z",
-    "ultimoItemId": "prospecto-1794004393982-0"
+    "updatedAt": "2026-11-08T22:45:21.288Z",
+    "ultimoItemId": "reporte-2026-11-08-1644"
   },
   "cotizador": {
     "estatus": "listo_para_revision",
-    "ultimaAccion": "Generó cotización tipo para: Bot de WhatsApp con IA",
+    "ultimaAccion": "Generó cotización tipo para: Dashboard administrativo",
     "error": null,
-    "updatedAt": "2026-11-06T22:33:51.795Z",
-    "ultimoItemId": "bot-de-whatsapp-con-ia"
+    "updatedAt": "2026-11-09T02:46:07.474Z",
+    "ultimoItemId": "dashboard-administrativo"
+  },
+  "pm": {
+    "ultimaAccion": "Reporte del equipo: El equipo se encuentra activo con algunos agentes en estado de \"listo para revisión\" y un agente que no ha registrado actividad. Desde el último reporte, el Seg…",
+    "updatedAt": "2026-11-09T02:46:18.435Z",
+    "estatus": "listo_para_revision",
+    "error": null,
+    "ultimoItemId": "reporte-equipo-2026-11-08-2046"
   }
 }

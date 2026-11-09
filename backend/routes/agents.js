@@ -6,7 +6,7 @@ function createStatusHandler({ statusPath, readStatus }) {
   };
 }
 
-function createChatHandler({ chatHandlers }) {
+function createChatHandler({ chatHandlers, actividad = null }) {
   return async (req, res) => {
     const { id } = req.params;
     const handler = chatHandlers[id];
@@ -14,6 +14,8 @@ function createChatHandler({ chatHandlers }) {
       res.status(404).json({ error: `Agente desconocido: ${id}` });
       return;
     }
+    const mensaje = String(req.body?.message ?? '');
+    actividad?.log(id, 'chat', `👤 El fundador escribió: ${mensaje.length > 300 ? `${mensaje.slice(0, 300)}…` : mensaje}`);
     try {
       const result = await handler(req.body);
       res.json(result);
@@ -35,10 +37,20 @@ function createForzarHandler({ scheduler }) {
   };
 }
 
-function createAgentsRouter({ statusPath, readStatus, scheduler, chatHandlers }) {
+function createActividadHandler({ actividad }) {
+  return (req, res) => {
+    const { desde, limite } = req.query;
+    res.json(actividad ? actividad.list(req.params.id, { desde, limite: limite ? Number(limite) : undefined }) : []);
+  };
+}
+
+function createAgentsRouter({ statusPath, readStatus, scheduler, chatHandlers, actividad = null }) {
   const router = express.Router();
   router.get('/status', createStatusHandler({ statusPath, readStatus }));
-  router.post('/:id/chat', createChatHandler({ chatHandlers }));
+  // Próximo ciclo de cada agente (intervalo propio, última y próxima ejecución).
+  router.get('/ciclos', (req, res) => res.json(scheduler.proximos ? scheduler.proximos() : {}));
+  router.get('/:id/actividad', createActividadHandler({ actividad }));
+  router.post('/:id/chat', createChatHandler({ chatHandlers, actividad }));
   router.post('/:id/forzar', createForzarHandler({ scheduler }));
   return router;
 }
@@ -48,4 +60,5 @@ module.exports = {
   createStatusHandler,
   createChatHandler,
   createForzarHandler,
+  createActividadHandler,
 };

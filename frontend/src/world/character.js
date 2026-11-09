@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { mat, pick, at, box, sphere, capsule, cyl } from './materials.js';
+import { mat, pick, at, box, rbox, sphere, cyl, shade } from './materials.js';
 
 const SKIN = [0xf1c27d, 0xe0ac69, 0xc68642, 0x8d5524, 0xffdbac, 0xd9a066, 0xb07a4f];
 const HAIR = [0x2c1b10, 0x4a2c17, 0x0f0f0f, 0x8b5a2b, 0xc89f5d, 0x6b4423, 0x9a3b2a, 0x1b1b2f];
@@ -11,6 +11,12 @@ const STYLES = ['short', 'long', 'bun', 'curly', 'ponytail', 'bald', 'side', 'sh
 const SEATED_PELVIS = 0.5;
 const STANDING_PELVIS = 0.9;
 const WALK_SPEED = 1.15;
+// Distancia mínima entre los centros de dos personas (cuerpo + espacio personal).
+const PERSONAL_SPACE = 0.62;
+// Si alguien le bloquea el paso más de esto, se rinde y regresa a su lugar.
+const MAX_WAIT = 3.5;
+// Direcciones alternativas para esquivar (primero hacia su derecha, como en un pasillo).
+const DETOURS = [-0.6, 0.6, -1.15, 1.15];
 const HALF_PI = Math.PI / 2;
 const JOINTS = ['pelvisY', 'torsoX', 'headX', 'headY', 'headZ', 'sX0', 'sZ0', 'eX0', 'sX1', 'sZ1', 'eX1', 'hX0', 'kX0', 'hX1', 'kX1'];
 
@@ -21,57 +27,98 @@ function angleDiff(a, b) {
   return d;
 }
 
-function blob(r, material, [x, y, z], [sx, sy, sz]) {
-  const m = at(sphere(r, material, 8, 6), x, y, z);
+function blob(r, material, [x, y, z], [sx, sy, sz], segs = [16, 12]) {
+  const m = at(sphere(r, material, segs[0], segs[1]), x, y, z);
   m.scale.set(sx, sy, sz);
   return m;
 }
 
+/** Cápsula con más caras que la genérica: se ve lisa aunque la cámara esté muy cerca. */
+function smoothCapsule(r, len, material) {
+  const m = new THREE.Mesh(new THREE.CapsuleGeometry(r, len, 8, 20), material);
+  m.castShadow = true;
+  return m;
+}
+
+function rgb(n) {
+  return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
+}
+
+/** Distancia aproximada entre dos colores (0-441). */
+function colorDistance(a, b) {
+  const [r1, g1, b1] = rgb(a);
+  const [r2, g2, b2] = rgb(b);
+  return Math.hypot(r1 - r2, g1 - g2, b1 - b2);
+}
+
+function hairShell(r, hairMat, phiStart, phiLength, thetaStart, thetaLength) {
+  const m = new THREE.Mesh(new THREE.SphereGeometry(r, 32, 20, phiStart, phiLength, thetaStart, thetaLength), hairMat);
+  m.castShadow = true;
+  m.position.y = 0.165;
+  return m;
+}
+
 function buildHair(style, hairMat, head) {
-  const cap = (thetaLen = Math.PI * 0.55) => {
-    const m = new THREE.Mesh(new THREE.SphereGeometry(0.172, 20, 14, 0, Math.PI * 2, 0, thetaLen), hairMat);
-    m.castShadow = true;
-    m.position.y = 0.17;
-    m.rotation.x = -0.25;
-    m.scale.set(1.02, 1.08, 1.05);
-    return m;
-  };
   if (style === 'bald') {
-    // Herradura de cabello solo en la nuca y los lados
-    const ring = new THREE.Mesh(new THREE.SphereGeometry(0.168, 18, 10, Math.PI * 0.85, Math.PI * 1.3, Math.PI * 0.38, Math.PI * 0.2), hairMat);
-    ring.position.y = 0.16;
-    head.add(ring);
+    // Solo una banda corta en la nuca, de oreja a oreja por detrás.
+    const band = hairShell(0.172, hairMat, Math.PI * 1.02, Math.PI * 0.96, Math.PI * 0.42, Math.PI * 0.2);
+    head.add(band);
     return;
   }
-  head.add(cap());
+  // Casquete: cubre la coronilla y baja más por detrás que por delante.
+  const cap = hairShell(0.178, hairMat, 0, Math.PI * 2, 0, Math.PI * 0.5);
+  cap.rotation.x = -0.32;
+  cap.scale.set(1.03, 1.06, 1.06);
+  head.add(cap);
+  // Nuca: media esfera trasera para que no se vea "pegado" por detrás.
+  const nape = hairShell(0.176, hairMat, Math.PI, Math.PI, Math.PI * 0.3, Math.PI * 0.35);
+  nape.scale.set(1.03, 1.05, 1.06);
+  head.add(nape);
+
   if (style === 'long') {
-    const back = capsule(0.13, 0.18, hairMat);
-    back.scale.set(1.25, 1, 0.6);
-    head.add(at(back, 0, 0.06, -0.08));
+    const back = smoothCapsule(0.12, 0.2, hairMat);
+    back.scale.set(1.35, 1, 0.55);
+    head.add(at(back, 0, 0.05, -0.1));
+    [-1, 1].forEach((s) => {
+      const side = smoothCapsule(0.045, 0.16, hairMat);
+      head.add(at(side, s * 0.15, 0.09, -0.02));
+    });
   } else if (style === 'bun') {
-    head.add(at(sphere(0.075, hairMat, 12, 10), 0, 0.33, -0.08));
+    head.add(at(sphere(0.07, hairMat, 20, 14), 0, 0.33, -0.1));
   } else if (style === 'curly') {
-    for (let i = 0; i < 10; i += 1) {
-      const a = (i / 10) * Math.PI * 2;
-      head.add(at(sphere(0.06, hairMat, 8, 6), Math.cos(a) * 0.15, 0.25 + Math.sin(i * 1.7) * 0.03, Math.sin(a) * 0.15 - 0.02));
+    for (let i = 0; i < 14; i += 1) {
+      const a = (i / 14) * Math.PI * 2;
+      const y = 0.24 + Math.sin(i * 1.7) * 0.025;
+      if (Math.sin(a) > 0.75) continue; // deja libre la frente
+      head.add(at(sphere(0.055, hairMat, 14, 10), Math.cos(a) * 0.155, y, Math.sin(a) * 0.15 - 0.02));
     }
-    head.add(at(sphere(0.08, hairMat, 10, 8), 0, 0.33, 0));
+    head.add(at(sphere(0.085, hairMat, 18, 12), 0, 0.31, -0.02));
   } else if (style === 'ponytail') {
-    const tail = capsule(0.045, 0.18, hairMat);
-    tail.rotation.x = 0.5;
-    head.add(at(tail, 0, 0.18, -0.2));
+    const tie = sphere(0.035, hairMat, 14, 10);
+    head.add(at(tie, 0, 0.24, -0.17));
+    const tail = smoothCapsule(0.042, 0.17, hairMat);
+    tail.rotation.x = 0.35;
+    head.add(at(tail, 0, 0.12, -0.21));
   } else if (style === 'side') {
-    const fringe = sphere(0.09, hairMat, 10, 8);
-    fringe.scale.set(1.4, 0.5, 0.9);
-    head.add(at(fringe, 0.05, 0.29, 0.08));
+    const fringe = sphere(0.1, hairMat, 20, 14);
+    fringe.scale.set(1.45, 0.42, 0.85);
+    fringe.rotation.z = -0.2;
+    head.add(at(fringe, 0.04, 0.285, 0.085));
+  } else {
+    // 'short': flequillo corto
+    const fringe = sphere(0.1, hairMat, 20, 14);
+    fringe.scale.set(1.35, 0.35, 0.7);
+    head.add(at(fringe, 0, 0.29, 0.1));
   }
 }
 
 /**
  * Persona low-poly procedural. La apariencia sale del id del agente (determinista).
  * Mira hacia +z en su espacio local; su origen está en el piso entre los pies.
+ * `crowd` (opcional) le dice dónde están los demás y le reparte lugares libres en la zona de café,
+ * para que nunca ocupen el mismo espacio.
  */
-export function createCharacter({ agentId, rng, accent }) {
+export function createCharacter({ agentId, rng, accent, crowd = null }) {
   const look = {
     skin: pick(rng, SKIN),
     hair: pick(rng, HAIR),
@@ -85,104 +132,142 @@ export function createCharacter({ agentId, rng, accent }) {
     height: 0.95 + rng() * 0.1,
     build: 0.92 + rng() * 0.16,
   };
-  const skinMat = mat(look.skin, { roughness: 0.65 });
-  const hairMat = mat(look.hair, { roughness: 0.85 });
-  const shirtMat = mat(look.shirt, { roughness: 0.8 });
+  // La camisa nunca del mismo tono que la piel (si no, de lejos parece que no trae ropa).
+  if (colorDistance(look.shirt, look.skin) < 120) {
+    look.shirt = SHIRTS.filter((c) => colorDistance(c, look.skin) >= 120)[Math.floor(rng() * 4)] || accent;
+  }
+  const skinMat = mat(look.skin, { roughness: 0.55 });
+  const hairMat = mat(look.hair, { roughness: 0.75 });
+  const shirtMat = mat(look.shirt, { roughness: 0.82 });
+  const collarMat = mat(shade(look.shirt, look.shirt > 0xcccccc ? -0.12 : 0.18), { roughness: 0.8 });
   const pantsMat = mat(look.pants, { roughness: 0.85 });
-  const shoeMat = mat(look.shoes, { roughness: 0.5 });
-  const darkMat = mat(0x1a1a22, { roughness: 0.3 });
+  const shoeMat = mat(look.shoes, { roughness: 0.45 });
+  const irisMat = mat(0x2a1d16, { roughness: 0.2 });
+  const scleraMat = mat(0xffffff, { roughness: 0.35 });
+  const shineMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
 
   const root = new THREE.Group();
   root.userData.agentId = agentId;
   const pelvis = new THREE.Group();
   root.add(pelvis);
-  pelvis.add(at(box(0.34, 0.16, 0.22, pantsMat), 0, 0, 0));
+  const hips = smoothCapsule(0.15, 0.1, pantsMat);
+  hips.rotation.z = HALF_PI;
+  hips.scale.set(0.75, 1, 0.75);
+  pelvis.add(at(hips, 0, 0, 0));
+  pelvis.add(at(cyl(0.165, 0.165, 0.035, mat(0x2b2b2b, { roughness: 0.5 }), 24), 0, 0.075, 0)); // cinturón
 
   const torso = new THREE.Group();
   torso.position.y = 0.06;
   torso.scale.set(look.build, look.height, look.build);
   pelvis.add(torso);
-  const chest = capsule(0.17, 0.26, shirtMat);
-  chest.scale.set(1.05, 1, 0.72);
-  torso.add(at(chest, 0, 0.24, 0));
+  const chest = smoothCapsule(0.165, 0.24, shirtMat);
+  chest.scale.set(1.08, 1, 0.74);
+  torso.add(at(chest, 0, 0.25, 0));
+  // Hombros redondeados para que los brazos no se vean "pegados".
+  [-1, 1].forEach((s) => torso.add(at(sphere(0.075, shirtMat, 18, 12), s * 0.2, 0.42, 0)));
+  // Cuello de la camisa
+  const collar = new THREE.Mesh(new THREE.TorusGeometry(0.07, 0.022, 10, 24), collarMat);
+  collar.rotation.x = HALF_PI;
+  torso.add(at(collar, 0, 0.5, 0.005));
   // Gafete con el color del departamento
-  torso.add(at(box(0.06, 0.08, 0.01, mat(0xffffff)), 0.08, 0.27, 0.125));
-  torso.add(at(box(0.06, 0.025, 0.012, mat(0x198f70)), 0.08, 0.3, 0.126));
-  torso.add(at(box(0.06, 0.012, 0.012, mat(accent)), 0.08, 0.24, 0.126));
-  torso.add(at(cyl(0.06, 0.065, 0.1, skinMat, 12), 0, 0.5, 0));
+  torso.add(at(rbox(0.06, 0.08, 0.01, 0.006, mat(0xffffff)), 0.08, 0.28, 0.127));
+  torso.add(at(box(0.06, 0.022, 0.012, mat(0x198f70)), 0.08, 0.305, 0.128));
+  torso.add(at(box(0.04, 0.008, 0.012, mat(accent)), 0.08, 0.26, 0.128));
+  torso.add(at(cyl(0.055, 0.06, 0.1, skinMat, 20), 0, 0.53, 0));
 
   const head = new THREE.Group();
-  head.position.y = 0.55;
+  head.position.y = 0.56;
   torso.add(head);
-  const skull = sphere(0.16, skinMat, 22, 16);
-  skull.scale.set(1, 1.08, 1);
+  const skull = sphere(0.165, skinMat, 40, 30);
+  skull.scale.set(1, 1.06, 0.98);
   head.add(at(skull, 0, 0.16, 0));
+  // Orejas
+  [-1, 1].forEach((s) => head.add(blob(0.04, skinMat, [s * 0.162, 0.155, -0.005], [0.45, 0.85, 0.65])));
+  // Ojos: blanco + iris + brillo (antes eran bolas negras que de cerca se veían raras).
   const eyes = [-1, 1].map((s) => {
-    const eye = sphere(0.022, darkMat, 10, 8);
-    head.add(at(eye, s * 0.056, 0.175, 0.142));
-    const brow = box(0.055, 0.012, 0.012, hairMat);
-    brow.rotation.z = s * -0.08;
-    head.add(at(brow, s * 0.058, 0.222, 0.145));
-    head.add(blob(0.036, skinMat, [s * 0.16, 0.155, 0], [0.5, 1, 0.8]));
+    const eye = new THREE.Group();
+    eye.position.set(s * 0.058, 0.172, 0.14);
+    eye.rotation.y = s * 0.28;
+    eye.add(blob(0.029, scleraMat, [0, 0, 0], [1, 1.12, 0.5], [20, 14]));
+    eye.add(blob(0.019, irisMat, [0, -0.002, 0.009], [1, 1.05, 0.45], [18, 12]));
+    eye.add(at(new THREE.Mesh(new THREE.SphereGeometry(0.0055, 8, 6), shineMat), 0.007, 0.008, 0.0185));
+    head.add(eye);
+    const brow = smoothCapsule(0.009, 0.04, hairMat);
+    brow.rotation.z = HALF_PI + s * 0.12;
+    head.add(at(brow, s * 0.06, 0.222, 0.148));
     return eye;
   });
-  head.add(at(sphere(0.024, skinMat, 8, 6), 0, 0.14, 0.16));
-  const mouth = new THREE.Mesh(new THREE.TorusGeometry(0.03, 0.007, 6, 12, Math.PI), mat(0x8a3b3b));
-  mouth.rotation.z = Math.PI;
-  head.add(at(mouth, 0, 0.1, 0.148));
-  const blush = mat(0xf28b82, { roughness: 0.9 });
-  [-1, 1].forEach((s) => head.add(blob(0.022, blush, [s * 0.09, 0.12, 0.13], [1, 0.6, 0.3])));
+  head.add(blob(0.02, skinMat, [0, 0.138, 0.162], [1, 0.9, 0.85]));
+  const mouth = new THREE.Mesh(new THREE.TorusGeometry(0.024, 0.0055, 8, 20, Math.PI), mat(0x8a3b3b, { roughness: 0.6 }));
+  mouth.rotation.set(-0.25, 0, Math.PI);
+  head.add(at(mouth, 0, 0.098, 0.151));
+  const blush = new THREE.MeshStandardMaterial({ color: 0xf28b82, roughness: 0.9, transparent: true, opacity: 0.45, depthWrite: false });
+  [-1, 1].forEach((s) => head.add(blob(0.024, blush, [s * 0.095, 0.122, 0.128], [1, 0.6, 0.35])));
   buildHair(look.style, hairMat, head);
   if (look.beard) {
-    const beard = new THREE.Mesh(new THREE.SphereGeometry(0.15, 16, 10, 0, Math.PI * 2, Math.PI * 0.55, Math.PI * 0.4), hairMat);
-    beard.position.set(0, 0.15, 0.015);
+    const beard = new THREE.Mesh(new THREE.SphereGeometry(0.168, 32, 16, Math.PI * 0.05, Math.PI * 0.9, Math.PI * 0.56, Math.PI * 0.32), hairMat);
+    beard.position.set(0, 0.16, 0.004);
+    beard.castShadow = true;
     head.add(beard);
+    head.add(at(new THREE.Mesh(new THREE.TorusGeometry(0.03, 0.009, 8, 18, Math.PI), hairMat), 0, 0.112, 0.152)); // bigote
   }
   if (look.glasses) {
-    const frameMat = mat(0x111111, { roughness: 0.3 });
-    [-1, 1].forEach((s) => head.add(at(new THREE.Mesh(new THREE.TorusGeometry(0.035, 0.006, 6, 18), frameMat), s * 0.058, 0.175, 0.162)));
-    head.add(at(box(0.04, 0.008, 0.008, frameMat), 0, 0.18, 0.165));
+    const frameMat = mat(0x16161c, { roughness: 0.3, metalness: 0.3 });
+    [-1, 1].forEach((s) => {
+      const lens = new THREE.Mesh(new THREE.TorusGeometry(0.034, 0.0045, 8, 28), frameMat);
+      lens.rotation.y = s * 0.28;
+      head.add(at(lens, s * 0.06, 0.172, 0.163));
+    });
+    head.add(at(box(0.034, 0.005, 0.005, frameMat), 0, 0.178, 0.17));
   }
 
   const sleeveMat = look.longSleeves ? shirtMat : skinMat;
   const arms = [-1, 1].map((s) => {
     const shoulder = new THREE.Group();
-    shoulder.position.set(s * 0.23, 0.42, 0);
+    shoulder.position.set(s * 0.22, 0.42, 0);
     torso.add(shoulder);
-    shoulder.add(at(capsule(0.058, 0.2, shirtMat), 0, -0.13, 0));
+    shoulder.add(at(smoothCapsule(0.058, 0.19, shirtMat), 0, -0.13, 0));
     const elbow = new THREE.Group();
     elbow.position.y = -0.27;
     shoulder.add(elbow);
-    elbow.add(at(capsule(0.05, 0.17, sleeveMat), 0, -0.11, 0));
-    const hand = sphere(0.052, skinMat, 10, 8);
-    elbow.add(at(hand, 0, -0.25, 0));
+    elbow.add(at(sphere(0.05, sleeveMat, 14, 10), 0, 0, 0));
+    elbow.add(at(smoothCapsule(0.048, 0.16, sleeveMat), 0, -0.11, 0));
+    if (!look.longSleeves) {
+      // Manga corta: borde de la manga sobre el brazo
+      elbow.parent.add(at(cyl(0.064, 0.066, 0.05, collarMat, 20), 0, -0.2, 0));
+    }
+    // Mano tipo mitón con pulgar
+    const hand = blob(0.048, skinMat, [0, -0.25, 0], [0.85, 1.1, 0.7], [16, 12]);
+    hand.add(blob(0.02, skinMat, [-s * 0.03, 0.01, 0.02], [0.9, 1.3, 0.9], [10, 8]));
+    elbow.add(hand);
     return { shoulder, elbow, hand, side: s };
   });
 
   const legs = [-1, 1].map((s) => {
     const hip = new THREE.Group();
-    hip.position.set(s * 0.1, -0.02, 0);
+    hip.position.set(s * 0.09, -0.02, 0);
     pelvis.add(hip);
-    hip.add(at(capsule(0.075, 0.28, pantsMat), 0, -0.19, 0));
+    hip.add(at(smoothCapsule(0.074, 0.28, pantsMat), 0, -0.19, 0));
     const knee = new THREE.Group();
     knee.position.y = -0.42;
     hip.add(knee);
-    knee.add(at(capsule(0.065, 0.28, pantsMat), 0, -0.19, 0));
-    knee.add(at(box(0.11, 0.07, 0.22, shoeMat), 0, -0.42, 0.04));
+    knee.add(at(sphere(0.07, pantsMat, 14, 10), 0, 0, 0));
+    knee.add(at(smoothCapsule(0.064, 0.28, pantsMat), 0, -0.19, 0));
+    knee.add(at(rbox(0.11, 0.07, 0.22, 0.03, shoeMat), 0, -0.42, 0.04));
     return { hip, knee };
   });
 
   // Taza que carga cuando va por café
   const heldMug = new THREE.Group();
-  heldMug.add(at(cyl(0.04, 0.036, 0.09, mat(0x198f70, { roughness: 0.35 }), 14), 0, 0, 0));
-  heldMug.add(at(cyl(0.034, 0.034, 0.005, mat(0x4a2c17), 14), 0, 0.04, 0));
+  heldMug.add(at(cyl(0.04, 0.036, 0.09, mat(0x198f70, { roughness: 0.35 }), 20), 0, 0, 0));
+  heldMug.add(at(cyl(0.034, 0.034, 0.005, mat(0x4a2c17), 20), 0, 0.04, 0));
   heldMug.position.set(0, -0.04, 0.05);
   heldMug.visible = false;
   arms[1].hand.add(heldMug);
 
   // Anillo de estatus en el piso
   const ringMat = new THREE.MeshBasicMaterial({ color: 0x9aa0a6, transparent: true, opacity: 0.85, toneMapped: false, depthWrite: false });
-  const ring = new THREE.Mesh(new THREE.RingGeometry(0.42, 0.52, 48), ringMat);
+  const ring = new THREE.Mesh(new THREE.RingGeometry(0.42, 0.52, 64), ringMat);
   ring.rotation.x = -HALF_PI;
   ring.position.y = 0.012;
   ring.renderOrder = 2;
@@ -190,7 +275,7 @@ export function createCharacter({ agentId, rng, accent }) {
 
   root.traverse((o) => {
     if (o.isMesh) {
-      o.castShadow = true;
+      o.castShadow = o.material !== shineMat && o.material !== blush;
       o.userData.agentId = agentId;
     }
   });
@@ -224,6 +309,7 @@ export function createCharacter({ agentId, rng, accent }) {
     selected: false,
     lookAt: null,
     seed: rng() * 100,
+    waited: 0,
   };
 
   function setSeat(position, route) {
@@ -245,6 +331,56 @@ export function createCharacter({ agentId, rng, accent }) {
     state.passed = [];
   }
 
+  /** ¿Se puede parar en (x, z) sin invadir el espacio de nadie? */
+  function isFree(x, z) {
+    if (!crowd) return true;
+    const here = root.position;
+    return crowd.others().every((o) => {
+      const after = Math.hypot(o.x - x, o.z - z);
+      if (after >= PERSONAL_SPACE) return true;
+      // Si ya estaban encimados (p. ej. al cargar), solo se permite alejarse.
+      return after > Math.hypot(o.x - here.x, o.z - here.z) + 1e-4;
+    });
+  }
+
+  /** Avanza hacia (ux, uz); si alguien estorba, prueba rodearlo. Devuelve si se movió. */
+  function tryStep(ux, uz, step) {
+    const options = [0, ...DETOURS];
+    for (const angle of options) {
+      const c = Math.cos(angle);
+      const sn = Math.sin(angle);
+      const vx = ux * c + uz * sn;
+      const vz = -ux * sn + uz * c;
+      const len = angle === 0 ? step : step * 0.75;
+      const nx = root.position.x + vx * len;
+      const nz = root.position.z + vz * len;
+      if (isFree(nx, nz)) {
+        root.position.x = nx;
+        root.position.z = nz;
+        state.targetYaw = Math.atan2(vx, vz);
+        return true;
+      }
+    }
+    return false;
+  }
+
+  /** Paso lateral o hacia atrás (orden aleatorio) para destrabar a dos que se bloquean. */
+  function sidestep(ux, uz, step) {
+    const angles = [HALF_PI, -HALF_PI, Math.PI * 0.75, -Math.PI * 0.75, Math.PI].sort(() => Math.random() - 0.5);
+    for (const angle of angles) {
+      const c = Math.cos(angle);
+      const sn = Math.sin(angle);
+      const nx = root.position.x + (ux * c + uz * sn) * step;
+      const nz = root.position.z + (-ux * sn + uz * c) * step;
+      if (isFree(nx, nz)) {
+        root.position.x = nx;
+        root.position.z = nz;
+        return true;
+      }
+    }
+    return false;
+  }
+
   function think(dt, t) {
     const out = state.mode !== 'seated';
     if (out && state.status !== 'idle' && !state.returning && state.mode !== 'toSit') {
@@ -255,11 +391,19 @@ export function createCharacter({ agentId, rng, accent }) {
     switch (state.mode) {
       case 'seated':
         if (state.status === 'idle' && state.route.length && t > state.nextOutingAt) {
+          // Pide un lugar libre en la zona de café; si están todos ocupados, lo intenta más tarde.
+          const spot = crowd ? crowd.reserveSpot() : null;
+          if (crowd && !spot) {
+            state.nextOutingAt = t + 10 + Math.random() * 15;
+            break;
+          }
           state.mode = 'toStand';
           state.timer = 0.7;
           state.returning = false;
           state.passed = [];
+          state.waited = 0;
           state.path = state.route.map((p) => p.clone());
+          if (spot) state.path.push(new THREE.Vector3(spot.x, 0, state.path[state.path.length - 1].z), spot);
         }
         break;
       case 'toStand':
@@ -272,9 +416,7 @@ export function createCharacter({ agentId, rng, accent }) {
         const dx = wp.x - root.position.x;
         const dz = wp.z - root.position.z;
         const dist = Math.hypot(dx, dz);
-        if (dist < 0.04) {
-          root.position.x = wp.x;
-          root.position.z = wp.z;
+        const arrived = () => {
           state.path.shift();
           if (!state.returning) state.passed.push(wp);
           if (!state.path.length) {
@@ -288,12 +430,36 @@ export function createCharacter({ agentId, rng, accent }) {
               state.spotTime = 0;
             }
           }
+        };
+        if (dist < 0.04) {
+          // Se acomoda en el punto exacto solo si no invade a nadie.
+          if (isFree(wp.x, wp.z)) {
+            root.position.x = wp.x;
+            root.position.z = wp.z;
+          }
+          arrived();
         } else {
           const step = Math.min(dist, WALK_SPEED * dt);
-          root.position.x += (dx / dist) * step;
-          root.position.z += (dz / dist) * step;
-          state.targetYaw = Math.atan2(dx, dz);
-          state.walkPhase += dt * WALK_SPEED * 6.2;
+          const moved = tryStep(dx / dist, dz / dist, step);
+          if (moved) {
+            state.waited = 0;
+            state.walkPhase += dt * WALK_SPEED * 6.2;
+          } else if (state.path.length > 1 && dist < PERSONAL_SPACE + 0.15) {
+            // Alguien está parado sobre un punto intermedio de la ruta: lo da por alcanzado.
+            arrived();
+          } else {
+            // Bloqueado: espera mirando hacia donde iba.
+            state.targetYaw = Math.atan2(dx, dz);
+            state.waited += dt;
+            if (state.waited > 1.2 && sidestep(dx / dist, dz / dist, WALK_SPEED * dt * 0.6)) {
+              // Se hizo a un lado para destrabar un cara a cara.
+              state.walkPhase += dt * WALK_SPEED * 3;
+            }
+            if (state.waited > MAX_WAIT && !state.returning) {
+              state.waited = 0;
+              startReturn();
+            }
+          }
         }
         break;
       }
@@ -309,6 +475,7 @@ export function createCharacter({ agentId, rng, accent }) {
         if (state.timer <= 0) {
           state.mode = 'seated';
           state.returning = false;
+          crowd?.releaseSpot();
           heldMug.visible = false;
           state.nextOutingAt = t + 30 + Math.random() * 60;
         }

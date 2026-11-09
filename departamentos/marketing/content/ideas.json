@@ -14,19 +14,19 @@
   {
     "id": "idea-1793997400056-2",
     "texto": "Haz un video corto mostrando cómo una pequeña empresa puede transformar su proceso manual en un sistema automatizado, usando un ejemplo cotidiano y fácil de entender.",
-    "estatus": "pendiente",
+    "estatus": "redactada",
     "creadaEn": "2026-11-06T20:36:40.056Z"
   },
   {
     "id": "idea-1793997400056-3",
     "texto": "Crea un reel con testimonios cortos de dueños de negocios que han visto mejoras en su productividad tras implementar soluciones de IA y automatización.",
-    "estatus": "pendiente",
+    "estatus": "redactada",
     "creadaEn": "2026-11-06T20:36:40.056Z"
   },
   {
     "id": "idea-1793997400056-4",
     "texto": "Ilustra el proceso de un cliente que deja de esperar respuestas y, en cambio, recibe atención instantánea gracias a chatbots, resaltando la diferencia del antes y el después.",
-    "estatus": "pendiente",
+    "estatus": "redactada",
     "creadaEn": "2026-11-06T20:36:40.056Z"
   },
   {
@@ -58,5 +58,95 @@
     "texto": "Muestra el día a día de un negocio antes y después de implementar un sistema de reservaciones automatizado, enfatizando la reducción de estrés y errores en la gestión.",
     "estatus": "pendiente",
     "creadaEn": "2026-11-06T22:32:41.940Z"
+  },
+  {
+    "id": "idea-1794148397627-0",
+    "texto": "Crea un video que muestre la frustración de un dueño de negocio al intentar organizar una agenda manualmente y cómo un sistema automatizado simplifica la gestión de citas.",
+    "estatus": "pendiente",
+    "creadaEn": "2026-11-08T14:33:17.627Z"
+  },
+  {
+    "id": "idea-1794148397627-1",
+    "texto": "Desarrolla un reel con una representación cómica de un cliente tratando de explicar su problema y ser ignorado, seguido de cómo un chatbot puede entender y atender automáticamente sus necesidades.",
+    "estatus": "pendiente",
+    "creadaEn": "2026-11-08T14:33:17.627Z"
+  },
+  {
+    "id": "idea-1794148397627-2",
+    "texto": "Muestra un comparativo visual de una pila de documentos desordenados y cómo la IA puede escanear y organizar automáticamente la información, haciendo la vida más fácil a los emprendedores.",
+    "estatus": "pendiente",
+    "creadaEn": "2026-11-08T14:33:17.627Z"
+  },
+  {
+    "id": "idea-1794148397627-3",
+    "texto": "Haz un post donde se debata si la tecnología está realmente al servicio del cliente o si hay un límite, y presenta casos donde la automatización mejora la experiencia de los usuarios.",
+    "estatus": "pendiente",
+    "creadaEn": "2026-11-08T14:33:17.627Z"
+  },
+  {
+    "id": "idea-1794148397627-4",
+    "texto": "Ilustra el caos que se genera en una reunión sin una agenda clara y cómo una herramienta de gestión de reuniones automatizada puede transformar la productividad y el enfoque del equipo.",
+    "estatus": "pendiente",
+    "creadaEn": "2026-11-08T14:33:17.627Z"
+  },
+  {
+    "id": "idea-1794170694536-0",
+    "texto": "Crea un video mostrando la transformación de un negocio que pasaba horas buscando información manualmente a uno que utiliza IA para obtener datos al instante, enfatizando el cambio en su eficiencia.",
+    "estatus": "pendiente",
+    "creadaEn": "2026-11-08T20:44:54.536Z"
+  },
+  {
+    "id": "idea-1794170694536-1",
+    "texto": "Haz un post que ilustre cómo un consultorio médico mejora la experiencia del paciente al integrar un sistema automatizado que envía recordatorios de citas y recopila información previa al ingreso.",
+    "estatus": "pendiente",
+    "creadaEn": "2026-11-08T20:44:54.536Z"
+  },
+  {
+    "id": "idea-1794170694536-2",
+    "texto": "Desarrolla un reel donde se representa a un dueño de negocio luchando con un flujo constante de clientes y cómo implementar un CRM puede simplificar su seguimiento y gestión de contactos.",
+    "estatus": "pendiente",
+    "creadaEn": "2026-11-08T20:44:54.536Z"
+  },
+  {
+    "id": "idea-1794170694536-3",
+    "texto": "Muestra de manera divertida cómo un sistema de reservas automatizado evita el caos en un restaurante, con ejemplos de reservas perdidas y cómo la tecnología asegura una correcta gestión.",
+    "estatus": "pendiente",
+    "creadaEn": "2026-11-08T20:44:54.536Z"
+  },
+  {
+    "id": "idea-1794170694536-4",
+    "texto": "Haz un post que presente la evolución de un proceso manual a uno automatizado en un negocio de servicios, resaltando las ventajas de menos errores y más tiempo para la atención al cliente.",
+    "estatus": "pendiente",
+    "creadaEn": "2026-11-08T20:44:54.536Z"
+  },
+  {
+    "id": "idea-1794192347824-0",
+    "texto": "Crea un video mostrando a un dueño de negocio frustrado por las preguntas repetitivas de los clientes y cómo un chatbot puede responder automáticamente, ahorrando tiempo y mejorando la experiencia del usuario.",
+    "estatus": "pendiente",
+    "creadaEn": "2026-11-09T02:45:47.824Z"
+  },
+  {
+    "id": "idea-1794192347824-1",
+    "texto": "Haz un reel que ilustre el contraste entre la gestión manual de inventarios y una solución automatizada, destacando la eficiencia y la reducción de pérdidas en un negocio de retail.",
+    "estatus": "pendiente",
+    "creadaEn": "2026-11-09T02:45:47.824Z"
+  },
+  {
+    "id": "idea-1794192347824-2",
+    "texto": "Desarrolla un post donde se cuente una anécdota de un emprendedor que perdió una venta importante por no tener un seguimiento adecuado y cómo un sistema automatizado puede prevenir estos problemas.",
+    "estatus": "pendiente",
+    "creadaEn": "2026-11-09T02:45:47.824Z"
+  },
+  {
+    "id": "idea-1794192347824-3",
+    "texto": "Crea un video cómico sobre la comunicación confusa entre un cliente y un negocio que no tiene un sistema de gestión eficiente, seguido de cómo una plataforma de CRM puede mejorar la relación.",
+    "estatus": "pendiente",
+    "creadaEn": "2026-11-09T02:45:47.824Z"
+  },
+  {
+    "id": "idea-1794192347824-4",
+    "texto": "Haz un post mostrando cómo la integración de un sistema de automatización puede hacer que un negocio se destaque en atención al cliente, con ejemplos concretos de situaciones cotidianas.",
+    "estatus": "pendiente",
+    "creadaEn": "2026-11-09T02:45:47.824Z"
   }
 ]

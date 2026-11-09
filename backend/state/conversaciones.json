@@ -42,5 +42,104 @@
     "estado": "completada",
     "inicio": "2026-11-07T16:57:07.984Z",
     "actualizado": "2026-11-07T16:57:10.424Z"
+  },
+  {
+    "id": "conv-1794085256916-1",
+    "de": "seguimiento-crm",
+    "para": "custom-objection-handling-1794008522407",
+    "pregunta": "¿tienes acceso a la base de datos de seguimiento de proyectos?",
+    "respuesta": "No tengo acceso a la base de datos de seguimiento de proyectos.",
+    "error": null,
+    "estado": "completada",
+    "inicio": "2026-11-07T21:00:56.916Z",
+    "actualizado": "2026-11-07T21:00:57.836Z"
+  },
+  {
+    "id": "conv-1794085257837-2",
+    "de": "seguimiento-crm",
+    "para": "cotizador",
+    "pregunta": "¿tienes acceso a la base de datos de seguimiento de proyectos?",
+    "respuesta": "No tengo acceso a la base de datos de seguimiento de proyectos. Te recomiendo consultar con el área de administración o con el responsable de la base de datos para obtener la información que necesitas.",
+    "error": null,
+    "estado": "completada",
+    "inicio": "2026-11-07T21:00:57.837Z",
+    "actualizado": "2026-11-07T21:00:59.545Z"
+  },
+  {
+    "id": "conv-1794085259546-3",
+    "de": "seguimiento-crm",
+    "para": "buscador-prospectos",
+    "pregunta": "¿tienes acceso a la base de datos de seguimiento de proyectos?",
+    "respuesta": "No tengo acceso a la base de datos de seguimiento de proyectos. Solo manejo la búsqueda de prospectos para generar nuevas oportunidades de negocio. Si necesitas información específica, te recomendaría contactar directamente a quien maneje esa base de datos.",
+    "error": null,
+    "estado": "completada",
+    "inicio": "2026-11-07T21:00:59.546Z",
+    "actualizado": "2026-11-07T21:01:01.161Z"
+  },
+  {
+    "id": "conv-1794087015216-1",
+    "de": "seguimiento-crm",
+    "para": "pm",
+    "pregunta": "Tickets atrasados para notificar: 6 tickets de 2 responsables:\n- Beto Galaviz: 3\n- Javier Karim: 3",
+    "respuesta": "Listo: 2 correos enviados.\n- Beto Galaviz: enviado\n- Javier Karim: enviado",
+    "error": null,
+    "estado": "completada",
+    "inicio": "2026-11-07T21:30:15.216Z",
+    "actualizado": "2026-11-07T21:30:18.559Z"
+  },
+  {
+    "id": "conv-1794087564968-1",
+    "de": "seguimiento-crm",
+    "para": "pm",
+    "pregunta": "¿tienes acceso a la base de datos de seguimiento de proyectos?",
+    "respuesta": "No tengo acceso directo a la base de datos de seguimiento de proyectos. Te sugiero que consultes a un agente que tenga esa herramienta activa o al fundador para obtener la información que necesitas. Si puedo ayudarte con algo más, házmelo saber.",
+    "error": null,
+    "estado": "completada",
+    "inicio": "2026-11-07T21:39:24.968Z",
+    "actualizado": "2026-11-07T21:39:26.101Z"
+  },
+  {
+    "id": "conv-1794087882653-2",
+    "de": "seguimiento-crm",
+    "para": "pm",
+    "pregunta": "Tickets atrasados para notificar: 6 tickets de 2 responsables:\n- Beto Galaviz: 3\n- Javier Karim: 3",
+    "respuesta": "Listo: 2 ya avisados hoy.\n- Beto Galaviz: ya_notificado (Ya se le avisó hoy)\n- Javier Karim: ya_notificado (Ya se le avisó hoy)",
+    "error": null,
+    "estado": "completada",
+    "inicio": "2026-11-07T21:44:42.653Z",
+    "actualizado": "2026-11-07T21:44:42.654Z"
+  },
+  {
+    "id": "conv-1794176968584-1",
+    "de": "seguimiento-crm",
+    "para": "pm",
+    "pregunta": "Tickets atrasados para notificar: 6 tickets de 2 responsables:\n- Beto Galaviz: 3\n- Javier Karim: 3",
+    "respuesta": "Listo: 1 correo enviado, 1 con error.\n- Beto Galaviz: error (Connection timeout)\n- Javier Karim: enviado",
+    "error": null,
+    "estado": "completada",
+    "inicio": "2026-11-08T22:29:28.584Z",
+    "actualizado": "2026-11-08T22:44:58.566Z"
+  },
+  {
+    "id": "conv-1794192353226-1",
+    "de": "buscador-prospectos",
+    "para": "seguimiento-crm",
+    "pregunta": "¿hay información sobre áreas o sectores donde hemos tenido éxito recientemente para buscar nuevos prospectos?",
+    "respuesta": "No tengo acceso a datos específicos sobre sectores o áreas donde hemos tenido éxito recientemente, ya que mi enfoque es el seguimiento de proyectos y tareas. Te recomiendo revisar con el equipo de ventas o consultar informes de desempeño pasado para identificar esos sectores. Si puedo ayudarte con otros temas relacionados a proyectos, házmelo saber.",
+    "error": null,
+    "estado": "completada",
+    "inicio": "2026-11-09T02:45:53.226Z",
+    "actualizado": "2026-11-09T02:45:54.877Z"
+  },
+  {
+    "id": "conv-1794192354879-2",
+    "de": "buscador-prospectos",
+    "para": "seguimiento-crm",
+    "pregunta": "¿qué tipos de negocios han mostrado interés en nuestros servicios en el último trimestre?",
+    "respuesta": "No tengo acceso a datos específicos sobre los tipos de negocios que han mostrado interés en nuestros servicios en el último trimestre. Te recomendaría revisar con el equipo de ventas o consultar los informes de seguimiento de prospectos para obtener esa información. Si necesitas ayuda con otros temas relacionados con proyectos, aquí estoy.",
+    "error": null,
+    "estado": "completada",
+    "inicio": "2026-11-09T02:45:54.879Z",
+    "actualizado": "2026-11-09T02:45:56.718Z"
   }
 ]

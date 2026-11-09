@@ -76,3 +76,18 @@ test('los agentes agregados en caliente se incluyen automáticamente', () => {
   depts[1].agents.push({ id: 'custom-nuevo' });
   assert.deepEqual(store.allowedTargetIds('cotizador'), ['prospectos', 'custom-nuevo']);
 });
+
+test('un agente puede declarar su propio valor por defecto (el PM consulta a todos)', () => {
+  const depts = departments();
+  depts.push({ id: 'administracion', agents: [{ id: 'pm', comunicacionPorDefecto: 'todos' }] });
+  const store = createComunicacionStore({ configPath: tempConfigPath(), departments: depts });
+  assert.deepEqual(store.allowedTargetIds('pm'), ['tendencias', 'publicador', 'prospectos', 'cotizador']);
+  assert.equal(store.ruleFor('pm').heredada, true);
+  assert.deepEqual(store.allowedTargetIds('tendencias'), ['publicador'], 'los demás siguen con su área');
+  store.setRule('pm', { alcance: 'nadie' });
+  assert.deepEqual(store.allowedTargetIds('pm'), []);
+  store.setRule('pm', { alcance: 'heredar' });
+  assert.equal(store.allowedTargetIds('pm').length, 4);
+  store.setAll('nadie');
+  assert.deepEqual(store.allowedTargetIds('pm'), [], '"Nadie habla" también aplica al PM');
+});

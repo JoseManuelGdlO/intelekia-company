@@ -98,6 +98,16 @@ const KNOWN_THEMES = {
   },
 };
 
+KNOWN_THEMES.administracion = {
+  accent: 0x2f6fde,
+  wall: 0xeef3fb,
+  floor: 0xb89b7d,
+  sofa: 0x1f3a5f,
+  rug: 0xc9d9f3,
+  board: 'team',
+  special: 'lounge',
+};
+
 const FALLBACK_ACCENTS = [0x4f46e5, 0xf08c00, 0x1c7ed6, 0x2f9e44, 0xc2255c, 0x0b7285];
 
 export function themeFor(departmentId, index) {

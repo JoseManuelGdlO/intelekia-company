@@ -2,9 +2,12 @@ const fs = require('fs');
 const path = require('path');
 
 const TIPOS = ['skill', 'plugin', 'documento'];
+// Herramientas que se pueden activar por agente.
+const HERRAMIENTAS = ['baseDatos', 'correo'];
 const MAX_CONTENIDO = 20000;
 const MAX_MEMORIA_INYECTADA = 4000;
 const MAX_ENTRADA_MEMORIA = 2000;
+const MAX_CICLO_HORAS = 720; // 30 días
 
 function tail(text, max) {
   return text.length > max ? `…${text.slice(-max)}` : text;
@@ -73,6 +76,61 @@ function createAgentProfiles({
 
   function skillsOf(agentId) {
     return readAll()[agentId]?.skills || [];
+  }
+
+  function herramientasOf(agentId) {
+    const saved = readAll()[agentId]?.herramientas || {};
+    return Object.fromEntries(HERRAMIENTAS.map((h) => [h, saved[h] === true]));
+  }
+
+  /**
+   * Cada cuántas horas corre el ciclo autónomo de un agente:
+   * su valor propio (editado en la app) o, si no tiene, el de `departments.js` (`cicloHoras`)
+   * o el general de .env (AGENT_INTERVAL_HOURS). 0 = no corre solo.
+   */
+  function cicloOf(agentId) {
+    const found = find(agentId);
+    const porDefecto = found?.agent.cicloHoras ?? config.agentIntervalHours ?? 6;
+    const propio = readAll()[agentId]?.cicloHoras;
+    return {
+      cadaHoras: typeof propio === 'number' ? propio : porDefecto,
+      porDefecto,
+      personalizado: typeof propio === 'number',
+    };
+  }
+
+  /** Skills y plugins instalados (de internet) que este agente usa: { skills: [ids], plugins: [ids] }. */
+  function instaladosOf(agentId) {
+    const saved = readAll()[agentId]?.instalados || {};
+    return {
+      skills: Array.isArray(saved.skills) ? saved.skills : [],
+      plugins: Array.isArray(saved.plugins) ? saved.plugins : [],
+    };
+  }
+
+  function normalizeInstalados(instalados) {
+    if (!instalados || typeof instalados !== 'object' || Array.isArray(instalados)) {
+      throw new Error('instalados debe ser un objeto, ej. { "skills": ["internal-comms"], "plugins": [] }');
+    }
+    const lista = (v, campo) => {
+      if (v === undefined) return [];
+      if (!Array.isArray(v) || v.some((x) => typeof x !== 'string' || !x)) throw new Error(`instalados.${campo} debe ser una lista de ids`);
+      return [...new Set(v)];
+    };
+    return { skills: lista(instalados.skills, 'skills'), plugins: lista(instalados.plugins, 'plugins') };
+  }
+
+  function hasTool(agentId, herramienta) {
+    return herramientasOf(agentId)[herramienta] === true;
+  }
+
+  function normalizeHerramientas(herramientas) {
+    if (!herramientas || typeof herramientas !== 'object' || Array.isArray(herramientas)) {
+      throw new Error('herramientas debe ser un objeto, ej. { "baseDatos": true }');
+    }
+    const desconocida = Object.keys(herramientas).find((h) => !HERRAMIENTAS.includes(h));
+    if (desconocida) throw new Error(`Herramienta desconocida: ${desconocida}`);
+    return Object.fromEntries(HERRAMIENTAS.map((h) => [h, herramientas[h] === true]));
   }
 
   function normalizeSkills(skills) {
@@ -153,12 +211,15 @@ function createAgentProfiles({
       rol: rolOf(agent),
       autonomous: agent.isCustom ? Boolean(agent.autonomous) : null,
       skills: skillsOf(agentId),
+      herramientas: herramientasOf(agentId),
+      instalados: instaladosOf(agentId),
+      ciclo: agent.isCustom && !agent.autonomous ? null : cicloOf(agentId),
       memoria: { caracteres: memoria.length },
       limites: { contenido: MAX_CONTENIDO },
     };
   }
 
-  function updateProfile(agentId, { rol, label, autonomous, skills } = {}) {
+  function updateProfile(agentId, { rol, label, autonomous, skills, herramientas, cicloHoras, instalados } = {}) {
     const { agent } = requireAgent(agentId);
     // Validar todo antes de escribir nada.
     if (rol !== undefined && (typeof rol !== 'string' || !rol.trim())) throw new Error('El rol no puede quedar vacío');
@@ -170,6 +231,14 @@ function createAgentProfiles({
       throw new Error('Los agentes base siempre son autónomos');
     }
     const normalizedSkills = skills !== undefined ? normalizeSkills(skills) : undefined;
+    const normalizedHerramientas = herramientas !== undefined ? normalizeHerramientas(herramientas) : undefined;
+    const normalizedInstalados = instalados !== undefined ? normalizeInstalados(instalados) : undefined;
+    if (cicloHoras !== undefined && cicloHoras !== null) {
+      const n = Number(cicloHoras);
+      if (!Number.isFinite(n) || n < 0 || n > MAX_CICLO_HORAS) {
+        throw new Error(`El ciclo debe ser un número de horas entre 0 y ${MAX_CICLO_HORAS} (0 = no corre solo)`);
+      }
+    }
 
     if (agent.isCustom) {
       const patch = {};
@@ -181,9 +250,14 @@ function createAgentProfiles({
       fs.writeFileSync(agent.deps.rolePath, rol);
     }
 
-    if (normalizedSkills !== undefined) {
+    if (normalizedSkills !== undefined || normalizedHerramientas !== undefined || normalizedInstalados !== undefined || cicloHoras !== undefined) {
       const all = readAll();
-      all[agentId] = { ...all[agentId], skills: normalizedSkills };
+      all[agentId] = { ...all[agentId] };
+      if (normalizedSkills !== undefined) all[agentId].skills = normalizedSkills;
+      if (normalizedHerramientas !== undefined) all[agentId].herramientas = normalizedHerramientas;
+      if (normalizedInstalados !== undefined) all[agentId].instalados = normalizedInstalados;
+      if (cicloHoras === null) delete all[agentId].cicloHoras; // volver al valor por defecto
+      else if (cicloHoras !== undefined) all[agentId].cicloHoras = Math.round(Number(cicloHoras) * 100) / 100;
       writeAll(all);
     }
     return getProfile(agentId);
@@ -214,7 +288,7 @@ function createAgentProfiles({
     return extra.length ? [...messages.slice(0, 1), ...extra, ...messages.slice(1)] : messages;
   }
 
-  return { getProfile, updateProfile, getMemory, setMemory, remember, compressMemory, decorate, TIPOS };
+  return { getProfile, updateProfile, hasTool, instaladosOf, cicloOf, getMemory, setMemory, remember, compressMemory, decorate, TIPOS, HERRAMIENTAS };
 }
 
-module.exports = { createAgentProfiles, TIPOS, MAX_CONTENIDO };
+module.exports = { createAgentProfiles, TIPOS, HERRAMIENTAS, MAX_CONTENIDO };

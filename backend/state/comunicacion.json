@@ -1,0 +1,14 @@
+{
+  "porDefecto": "area",
+  "reglas": {
+    "seguimiento-crm": {
+      "alcance": "personalizado",
+      "permitidos": [
+        "buscador-prospectos",
+        "cotizador",
+        "custom-objection-handling-1794008522407",
+        "pm"
+      ]
+    }
+  }
+}

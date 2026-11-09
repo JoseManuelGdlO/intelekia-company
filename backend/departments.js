@@ -4,11 +4,13 @@ const publicador = require('./agents/publicador');
 const buscadorProspectos = require('./agents/buscadorProspectos');
 const seguimientoCRM = require('./agents/seguimientoCRM');
 const cotizador = require('./agents/cotizador');
+const pm = require('./agents/pm');
 
 function buildDepartments({ rootDir, config, createChatCompletion }) {
   const CONTEXT_PATH = path.join(rootDir, 'CONTEXTO-INTELEKIA.md');
   const MARKETING_DIR = path.join(rootDir, 'departamentos', 'marketing');
   const COMERCIAL_DIR = path.join(rootDir, 'departamentos', 'comercial');
+  const ADMINISTRACION_DIR = path.join(rootDir, 'departamentos', 'administracion');
 
   const shared = { apiKey: config.openaiApiKey, model: config.openaiModel, createChatCompletion };
 
@@ -20,6 +22,7 @@ function buildDepartments({ rootDir, config, createChatCompletion }) {
         {
           id: 'buscador-tendencias',
           label: 'Buscador de Tendencias',
+          cicloHoras: 6, // Ideas para reels: cada 6 h (editable en la app)
           module: buscadorTendencias,
           deps: {
             contextPath: CONTEXT_PATH,
@@ -59,13 +62,16 @@ function buildDepartments({ rootDir, config, createChatCompletion }) {
         },
         {
           id: 'seguimiento-crm',
-          label: 'Seguimiento / CRM',
+          label: 'Seguimiento de Proyectos',
+          cicloHoras: 24, // Reporte y avisos de tickets atrasados: una vez al día (editable en la app)
           module: seguimientoCRM,
           deps: {
             contextPath: CONTEXT_PATH,
             rolePath: path.join(COMERCIAL_DIR, 'agentes', 'seguimiento-crm.md'),
-            prospectosPath: path.join(COMERCIAL_DIR, 'content', 'prospectos.json'),
-            seguimientosDir: path.join(COMERCIAL_DIR, 'content', 'seguimientos'),
+            // Reportes generados con datos de la base de proyectos (herramienta consultar_base_datos).
+            reportesDir: path.join(COMERCIAL_DIR, 'content', 'reportes-seguimiento'),
+            // server.js conecta aquí el flujo de tickets atrasados → PM → correos (lib/atrasados.js).
+            notificarAtrasados: null,
             ...shared,
           },
         },
@@ -78,6 +84,27 @@ function buildDepartments({ rootDir, config, createChatCompletion }) {
             rolePath: path.join(COMERCIAL_DIR, 'agentes', 'cotizador.md'),
             serviciosPath: path.join(COMERCIAL_DIR, 'content', 'servicios.json'),
             cotizacionesDir: path.join(COMERCIAL_DIR, 'content', 'cotizaciones-tipo'),
+            ...shared,
+          },
+        },
+      ],
+    },
+    {
+      id: 'administracion',
+      label: 'Administración',
+      agents: [
+        {
+          id: 'pm',
+          label: 'PM',
+          module: pm,
+          // Para dar seguimiento necesita poder preguntarle a cualquier agente (editable en Comunicación).
+          comunicacionPorDefecto: 'todos',
+          deps: {
+            contextPath: CONTEXT_PATH,
+            rolePath: path.join(ADMINISTRACION_DIR, 'agentes', 'pm.md'),
+            reportesDir: path.join(ADMINISTRACION_DIR, 'content', 'reportes-equipo'),
+            // server.js conecta aquí el panorama real del equipo (lib/teamSnapshot.js).
+            getTeamSnapshot: null,
             ...shared,
           },
         },

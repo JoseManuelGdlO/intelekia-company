@@ -1,3 +1,5 @@
+import { fechaCorta, haceCuanto, enCuanto, fechaLarga } from './fechas.js';
+
 const STATUS_LABELS = {
   idle: 'Disponible',
   trabajando: 'Trabajando',
@@ -26,6 +28,10 @@ export function createPanel({ onSend, onForzar, onClose, onEdit }) {
   const closeButton = document.getElementById('panel-close');
   const editButton = document.getElementById('panel-edit');
   const teamList = document.getElementById('panel-team-list');
+  const cicloEl = document.getElementById('panel-ciclo');
+  const activityList = document.getElementById('panel-activity-list');
+  const activityLive = document.getElementById('panel-activity-live');
+  const activityCount = document.getElementById('panel-activity-count');
   const teamCount = document.getElementById('panel-team-count');
 
   let currentAgentId = null;
@@ -61,6 +67,11 @@ export function createPanel({ onSend, onForzar, onClose, onEdit }) {
         const who = document.createElement('div');
         who.className = 'who';
         who.append(item.deLabel, Object.assign(document.createElement('span'), { className: 'arrow', textContent: '→' }), item.paraLabel);
+        if (item.inicio) {
+          const when = Object.assign(document.createElement('span'), { className: 'team-time', textContent: `${fechaCorta(item.inicio)} · ${haceCuanto(item.inicio)}` });
+          when.title = fechaLarga(item.inicio);
+          who.appendChild(when);
+        }
         const q = Object.assign(document.createElement('div'), { className: 'q', textContent: item.pregunta });
         const answer = item.estado === 'en_curso' ? 'Respondiendo…' : item.error ? `Error: ${item.error}` : item.respuesta;
         const a = Object.assign(document.createElement('div'), { className: 'a', textContent: answer });
@@ -98,9 +109,56 @@ export function createPanel({ onSend, onForzar, onClose, onEdit }) {
       line.appendChild(name);
     }
     line.appendChild(document.createTextNode(text));
+    if (kind !== 'system') {
+      const ahora = new Date().toISOString();
+      const time = Object.assign(document.createElement('span'), { className: 'msg-time', textContent: fechaCorta(ahora) });
+      time.title = fechaLarga(ahora);
+      line.appendChild(time);
+    }
     chatLog.appendChild(line);
     chatLog.scrollTop = chatLog.scrollHeight;
     return line;
+  }
+
+  const ICONOS_TIPO = { inicio: 'tipo-inicio', fin: 'tipo-fin', error: 'tipo-error', respuesta: 'tipo-respuesta', chat: 'tipo-chat', pensando: 'tipo-pensando', herramienta: 'tipo-herramienta', resultado: 'tipo-resultado', nota: 'tipo-nota' };
+
+  /** Próximo ciclo automático del agente (o que no corre solo). */
+  function renderCiclo(info) {
+    if (!info) {
+      cicloEl.textContent = '';
+      return;
+    }
+    if (info.enCurso) cicloEl.textContent = '⏱️ Ejecutando su ciclo ahora…';
+    else if (info.enCola) cicloEl.textContent = '⏱️ En cola para ejecutar su ciclo…';
+    else if (!info.cadaHoras) cicloEl.textContent = '⏱️ No corre solo (solo chat o Forzar ciclo)';
+    else cicloEl.textContent = `⏱️ Próximo ciclo: ${info.proxima ? `${fechaCorta(info.proxima)} (${enCuanto(info.proxima)})` : 'pronto'} · cada ${info.cadaHoras} h`;
+  }
+
+  /** Bitácora de actividad del agente, lo más reciente arriba. */
+  function renderActividad(eventos, { enVivo = false } = {}) {
+    activityLive.hidden = !enVivo;
+    activityCount.textContent = eventos.length ? `(${eventos.length})` : '';
+    activityList.innerHTML = '';
+    if (!eventos.length) {
+      activityList.appendChild(Object.assign(document.createElement('div'), { className: 'team-empty', textContent: 'Todavía no hay actividad registrada. Fuerza un ciclo o escríbele para verlo trabajar.' }));
+      return;
+    }
+    eventos
+      .slice()
+      .reverse()
+      .forEach((e, i) => {
+        const row = document.createElement(e.detalle ? 'details' : 'div');
+        row.className = `act-row ${ICONOS_TIPO[e.tipo] || ''}${i === 0 && enVivo ? ' latest' : ''}`;
+        const head = document.createElement(e.detalle ? 'summary' : 'div');
+        head.className = 'act-head';
+        const time = Object.assign(document.createElement('span'), { className: 'act-time', textContent: fechaCorta(e.fecha, { segundos: true }) });
+        time.title = `${fechaLarga(e.fecha)} (${haceCuanto(e.fecha)})`;
+        const text = Object.assign(document.createElement('span'), { className: 'act-text', textContent: e.texto });
+        head.append(time, text);
+        row.appendChild(head);
+        if (e.detalle) row.appendChild(Object.assign(document.createElement('pre'), { className: 'act-detail', textContent: e.detalle }));
+        activityList.appendChild(row);
+      });
   }
 
   function showPending() {
@@ -158,8 +216,8 @@ export function createPanel({ onSend, onForzar, onClose, onEdit }) {
   }
   window.addEventListener('keydown', (e) => {
     // Si hay un editor abierto encima, Escape cierra ese editor, no el panel.
-    if (e.key === 'Escape' && currentAgentId && !document.querySelector('#perfil-modal.visible, #com-modal.visible')) close();
+    if (e.key === 'Escape' && currentAgentId && !document.querySelector('#perfil-modal.visible, #com-modal.visible, #mail-modal.visible')) close();
   });
 
-  return { open, close, setTitle, renderStatus, renderTeam, appendMessage, getCurrentAgentId: () => currentAgentId };
+  return { open, close, setTitle, renderStatus, renderTeam, renderActividad, renderCiclo, appendMessage, getCurrentAgentId: () => currentAgentId };
 }

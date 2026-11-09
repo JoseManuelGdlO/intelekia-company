@@ -87,7 +87,9 @@ export function createComunicacionEditor({ getDepartments, accentOf, onChange, o
         const allowed = new Set(data.permitidos[origin.id] || []);
 
         const select = el('select', { 'aria-label': `Regla de ${origin.label}` });
-        select.appendChild(el('option', { value: 'heredar', text: `Por defecto (${ALCANCE_LABELS[data.porDefecto]})` }));
+        // Algunos agentes (como el PM) tienen su propio valor por defecto.
+        const heredado = rule.heredada ? rule.alcance : data.porDefecto;
+        select.appendChild(el('option', { value: 'heredar', text: `Por defecto (${ALCANCE_LABELS[heredado]})` }));
         Object.entries(ALCANCE_LABELS).forEach(([value, label]) => select.appendChild(el('option', { value, text: label })));
         select.value = rule.heredada ? 'heredar' : rule.alcance;
         select.addEventListener('change', () => {

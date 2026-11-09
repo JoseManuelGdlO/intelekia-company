@@ -114,3 +114,52 @@ test('remember nunca lanza aunque el agente no exista', () => {
   assert.doesNotThrow(() => profiles.remember('fantasma', 'x'));
   assert.throws(() => profiles.getProfile('fantasma'), /Agente desconocido/);
 });
+
+test('las herramientas se activan por agente y se validan', () => {
+  const { profiles } = setup();
+  assert.deepEqual(profiles.getProfile('publicador').herramientas, { baseDatos: false, correo: false });
+  assert.equal(profiles.hasTool('publicador', 'baseDatos'), false);
+  profiles.updateProfile('publicador', { herramientas: { baseDatos: true } });
+  assert.equal(profiles.hasTool('publicador', 'baseDatos'), true);
+  assert.equal(profiles.hasTool('custom-x', 'baseDatos'), false);
+  profiles.updateProfile('publicador', { skills: [SKILL] });
+  assert.equal(profiles.hasTool('publicador', 'baseDatos'), true, 'guardar skills no apaga herramientas');
+  assert.throws(() => profiles.updateProfile('publicador', { herramientas: { shell: true } }), /desconocida/);
+});
+
+test('cada agente tiene su ciclo: valor de departments.js, general de .env, o el propio editado', () => {
+  const { profiles } = setup();
+  // publicador no declara cicloHoras: usa el general (config.agentIntervalHours no está en el setup → 6)
+  assert.deepEqual(profiles.cicloOf('publicador'), { cadaHoras: 6, porDefecto: 6, personalizado: false });
+  profiles.updateProfile('publicador', { cicloHoras: 24 });
+  assert.deepEqual(profiles.cicloOf('publicador'), { cadaHoras: 24, porDefecto: 6, personalizado: true });
+  profiles.updateProfile('publicador', { cicloHoras: 0 });
+  assert.equal(profiles.cicloOf('publicador').cadaHoras, 0);
+  profiles.updateProfile('publicador', { cicloHoras: null });
+  assert.equal(profiles.cicloOf('publicador').personalizado, false);
+  assert.throws(() => profiles.updateProfile('publicador', { cicloHoras: -1 }), /entre 0 y 720/);
+  assert.throws(() => profiles.updateProfile('publicador', { cicloHoras: 'mucho' }), /entre 0 y 720/);
+  assert.equal(profiles.getProfile('custom-x').ciclo, null, 'un trabajador que solo responde en chat no tiene ciclo');
+});
+
+test('instalados: se guardan por agente, se validan y salen en el perfil', () => {
+  const fs = require('fs');
+  const os = require('os');
+  const path = require('path');
+  const { createAgentProfiles } = require('../lib/agentProfiles');
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'perf-inst-'));
+  const rolePath = path.join(dir, 'rol.md');
+  fs.writeFileSync(rolePath, 'rol');
+  const profiles = createAgentProfiles({
+    profilesPath: path.join(dir, 'perfiles.json'),
+    memoriasDir: dir,
+    departments: [{ id: 'd', label: 'D', agents: [{ id: 'a', label: 'A', deps: { rolePath } }] }],
+    createChatCompletion: async () => '',
+    config: {},
+  });
+  assert.deepStrictEqual(profiles.getProfile('a').instalados, { skills: [], plugins: [] });
+  profiles.updateProfile('a', { instalados: { skills: ['s1', 's1'], plugins: ['p1'] } });
+  assert.deepStrictEqual(profiles.instaladosOf('a'), { skills: ['s1'], plugins: ['p1'] });
+  assert.throws(() => profiles.updateProfile('a', { instalados: { skills: 'x' } }), /lista de ids/);
+  assert.throws(() => profiles.updateProfile('a', { instalados: [] }), /objeto/);
+});

@@ -1,4 +1,5 @@
-import { fetchPerfil, savePerfil, fetchMemoria, saveMemoria, comprimirMemoria } from './api.js';
+import { fetchPerfil, savePerfil, fetchMemoria, saveMemoria, comprimirMemoria, fetchBaseDatosEstado, probarBaseDatos, fetchConsultasBD, fetchCorreoEstado, saveCorreoConfig, probarCorreo, fetchCorreos, fetchCiclos, fetchInstalables, instalarSkill, quitarSkillInstalada, instalarPlugin, probarPlugin, quitarPlugin } from './api.js';
+import { fechaCorta } from './fechas.js';
 
 const TIPO_LABELS = { skill: 'Skill', plugin: 'Plugin', documento: 'Documento' };
 
@@ -25,7 +26,9 @@ export function createPerfilEditor({ accentOf, onSaved }) {
   let agentId = null;
   let perfil = null;
   let skills = [];
-  let dirty = { rol: false, skills: false, memoria: false };
+  let dirty = { rol: false, skills: false, memoria: false, herramientas: false, instalados: false };
+  let catalogo = { skills: [], plugins: [] };
+  let asignados = { skills: new Set(), plugins: new Set() };
   let closeArmed = false;
   let compressArmed = false;
   let toastTimer = null;
@@ -163,14 +166,35 @@ export function createPerfilEditor({ accentOf, onSaved }) {
     $('perfil-label').value = perfil.label;
     $('perfil-autonomous').checked = Boolean(perfil.autonomous);
     $('perfil-rol').value = perfil.rol;
+    fillCiclo();
     $('perfil-rol-hint').textContent = isCustom
       ? 'Contexto que le diste al crearlo.'
       : 'Se guarda en su archivo de rol (departamentos/…/agentes). Ojo: si pide un formato de salida específico, consérvalo.';
   }
 
+  async function fillCiclo() {
+    const row = $('perfil-ciclo-row');
+    row.hidden = !perfil.ciclo;
+    cicloDirty = false;
+    if (!perfil.ciclo) return;
+    const { cadaHoras, porDefecto, personalizado } = perfil.ciclo;
+    $('perfil-ciclo').value = cadaHoras;
+    cicloValor = cadaHoras;
+    $('perfil-ciclo-default').disabled = !personalizado;
+    $('perfil-ciclo-default').textContent = `Usar valor por defecto (${porDefecto} h)`;
+    let texto = cadaHoras === 0 ? 'No corre solo: solo responde en el chat o con Forzar ciclo.' : '0 = no corre solo.';
+    try {
+      const info = (await fetchCiclos())[perfil.id];
+      if (info?.proxima && cadaHoras > 0) texto += ` Próximo ciclo: ${fechaCorta(info.proxima)}`;
+    } catch {
+      // opcional
+    }
+    $('perfil-ciclo-hint').textContent = texto;
+  }
+
   async function open(id) {
     agentId = id;
-    dirty = { rol: false, skills: false, memoria: false };
+    dirty = { rol: false, skills: false, memoria: false, herramientas: false, instalados: false };
     closeArmed = false;
     showTab('rol');
     modal.classList.add('visible');
@@ -183,6 +207,9 @@ export function createPerfilEditor({ accentOf, onSaved }) {
       renderSkills();
       $('perfil-memoria').value = mem.content;
       updateCounts();
+      loadTools();
+      asignados = { skills: new Set(p.instalados?.skills || []), plugins: new Set(p.instalados?.plugins || []) };
+      loadInstalables();
     } catch (err) {
       notify(`No se pudo cargar el perfil: ${err.message}`, true);
     }
@@ -207,6 +234,7 @@ export function createPerfilEditor({ accentOf, onSaved }) {
     setBusy(button, true);
     try {
       const patch = { rol: $('perfil-rol').value };
+      if (cicloDirty) patch.cicloHoras = cicloValor;
       if (perfil.tipo === 'custom') {
         patch.label = $('perfil-label').value;
         patch.autonomous = $('perfil-autonomous').checked;
@@ -215,7 +243,8 @@ export function createPerfilEditor({ accentOf, onSaved }) {
       perfil = await savePerfil(agentId, patch);
       fillRol();
       dirty.rol = false;
-      notify('Rol guardado ✓ — aplica desde su siguiente tarea');
+      notify(cicloDirty ? 'Guardado ✓ — el nuevo ciclo aplica en menos de un minuto' : 'Rol guardado ✓ — aplica desde su siguiente tarea');
+      cicloDirty = false;
       onSaved?.(perfil, { labelChanged: perfil.label !== previousLabel });
     } catch (err) {
       notify(err.message, true);
@@ -297,6 +326,152 @@ export function createPerfilEditor({ accentOf, onSaved }) {
     }
   }
 
+  // --- Herramientas (base de datos) ---
+  let mailConfigDirty = false;
+  let cicloDirty = false;
+  let cicloValor; // número de horas, o null para volver al valor por defecto
+
+  function fillToolsCount() {
+    const activas = Object.values(perfil?.herramientas || {}).filter(Boolean).length;
+    $('perfil-tools-count').textContent = activas ? `(${activas})` : '';
+  }
+
+  const ESTADO_CORREO = { enviado: 'enviado ✓', por_aprobar: 'por aprobar', error: 'error', descartado: 'descartado' };
+
+  function renderMailLog(items) {
+    const box = $('mail-log');
+    box.innerHTML = '';
+    if (!items.length) {
+      box.innerHTML = '<div class="skill-empty">Todavía no ha enviado correos.</div>';
+      return;
+    }
+    items
+      .slice()
+      .reverse()
+      .forEach((item) => {
+        const row = document.createElement('div');
+        row.className = `bd-row mail-row estado-${item.estado}`;
+        const meta = document.createElement('div');
+        meta.className = 'bd-meta';
+        const fecha = new Date(item.creadoEn).toLocaleString('es-MX', { dateStyle: 'short', timeStyle: 'short' });
+        meta.textContent = `${fecha} · ${ESTADO_CORREO[item.estado] || item.estado} · para ${item.para.join(', ')}`;
+        const asunto = Object.assign(document.createElement('div'), { className: 'mail-subject', textContent: item.asunto });
+        row.append(meta, asunto);
+        const nota = item.error || (item.estado === 'por_aprobar' ? item.motivo : null);
+        if (nota) row.appendChild(Object.assign(document.createElement('div'), { className: 'bd-error', textContent: nota }));
+        box.appendChild(row);
+      });
+  }
+
+  async function loadMail() {
+    $('mail-activo').checked = Boolean(perfil?.herramientas?.correo);
+    $('mail-test-result').textContent = '';
+    mailConfigDirty = false;
+    try {
+      const [estado, correos] = await Promise.all([fetchCorreoEstado(), fetchCorreos({ agentId, limite: 20 })]);
+      $('mail-remitente').textContent = estado.remitente ? `· ${estado.remitente}` : '';
+      const badge = $('mail-estado');
+      badge.textContent = estado.configurado ? 'Configurado' : 'Sin configurar';
+      badge.classList.toggle('off', !estado.configurado);
+      $('mail-config-help').hidden = estado.configurado;
+      $('mail-probar').disabled = !estado.configurado;
+      $('mail-permitidos').value = estado.permitidos.join('\n');
+      $('mail-limite').value = estado.limiteDiario;
+      $('mail-limite-txt').textContent = estado.limiteDiario;
+      $('mail-hoy').textContent = estado.enviadosHoy;
+      const cco = estado.copiaOculta || [];
+      $('mail-bcc').textContent = cco.length ? cco.join(', ') : 'nadie (configura SMTP_BCC en backend/.env)';
+      renderMailLog(correos);
+    } catch (err) {
+      notify(`No se pudo leer el estado del correo: ${err.message}`, true);
+    }
+  }
+
+  function renderLog(items) {
+    const box = $('bd-log');
+    box.innerHTML = '';
+    if (!items.length) {
+      box.innerHTML = '<div class="skill-empty">Todavía no ha consultado la base de datos.</div>';
+      return;
+    }
+    items
+      .slice()
+      .reverse()
+      .forEach((item) => {
+        const row = document.createElement('div');
+        row.className = `bd-row${item.error ? ' error' : ''}`;
+        const meta = document.createElement('div');
+        meta.className = 'bd-meta';
+        const fecha = new Date(item.fecha).toLocaleString('es-MX', { dateStyle: 'short', timeStyle: 'short' });
+        meta.textContent = `${fecha} · ${item.error ? (item.bloqueada ? 'bloqueada' : 'error') : `${item.filas} fila(s)`}${item.motivo ? ` · ${item.motivo}` : ''}`;
+        const sql = document.createElement('code');
+        sql.textContent = item.sql;
+        row.append(meta, sql);
+        if (item.error) row.appendChild(Object.assign(document.createElement('div'), { className: 'bd-error', textContent: item.error }));
+        box.appendChild(row);
+      });
+  }
+
+  async function loadTools() {
+    fillToolsCount();
+    $('bd-activa').checked = Boolean(perfil?.herramientas?.baseDatos);
+    $('bd-test-result').textContent = '';
+    try {
+      const [estado, log] = await Promise.all([fetchBaseDatosEstado(), fetchConsultasBD({ agentId })]);
+      $('bd-nombre').textContent = estado.baseDatos ? `· ${estado.baseDatos}` : '';
+      const badge = $('bd-estado');
+      badge.textContent = estado.configurada ? 'Configurada' : 'Sin configurar';
+      badge.classList.toggle('off', !estado.configurada);
+      $('bd-tablas').textContent = estado.tablas.join(', ');
+      $('bd-bloqueadas').textContent = estado.columnasBloqueadas.join(', ');
+      $('bd-root-warning').hidden = !(estado.configurada && estado.usuarioEsRoot);
+      $('bd-config-help').hidden = estado.configurada;
+      $('bd-probar').disabled = !estado.configurada;
+      renderLog(log);
+    } catch (err) {
+      notify(`No se pudo leer el estado de la base de datos: ${err.message}`, true);
+    }
+    await loadMail();
+  }
+
+  async function saveTools() {
+    const button = $('perfil-tools-save');
+    setBusy(button, true);
+    try {
+      if (mailConfigDirty) {
+        const permitidos = $('mail-permitidos').value.split(/[\n,]+/).map((s) => s.trim()).filter(Boolean);
+        await saveCorreoConfig({ permitidos, limiteDiario: Number($('mail-limite').value) });
+        mailConfigDirty = false;
+      }
+      perfil = await savePerfil(agentId, {
+        herramientas: { baseDatos: $('bd-activa').checked, correo: $('mail-activo').checked },
+      });
+      dirty.herramientas = false;
+      fillToolsCount();
+      await loadMail();
+      const activas = [perfil.herramientas.baseDatos && 'base de datos', perfil.herramientas.correo && 'correo'].filter(Boolean);
+      notify(activas.length ? `Herramientas guardadas ✓ — activas: ${activas.join(' y ')}` : 'Herramientas guardadas ✓ — ninguna activa');
+    } catch (err) {
+      notify(err.message, true);
+    } finally {
+      setBusy(button, false);
+    }
+  }
+
+  async function testDb() {
+    const button = $('bd-probar');
+    setBusy(button, true);
+    $('bd-test-result').textContent = 'Probando…';
+    try {
+      const r = await probarBaseDatos();
+      $('bd-test-result').textContent = `✓ Conectó: ${r.tablas} tabla(s) visibles`;
+    } catch (err) {
+      $('bd-test-result').textContent = `✕ ${err.message}`;
+    } finally {
+      setBusy(button, false);
+    }
+  }
+
   async function loadFiles(files) {
     for (const file of files) {
       const text = await file.text();
@@ -304,6 +479,201 @@ export function createPerfilEditor({ accentOf, onSaved }) {
       addSkill(tipo, guessName(file.name, text), text);
     }
   }
+
+  // ---------- Instalados desde internet (skills de GitHub y plugins MCP) ----------
+
+  async function loadInstalables() {
+    try {
+      catalogo = await fetchInstalables();
+    } catch {
+      catalogo = { skills: [], plugins: [] };
+    }
+    renderInstalables();
+  }
+
+  function instCount() {
+    const n = asignados.skills.size + asignados.plugins.size;
+    $('inst-count').textContent = catalogo.skills.length + catalogo.plugins.length ? `(${n} en uso)` : '';
+  }
+
+  function instRow({ tipo, item, titulo, sub, detalle, fuente }) {
+    const row = document.createElement('div');
+    row.className = 'inst-item';
+    const set = asignados[tipo];
+    row.innerHTML = `
+      <label class="inst-check"><input type="checkbox" /> <span class="inst-name"></span></label>
+      <div class="inst-sub"></div>
+      <div class="inst-actions"></div>`;
+    const check = row.querySelector('input');
+    check.checked = set.has(item.id);
+    check.addEventListener('change', () => {
+      if (check.checked) set.add(item.id);
+      else set.delete(item.id);
+      dirty.instalados = true;
+      instCount();
+    });
+    row.querySelector('.inst-name').textContent = titulo;
+    row.querySelector('.inst-sub').textContent = sub;
+    if (detalle) row.querySelector('.inst-sub').title = detalle;
+    const actions = row.querySelector('.inst-actions');
+    if (fuente) {
+      const a = Object.assign(document.createElement('a'), { href: fuente, target: '_blank', rel: 'noopener', textContent: 'Ver origen', className: 'inst-link' });
+      actions.appendChild(a);
+    }
+    return { row, actions };
+  }
+
+  function armedButton(label, onConfirm) {
+    const b = Object.assign(document.createElement('button'), { className: 'btn ghost small', type: 'button', textContent: label });
+    b.addEventListener('click', async () => {
+      if (!b.classList.contains('armed')) {
+        b.classList.add('armed');
+        b.textContent = '¿Seguro? Clic de nuevo';
+        setTimeout(() => {
+          b.classList.remove('armed');
+          b.textContent = label;
+        }, 3000);
+        return;
+      }
+      b.disabled = true;
+      try {
+        await onConfirm();
+      } finally {
+        b.disabled = false;
+      }
+    });
+    return b;
+  }
+
+  function renderInstalables() {
+    const box = $('inst-list');
+    box.innerHTML = '';
+    if (!catalogo.skills.length && !catalogo.plugins.length) {
+      box.innerHTML = '<div class="skill-empty">Todavía no hay nada instalado. Pega abajo la URL de un skill de GitHub o de un plugin MCP.</div>';
+    }
+    catalogo.skills.forEach((s) => {
+      const { row, actions } = instRow({
+        tipo: 'skills',
+        item: s,
+        titulo: `🧩 ${s.nombre}`,
+        sub: `${s.descripcion || 'Sin descripción'} · ${s.archivos.length} archivo(s)`,
+        detalle: s.archivos.join('\n'),
+        fuente: s.fuente,
+      });
+      actions.appendChild(
+        armedButton('Desinstalar', async () => {
+          try {
+            await quitarSkillInstalada(s.id);
+            asignados.skills.delete(s.id);
+            notify(`Skill ${s.nombre} desinstalado`);
+            loadInstalables();
+          } catch (err) {
+            notify(err.message, true);
+          }
+        })
+      );
+      box.appendChild(row);
+    });
+    catalogo.plugins.forEach((p) => {
+      const herramientas = (p.herramientas || []).map((h) => h.nombre);
+      const { row, actions } = instRow({
+        tipo: 'plugins',
+        item: p,
+        titulo: `🔌 ${p.nombre}`,
+        sub: `${p.transporte === 'http' ? p.url : `npm: ${p.paquete}`} · ${herramientas.length} herramienta(s): ${herramientas.join(', ')}`,
+        detalle: (p.herramientas || []).map((h) => `${h.nombre}: ${h.descripcion}`).join('\n'),
+        fuente: p.transporte === 'npm' ? `https://www.npmjs.com/package/${p.paquete}` : null,
+      });
+      const probar = Object.assign(document.createElement('button'), { className: 'btn ghost small', type: 'button', textContent: 'Probar' });
+      probar.addEventListener('click', async () => {
+        probar.disabled = true;
+        probar.textContent = 'Probando…';
+        try {
+          const r = await probarPlugin(p.id);
+          notify(`✓ ${r.nombre} respondió con ${r.herramientas.length} herramienta(s)`);
+          loadInstalables();
+        } catch (err) {
+          notify(`✕ ${err.message}`, true);
+        } finally {
+          probar.disabled = false;
+          probar.textContent = 'Probar';
+        }
+      });
+      actions.append(
+        probar,
+        armedButton('Quitar', async () => {
+          try {
+            await quitarPlugin(p.id);
+            asignados.plugins.delete(p.id);
+            notify(`Plugin ${p.nombre} quitado`);
+            loadInstalables();
+          } catch (err) {
+            notify(err.message, true);
+          }
+        })
+      );
+      box.appendChild(row);
+    });
+    instCount();
+  }
+
+  async function doInstall(button, fn, okText) {
+    button.disabled = true;
+    const label = button.textContent;
+    button.textContent = 'Instalando…';
+    $('inst-result').textContent = 'Descargando y verificando…';
+    try {
+      const item = await fn();
+      // Lo recién instalado queda marcado para este trabajador (falta guardar).
+      (item.herramientas ? asignados.plugins : asignados.skills).add(item.id);
+      dirty.instalados = true;
+      $('inst-result').textContent = okText(item);
+      await loadInstalables();
+      return true;
+    } catch (err) {
+      $('inst-result').textContent = `✕ ${err.message}`;
+      return false;
+    } finally {
+      button.disabled = false;
+      button.textContent = label;
+    }
+  }
+
+  async function saveInstalados() {
+    const button = $('inst-save');
+    setBusy(button, true);
+    try {
+      perfil = await savePerfil(agentId, { instalados: { skills: [...asignados.skills], plugins: [...asignados.plugins] } });
+      dirty.instalados = false;
+      notify('Asignación guardada ✓ — aplica desde su siguiente tarea');
+      $('inst-result').textContent = '';
+      onSaved?.(perfil, { labelChanged: false });
+    } catch (err) {
+      notify(err.message, true);
+    } finally {
+      setBusy(button, false);
+    }
+  }
+
+  $('inst-skill-btn').addEventListener('click', async () => {
+    const input = $('inst-skill-url');
+    if (!input.value.trim()) return input.focus();
+    const ok = await doInstall($('inst-skill-btn'), () => instalarSkill(input.value.trim()), (s) => `✓ Skill "${s.nombre}" instalado (${s.archivos.length} archivos). Guarda para asignarlo.`);
+    if (ok) input.value = '';
+  });
+  $('inst-plugin-btn').addEventListener('click', async () => {
+    const input = $('inst-plugin-url');
+    const valor = input.value.trim();
+    if (!valor) return input.focus();
+    const datos = /^https?:\/\//i.test(valor) ? { url: valor } : { paquete: valor };
+    datos.nombre = $('inst-plugin-nombre').value.trim();
+    const ok = await doInstall($('inst-plugin-btn'), () => instalarPlugin(datos), (p) => `✓ Plugin "${p.nombre}" conectado: ${p.herramientas.length} herramienta(s). Guarda para asignarlo.`);
+    if (ok) {
+      input.value = '';
+      $('inst-plugin-nombre').value = '';
+    }
+  });
+  $('inst-save').addEventListener('click', saveInstalados);
 
   document.querySelectorAll('.perfil-tab').forEach((tab) => tab.addEventListener('click', () => showTab(tab.dataset.tab)));
   document.querySelectorAll('[data-add]').forEach((b) => b.addEventListener('click', () => addSkill(b.dataset.add)));
@@ -320,11 +690,53 @@ export function createPerfilEditor({ accentOf, onSaved }) {
   $('perfil-autonomous').addEventListener('change', () => {
     dirty.rol = true;
   });
+  $('perfil-ciclo').addEventListener('input', () => {
+    const v = $('perfil-ciclo').value;
+    cicloValor = v === '' ? null : Number(v);
+    cicloDirty = true;
+    dirty.rol = true;
+  });
+  $('perfil-ciclo-default').addEventListener('click', () => {
+    cicloValor = null;
+    cicloDirty = true;
+    dirty.rol = true;
+    $('perfil-ciclo').value = perfil.ciclo?.porDefecto ?? '';
+    $('perfil-ciclo-hint').textContent = 'Volverá al valor por defecto al guardar.';
+  });
   $('perfil-memoria').addEventListener('input', () => {
     dirty.memoria = true;
     updateCounts();
   });
   $('perfil-rol-save').addEventListener('click', saveRol);
+  $('perfil-tools-save').addEventListener('click', saveTools);
+  $('bd-probar').addEventListener('click', testDb);
+  $('bd-log-reload').addEventListener('click', async () => renderLog(await fetchConsultasBD({ agentId }).catch(() => [])));
+  $('bd-activa').addEventListener('change', () => {
+    dirty.herramientas = true;
+  });
+  $('mail-activo').addEventListener('change', () => {
+    dirty.herramientas = true;
+  });
+  ['mail-permitidos', 'mail-limite'].forEach((id) =>
+    $(id).addEventListener('input', () => {
+      mailConfigDirty = true;
+      dirty.herramientas = true;
+    })
+  );
+  $('mail-probar').addEventListener('click', async () => {
+    const button = $('mail-probar');
+    setBusy(button, true);
+    $('mail-test-result').textContent = 'Probando…';
+    try {
+      const r = await probarCorreo();
+      $('mail-test-result').textContent = `✓ Conectó como ${r.remitente}`;
+    } catch (err) {
+      $('mail-test-result').textContent = `✕ ${err.message}`;
+    } finally {
+      setBusy(button, false);
+    }
+  });
+  $('mail-log-reload').addEventListener('click', async () => renderMailLog(await fetchCorreos({ agentId, limite: 20 }).catch(() => [])));
   $('perfil-skills-save').addEventListener('click', saveSkills);
   $('perfil-mem-save').addEventListener('click', saveMem);
   $('perfil-mem-reload').addEventListener('click', reloadMem);

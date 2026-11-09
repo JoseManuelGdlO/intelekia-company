@@ -16,12 +16,17 @@ function build() {
   });
 }
 
-test('buildDepartments returns the marketing and comercial departments with their agent ids', () => {
+test('buildDepartments returns marketing, comercial and administracion with their agent ids', () => {
   const departments = build();
   assert.deepEqual(
     departments.map((d) => d.id),
-    ['marketing', 'comercial']
+    ['marketing', 'comercial', 'administracion']
   );
+  const admin = departments.find((d) => d.id === 'administracion');
+  assert.deepEqual(admin.agents.map((a) => a.id), ['pm']);
+  assert.equal(admin.agents[0].module, require('../agents/pm'));
+  assert.equal(admin.agents[0].comunicacionPorDefecto, 'todos');
+  assert.equal(admin.agents[0].deps.reportesDir, path.join('/fake/root', 'departamentos', 'administracion', 'content', 'reportes-equipo'));
   assert.deepEqual(
     departments.find((d) => d.id === 'marketing').agents.map((a) => a.id),
     ['buscador-tendencias', 'publicador']
@@ -62,7 +67,7 @@ test('every agent deps object carries the shared apiKey, model, and createChatCo
   });
 });
 
-test('publicador deps point at the marketing drafts directory and seguimiento-crm deps point at the comercial seguimientos directory', () => {
+test('publicador deps point at the marketing drafts directory and seguimiento-crm deps point at the comercial reportes directory', () => {
   const departments = build();
   const publicadorAgent = departments.find((d) => d.id === 'marketing').agents.find((a) => a.id === 'publicador');
   const seguimientoAgent = departments.find((d) => d.id === 'comercial').agents.find((a) => a.id === 'seguimiento-crm');
@@ -72,7 +77,11 @@ test('publicador deps point at the marketing drafts directory and seguimiento-cr
     path.join('/fake/root', 'departamentos', 'marketing', 'content', 'drafts')
   );
   assert.equal(
-    seguimientoAgent.deps.seguimientosDir,
-    path.join('/fake/root', 'departamentos', 'comercial', 'content', 'seguimientos')
+    seguimientoAgent.deps.reportesDir,
+    path.join('/fake/root', 'departamentos', 'comercial', 'content', 'reportes-seguimiento')
   );
+  assert.equal(seguimientoAgent.label, 'Seguimiento de Proyectos');
+  assert.equal(seguimientoAgent.cicloHoras, 24);
+  assert.equal(departments.find((d) => d.id === 'marketing').agents.find((a) => a.id === 'buscador-tendencias').cicloHoras, 6);
+  assert.equal(seguimientoAgent.deps.prospectosPath, undefined, 'ya no toca prospectos.json');
 });
