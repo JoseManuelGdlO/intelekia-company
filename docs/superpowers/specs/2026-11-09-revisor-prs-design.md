@@ -135,6 +135,29 @@ Lógica sin IA, probada de forma aislada:
 - `revisorPRs.runCycle`: omitido sin configuración; sin pendientes no llama a la IA; veredicto
   confirmado con el plugin, no con la respuesta del modelo.
 
+## Ajustes de implementación (agregados al planear)
+
+- **Herramientas restringidas durante una revisión.** El plugin de GitHub expone muchas herramientas
+  (incluidas escrituras de archivos). Como el diff de un PR puede traer instrucciones maliciosas
+  (prompt injection), en el ciclo el agente solo recibe `pull_request_read`, `get_file_contents`,
+  `pull_request_review_write`, `add_comment_to_pending_review` y `merge_pull_request`, y las de
+  escritura solo aceptan el `owner/repo/pullNumber` del PR en revisión. El merge fuerza
+  `expectedHeadSha` = SHA revisado. Se elimina la herramienta de consultar compañeros en el ciclo.
+- **Chat de solo lectura.** En el chat el agente solo tiene `pull_request_read`,
+  `get_file_contents`, `search_pull_requests` y `list_pull_requests`: nunca aprueba ni hace merge
+  desde el chat.
+- **Veredicto verificado.** La respuesta final del modelo termina en
+  `VEREDICTO: APROBADO | CAMBIOS | BLOQUEADO`. `aprobado_mergeado` solo se registra si el plugin
+  confirma `merged: true`; si dijo APROBADO pero no quedó mergeado, es `error`.
+- **Reintentos acotados.** Un PR en `error` se reintenta como máximo 3 veces con el mismo SHA;
+  después queda `bloqueado` hasta que llegue un commit nuevo.
+- **Conflictos sin IA.** Si `mergeable_state` es `dirty`, el código publica el comentario de
+  conflictos y registra `bloqueado`, sin llamar al modelo.
+- **Ciclos silenciosos.** Un ciclo sin PRs pendientes no escribe en la memoria ni en la bitácora
+  de actividad (corre cada 5 min y llenaría ambas).
+- `instalables.llamar` acepta `{ maxChars }` para que el código reciba el JSON completo del plugin
+  (el recorte por defecto de 12 000 caracteres rompería el `JSON.parse`).
+
 ## Fuera de alcance
 
 - Webhooks.
