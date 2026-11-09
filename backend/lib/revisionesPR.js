@@ -10,7 +10,10 @@ const MAX_POR_CICLO = 5;
 // Herramientas del plugin de GitHub que puede usar el modelo (el resto se le quita).
 const REVISION_LECTURA = ['pull_request_read', 'get_file_contents'];
 const REVISION_ESCRITURA = ['pull_request_review_write', 'add_comment_to_pending_review', 'merge_pull_request'];
-const CHAT_LECTURA = ['pull_request_read', 'get_file_contents', 'search_pull_requests', 'list_pull_requests'];
+// En pull_request_review_write el modelo solo crea/envía/descarta su review (nunca resuelve hilos).
+const METODOS_REVIEW = ['create', 'submit_pending', 'delete_pending'];
+const EVENTOS_REVIEW = ['APPROVE', 'REQUEST_CHANGES', 'COMMENT'];
+const CHAT_LECTURA =['pull_request_read', 'get_file_contents', 'search_pull_requests', 'list_pull_requests'];
 
 function claveDe({ owner, repo, numero }) {
   return `${owner}/${repo}#${numero}`;
@@ -113,12 +116,19 @@ function herramientaDe(nombre) {
   return n.slice(n.lastIndexOf('__') + 2);
 }
 
-function esDelPr(pr, args = {}) {
+function esDelRepo(pr, args = {}) {
   return (
     String(args.owner || '').toLowerCase() === pr.owner.toLowerCase() &&
-    String(args.repo || '').toLowerCase() === pr.repo.toLowerCase() &&
-    Number(args.pullNumber) === pr.numero
+    String(args.repo || '').toLowerCase() === pr.repo.toLowerCase()
   );
+}
+
+function esDelPr(pr, args = {}) {
+  return esDelRepo(pr, args) && Number(args.pullNumber) === pr.numero;
+}
+
+function bloqueo(pr) {
+  return `Bloqueado: en esta revisión solo puedes actuar sobre ${pr.clave} (owner "${pr.owner}", repo "${pr.repo}", pullNumber ${pr.numero}).`;
 }
 
 /**
@@ -135,13 +145,21 @@ function herramientasRevision({ pr, github }) {
       const nombre = t.function.name;
       const herramienta = herramientaDe(nombre);
       const original = handlers[nombre];
-      if (REVISION_LECTURA.includes(herramienta)) {
-        nuevos[nombre] = original;
+      if (herramienta === 'get_file_contents') {
+        // Solo archivos del repo del PR. `ref` no se restringe: se esperan las ramas head y base.
+        nuevos[nombre] = async (args = {}) => (esDelRepo(pr, args) ? original(args) : bloqueo(pr));
         return;
       }
       nuevos[nombre] = async (args = {}) => {
-        if (!esDelPr(pr, args)) {
-          return `Bloqueado: en esta revisión solo puedes actuar sobre ${pr.clave} (owner "${pr.owner}", repo "${pr.repo}", pullNumber ${pr.numero}).`;
+        if (!esDelPr(pr, args)) return bloqueo(pr);
+        if (herramienta === 'pull_request_review_write') {
+          if (!METODOS_REVIEW.includes(args.method)) {
+            return `Bloqueado: no puedes usar el método "${args.method}"; solo puedes crear y enviar tu review.`;
+          }
+          if (args.event !== undefined && !EVENTOS_REVIEW.includes(args.event)) {
+            return `Bloqueado: no puedes usar el event "${args.event}"; solo APPROVE, REQUEST_CHANGES o COMMENT.`;
+          }
+          return original(args.method === 'create' ? { ...args, commitID: pr.sha } : args);
         }
         if (herramienta !== 'merge_pull_request') return original(args);
         const hilos = await github.llamar('pull_request_read', { method: 'get_review_comments', owner: pr.owner, repo: pr.repo, pullNumber: pr.numero, perPage: 100 });

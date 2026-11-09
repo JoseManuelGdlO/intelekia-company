@@ -174,3 +174,44 @@ test('herramientasSoloLectura deja solo consultas para el chat', () => {
   assert.deepEqual(Object.keys(ajustado.handlers).length, 3);
   assert.match(ajustado.instrucciones[0], /nunca desde el chat/);
 });
+
+test('review_write: resolve/unresolve de hilos se bloquean sin llamar al handler original', async () => {
+  const t = toolsDePlugin(TODAS);
+  const { handlers } = herramientasRevision({ pr: PR, github: fakeGithub() })(t);
+  for (const method of ['resolve_thread', 'unresolve_thread']) {
+    const r = await handlers.mcp_github__pull_request_review_write({ ...MIO, method, threadId: 'T1' });
+    assert.equal(r, `Bloqueado: no puedes usar el método "${method}"; solo puedes crear y enviar tu review.`);
+  }
+  assert.equal(t.llamadas.length, 0);
+});
+
+test('review_write: un event desconocido se bloquea', async () => {
+  const t = toolsDePlugin(TODAS);
+  const { handlers } = herramientasRevision({ pr: PR, github: fakeGithub() })(t);
+  assert.match(await handlers.mcp_github__pull_request_review_write({ ...MIO, method: 'submit_pending', event: 'DISMISS' }), /^Bloqueado/);
+  assert.equal(t.llamadas.length, 0);
+  await handlers.mcp_github__pull_request_review_write({ ...MIO, method: 'submit_pending', event: 'REQUEST_CHANGES', body: 'x' });
+  await handlers.mcp_github__pull_request_review_write({ ...MIO, method: 'delete_pending' });
+  assert.equal(t.llamadas.length, 2);
+});
+
+test('review_write create fuerza commitID al SHA revisado', async () => {
+  const t = toolsDePlugin(TODAS);
+  const { handlers } = herramientasRevision({ pr: PR, github: fakeGithub() })(t);
+  await handlers.mcp_github__pull_request_review_write({ ...MIO, method: 'create', event: 'APPROVE', commitID: 'otro' });
+  await handlers.mcp_github__pull_request_review_write({ ...MIO, method: 'create' });
+  assert.deepEqual(t.llamadas.map((l) => l.args.commitID), ['abc123', 'abc123']);
+});
+
+test('las lecturas solo aceptan el PR en revisión y su repo', async () => {
+  const t = toolsDePlugin(TODAS);
+  const { handlers } = herramientasRevision({ pr: PR, github: fakeGithub() })(t);
+  assert.match(await handlers.mcp_github__pull_request_read({ method: 'get_diff', owner: 'jose', repo: 'app', pullNumber: 8 }), /^Bloqueado/);
+  assert.match(await handlers.mcp_github__pull_request_read({ method: 'get', owner: 'otra', repo: 'app', pullNumber: 7 }), /^Bloqueado/);
+  assert.match(await handlers.mcp_github__get_file_contents({ owner: 'jose', repo: 'secreto', path: '.env' }), /^Bloqueado/);
+  assert.match(await handlers.mcp_github__get_file_contents({ owner: 'otra', repo: 'app', path: 'x.js' }), /^Bloqueado/);
+  assert.equal(t.llamadas.length, 0);
+  assert.equal(await handlers.mcp_github__pull_request_read({ ...MIO, method: 'get_files' }), 'ok pull_request_read');
+  assert.equal(await handlers.mcp_github__get_file_contents({ owner: 'Jose', repo: 'APP', path: 'x.js', ref: 'refs/heads/feature' }), 'ok get_file_contents');
+  assert.equal(t.llamadas.length, 2);
+});
