@@ -21,6 +21,9 @@ const { createDatabase } = require('./lib/database');
 const { createBaseDatosRouter } = require('./routes/baseDatos');
 const { createTeamSnapshot } = require('./lib/teamSnapshot');
 const { createMailer } = require('./lib/correo');
+const { createMeta } = require('./lib/meta');
+const { createAprobaciones } = require('./lib/aprobaciones');
+const { createAprobacionesRouter } = require('./routes/aprobaciones');
 const { createCorreoRouter } = require('./routes/correo');
 const { createAtrasadosFlow } = require('./lib/atrasados');
 const { createActividadStore } = require('./lib/actividad');
@@ -81,6 +84,12 @@ if (database.isConfigured() && config.db.user === 'root') {
 }
 // Correo saliente (SMTP) para los agentes que lo tengan activado.
 const mailer = createMailer({ smtp: config.smtp, settingsPath: CORREO_SETTINGS_PATH, logPath: CORREOS_PATH });
+// Graph API de Meta (Respuestas en Redes) y bandeja general de aprobaciones.
+const meta = createMeta({ config: config.meta });
+const aprobaciones = createAprobaciones({ filePath: path.join(__dirname, 'state', 'aprobaciones.json') });
+aprobaciones.registrarEjecutor('responder_comentario', (item) =>
+  meta.responder({ red: item.contexto.red, comentarioId: item.contexto.comentarioId, mensaje: item.propuesta })
+);
 // Skills (GitHub) y plugins (servidores MCP) instalados desde internet; cada agente elige cuáles usa.
 // 3 min de espera: algunos plugins (p. ej. mcp-remote) abren el navegador para iniciar sesión al conectar.
 const instalables = createInstalables({ dir: path.join(__dirname, 'state', 'instalados'), timeoutMs: 180000 });
@@ -127,6 +136,10 @@ for (const agent of allAgents) {
   if ('getTeamSnapshot' in agent.deps) {
     agent.deps.getTeamSnapshot = () => teamSnapshot.toText(teamSnapshot.build({ excluir: [agent.id] }));
   }
+  if ('meta' in agent.deps) agent.deps.meta = meta;
+  if ('aprobaciones' in agent.deps) agent.deps.aprobaciones = aprobaciones;
+  if ('autonomia' in agent.deps) agent.deps.autonomia = () => profiles.autonomiaOf(agent.id);
+  if ('bitacora' in agent.deps) agent.deps.bitacora = (tipo, texto, detalle) => actividad.log(agent.id, tipo, texto, detalle);
   if ('github' in agent.deps) {
     agent.deps.github = createGithubPlugin({ instalables, profiles, agentId: agent.id, owner: config.githubOwner });
   }
@@ -211,6 +224,7 @@ app.use('/api/perfiles', createPerfilesRouter({ profiles }));
 app.use('/api/instalables', createInstalablesRouter({ instalables }));
 app.use('/api/base-datos', createBaseDatosRouter({ database }));
 app.use('/api/correo', createCorreoRouter({ mailer }));
+app.use('/api/aprobaciones', createAprobacionesRouter({ aprobaciones }));
 const revisorPRsAgent = allAgents.find((a) => a.id === 'revisor-prs');
 if (revisorPRsAgent) {
   app.use('/api/revisiones-pr', createRevisionesPRRouter({ filePath: revisorPRsAgent.deps.revisionesPath }));

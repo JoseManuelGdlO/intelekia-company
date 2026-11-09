@@ -1,6 +1,7 @@
 const path = require('path');
 const buscadorTendencias = require('./agents/buscadorTendencias');
 const publicador = require('./agents/publicador');
+const respuestasRedes = require('./agents/respuestasRedes');
 const buscadorProspectos = require('./agents/buscadorProspectos');
 const seguimientoCRM = require('./agents/seguimientoCRM');
 const cotizador = require('./agents/cotizador');
@@ -42,6 +43,24 @@ function buildDepartments({ rootDir, config, createChatCompletion }) {
             rolePath: path.join(MARKETING_DIR, 'agentes', 'publicador.md'),
             ideasPath: path.join(MARKETING_DIR, 'content', 'ideas.json'),
             draftsDir: path.join(MARKETING_DIR, 'content', 'drafts'),
+            ...shared,
+          },
+        },
+        {
+          id: 'respuestas-redes',
+          label: 'Respuestas en Redes',
+          cicloHoras: 0.17, // ~10 min: revisa comentarios nuevos en FB e IG (editable en la app)
+          cicloSilencioso: true,
+          module: respuestasRedes,
+          deps: {
+            contextPath: CONTEXT_PATH,
+            rolePath: path.join(MARKETING_DIR, 'agentes', 'respuestas-redes.md'),
+            atendidosPath: path.join(rootDir, 'backend', 'state', 'comentarios-atendidos.json'),
+            // server.js conecta aquí Meta, la bandeja de aprobaciones, el switch de autonomía y la bitácora.
+            meta: null,
+            aprobaciones: null,
+            autonomia: null,
+            bitacora: null,
             ...shared,
           },
         },

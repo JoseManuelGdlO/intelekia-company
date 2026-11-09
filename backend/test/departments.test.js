@@ -29,7 +29,7 @@ test('buildDepartments returns marketing, comercial and administracion with thei
   assert.equal(admin.agents[0].deps.reportesDir, path.join('/fake/root', 'departamentos', 'administracion', 'content', 'reportes-equipo'));
   assert.deepEqual(
     departments.find((d) => d.id === 'marketing').agents.map((a) => a.id),
-    ['buscador-tendencias', 'publicador']
+    ['buscador-tendencias', 'publicador', 'respuestas-redes']
   );
   assert.deepEqual(
     departments.find((d) => d.id === 'comercial').agents.map((a) => a.id),
@@ -97,4 +97,15 @@ test('desarrollo tiene al Revisor de PRs con ciclo corto y silencioso', () => {
   assert.equal(revisor.deps.github, null);
   assert.equal(revisor.deps.revisionesPath, path.join('/fake/root', 'backend', 'state', 'revisiones-pr.json'));
   assert.equal(revisor.deps.rolePath, path.join('/fake/root', 'departamentos', 'desarrollo', 'agentes', 'revisor-prs.md'));
+});
+
+test('marketing tiene a Respuestas en Redes con ciclo de ~10 min, silencioso y deps por conectar', () => {
+  const agente = build().find((d) => d.id === 'marketing').agents.find((a) => a.id === 'respuestas-redes');
+  assert.equal(agente.label, 'Respuestas en Redes');
+  assert.equal(agente.module, require('../agents/respuestasRedes'));
+  assert.equal(agente.cicloHoras, 0.17);
+  assert.equal(agente.cicloSilencioso, true);
+  for (const dep of ['meta', 'aprobaciones', 'autonomia', 'bitacora']) assert.equal(agente.deps[dep], null);
+  assert.equal(agente.deps.atendidosPath, path.join('/fake/root', 'backend', 'state', 'comentarios-atendidos.json'));
+  assert.equal(agente.deps.rolePath, path.join('/fake/root', 'departamentos', 'marketing', 'agentes', 'respuestas-redes.md'));
 });
