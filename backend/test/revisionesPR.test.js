@@ -3,7 +3,7 @@ const assert = require('node:assert/strict');
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
-const { createRevisionesStore, detectar, parsePrUrl, hilosAbiertos } = require('../lib/revisionesPR');
+const { createRevisionesStore, detectar, parsePrUrl, hilosAbiertos, herramientasRevision, herramientasSoloLectura, herramientaDe } = require('../lib/revisionesPR');
 
 function tmpFile() {
   return path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'revisiones-')), 'revisiones-pr.json');
@@ -93,4 +93,67 @@ test('detectar respeta el tope por ciclo', async () => {
   const github = fakeGithub({ items: [1, 2, 3, 4, 5, 6, 7].map((n) => item(n)) });
   assert.equal((await detectar({ github, store })).length, 5);
   assert.equal((await detectar({ github, store, max: 2 })).length, 2);
+});
+
+const PR = { owner: 'jose', repo: 'app', numero: 7, clave: 'jose/app#7', sha: 'abc123' };
+const MIO = { owner: 'jose', repo: 'app', pullNumber: 7 };
+
+function toolsDePlugin(nombres) {
+  const handlers = {};
+  const llamadas = [];
+  const tools = nombres.map((n) => {
+    const name = `mcp_github__${n}`;
+    handlers[name] = async (args) => {
+      llamadas.push({ n, args });
+      return `ok ${n}`;
+    };
+    return { type: 'function', function: { name, parameters: { type: 'object', properties: {} } } };
+  });
+  tools.push({ type: 'function', function: { name: 'consultar_companero', parameters: { type: 'object', properties: {} } } });
+  handlers.consultar_companero = async () => 'hola';
+  return { tools, handlers, llamadas };
+}
+
+const TODAS = ['search_pull_requests', 'pull_request_read', 'get_file_contents', 'pull_request_review_write', 'add_comment_to_pending_review', 'merge_pull_request', 'create_or_update_file', 'push_files'];
+
+test('herramientaDe extrae el nombre real de la herramienta del plugin', () => {
+  assert.equal(herramientaDe('mcp_github__merge_pull_request'), 'merge_pull_request');
+  assert.equal(herramientaDe('consultar_companero'), null);
+});
+
+test('herramientasRevision deja solo leer el PR y publicar su revisión', () => {
+  const base = toolsDePlugin(TODAS);
+  const ajustado = herramientasRevision({ pr: PR, github: fakeGithub() })({ ...base, instrucciones: ['x'] });
+  assert.deepEqual(ajustado.tools.map((t) => herramientaDe(t.function.name)).sort(), [
+    'add_comment_to_pending_review', 'get_file_contents', 'merge_pull_request', 'pull_request_read', 'pull_request_review_write',
+  ]);
+  assert.match(ajustado.instrucciones.join(' '), /jose\/app#7/);
+});
+
+test('las escrituras solo aceptan el PR en revisión', async () => {
+  const base = toolsDePlugin(TODAS);
+  const { handlers } = herramientasRevision({ pr: PR, github: fakeGithub() })(base);
+  const otro = await handlers.mcp_github__pull_request_review_write({ owner: 'jose', repo: 'otro', pullNumber: 7, method: 'create', event: 'APPROVE' });
+  assert.match(otro, /^Bloqueado/);
+  assert.equal(await handlers.mcp_github__pull_request_review_write({ ...MIO, method: 'create', event: 'APPROVE' }), 'ok pull_request_review_write');
+  assert.deepEqual(base.llamadas.map((l) => l.n), ['pull_request_review_write']);
+});
+
+test('el merge se bloquea con hilos sin resolver y fuerza el SHA revisado', async () => {
+  const conHilo = toolsDePlugin(TODAS);
+  const bloqueado = herramientasRevision({ pr: PR, github: fakeGithub({ hilos: { 7: [{ is_resolved: false }] } }) })(conHilo);
+  assert.match(await bloqueado.handlers.mcp_github__merge_pull_request({ ...MIO }), /Merge bloqueado: el PR tiene 1 comentario/);
+  assert.equal(conHilo.llamadas.length, 0);
+
+  const limpio = toolsDePlugin(TODAS);
+  const permitido = herramientasRevision({ pr: PR, github: fakeGithub({ hilos: { 7: [{ is_resolved: true }] } }) })(limpio);
+  assert.equal(await permitido.handlers.mcp_github__merge_pull_request({ ...MIO, expectedHeadSha: 'otro' }), 'ok merge_pull_request');
+  assert.equal(limpio.llamadas[0].args.expectedHeadSha, 'abc123');
+});
+
+test('herramientasSoloLectura deja solo consultas para el chat', () => {
+  const ajustado = herramientasSoloLectura()(toolsDePlugin(TODAS));
+  assert.deepEqual(ajustado.tools.map((t) => herramientaDe(t.function.name)).sort(), ['get_file_contents', 'pull_request_read', 'search_pull_requests']);
+  assert.deepEqual(Object.keys(ajustado.handlers).length, 3);
+  assert.match(ajustado.instrucciones[0], /nunca desde el chat/);
 });

@@ -7,6 +7,11 @@ const path = require('path');
  */
 const MAX_POR_CICLO = 5;
 
+// Herramientas del plugin de GitHub que puede usar el modelo (el resto se le quita).
+const REVISION_LECTURA = ['pull_request_read', 'get_file_contents'];
+const REVISION_ESCRITURA = ['pull_request_review_write', 'add_comment_to_pending_review', 'merge_pull_request'];
+const CHAT_LECTURA = ['pull_request_read', 'get_file_contents', 'search_pull_requests', 'list_pull_requests'];
+
 function claveDe({ owner, repo, numero }) {
   return `${owner}/${repo}#${numero}`;
 }
@@ -94,4 +99,78 @@ async function detectar({ github, store, max = MAX_POR_CICLO }) {
   return pendientes;
 }
 
-module.exports = { createRevisionesStore, detectar, parsePrUrl, hilosAbiertos, claveDe, MAX_POR_CICLO };
+/** "mcp_github__merge_pull_request" → "merge_pull_request"; null si no es de un plugin. */
+function herramientaDe(nombre) {
+  const n = String(nombre || '');
+  if (!n.startsWith('mcp_') || !n.includes('__')) return null;
+  return n.slice(n.lastIndexOf('__') + 2);
+}
+
+function esDelPr(pr, args = {}) {
+  return (
+    String(args.owner || '').toLowerCase() === pr.owner.toLowerCase() &&
+    String(args.repo || '').toLowerCase() === pr.repo.toLowerCase() &&
+    Number(args.pullNumber) === pr.numero
+  );
+}
+
+/**
+ * Para el ciclo: el modelo solo puede leer y publicar la revisión del PR en curso.
+ * El diff es contenido de terceros (posible prompt injection), por eso se quitan las demás
+ * herramientas y cada escritura se valida en código. El merge además exige cero hilos sin
+ * resolver y se fija al SHA revisado (si llegó otro commit durante la revisión, GitHub lo rechaza).
+ */
+function herramientasRevision({ pr, github }) {
+  return ({ tools, handlers }) => {
+    const permitidas = tools.filter((t) => [...REVISION_LECTURA, ...REVISION_ESCRITURA].includes(herramientaDe(t.function.name)));
+    const nuevos = {};
+    permitidas.forEach((t) => {
+      const nombre = t.function.name;
+      const herramienta = herramientaDe(nombre);
+      const original = handlers[nombre];
+      if (REVISION_LECTURA.includes(herramienta)) {
+        nuevos[nombre] = original;
+        return;
+      }
+      nuevos[nombre] = async (args = {}) => {
+        if (!esDelPr(pr, args)) {
+          return `Bloqueado: en esta revisión solo puedes actuar sobre ${pr.clave} (owner "${pr.owner}", repo "${pr.repo}", pullNumber ${pr.numero}).`;
+        }
+        if (herramienta !== 'merge_pull_request') return original(args);
+        const hilos = await github.llamar('pull_request_read', { method: 'get_review_comments', owner: pr.owner, repo: pr.repo, pullNumber: pr.numero, perPage: 100 });
+        const abiertos = hilosAbiertos(hilos);
+        if (abiertos > 0) return `Merge bloqueado: el PR tiene ${abiertos} comentario(s) sin resolver.`;
+        return original({ ...args, expectedHeadSha: pr.sha });
+      };
+    });
+    return {
+      tools: permitidas,
+      handlers: nuevos,
+      instrucciones: [`Estás revisando ${pr.clave}. Solo tienes herramientas de GitHub para leer este PR y publicar su revisión.`],
+    };
+  };
+}
+
+/** Para el chat: solo consultas; nunca aprobar, comentar ni hacer merge. */
+function herramientasSoloLectura() {
+  return ({ tools, handlers }) => {
+    const permitidas = tools.filter((t) => CHAT_LECTURA.includes(herramientaDe(t.function.name)));
+    return {
+      tools: permitidas,
+      handlers: Object.fromEntries(permitidas.map((t) => [t.function.name, handlers[t.function.name]])),
+      instrucciones: ['Puedes consultar PRs de GitHub en modo lectura. Las revisiones, aprobaciones y merges solo los haces en tu ciclo automático, nunca desde el chat.'],
+    };
+  };
+}
+
+module.exports = {
+  createRevisionesStore,
+  detectar,
+  herramientasRevision,
+  herramientasSoloLectura,
+  herramientaDe,
+  parsePrUrl,
+  hilosAbiertos,
+  claveDe,
+  MAX_POR_CICLO,
+};
