@@ -20,7 +20,7 @@ test('buildDepartments returns marketing, comercial and administracion with thei
   const departments = build();
   assert.deepEqual(
     departments.map((d) => d.id),
-    ['marketing', 'comercial', 'administracion']
+    ['marketing', 'comercial', 'administracion', 'desarrollo']
   );
   const admin = departments.find((d) => d.id === 'administracion');
   assert.deepEqual(admin.agents.map((a) => a.id), ['pm']);
@@ -84,4 +84,17 @@ test('publicador deps point at the marketing drafts directory and seguimiento-cr
   assert.equal(seguimientoAgent.cicloHoras, 24);
   assert.equal(departments.find((d) => d.id === 'marketing').agents.find((a) => a.id === 'buscador-tendencias').cicloHoras, 6);
   assert.equal(seguimientoAgent.deps.prospectosPath, undefined, 'ya no toca prospectos.json');
+});
+
+test('desarrollo tiene al Revisor de PRs con ciclo corto y silencioso', () => {
+  const dev = build().find((d) => d.id === 'desarrollo');
+  assert.equal(dev.label, 'Desarrollo');
+  const revisor = dev.agents[0];
+  assert.equal(revisor.id, 'revisor-prs');
+  assert.equal(revisor.module, require('../agents/revisorPRs'));
+  assert.equal(revisor.cicloHoras, 0.08);
+  assert.equal(revisor.cicloSilencioso, true);
+  assert.equal(revisor.deps.github, null);
+  assert.equal(revisor.deps.revisionesPath, path.join('/fake/root', 'backend', 'state', 'revisiones-pr.json'));
+  assert.equal(revisor.deps.rolePath, path.join('/fake/root', 'departamentos', 'desarrollo', 'agentes', 'revisor-prs.md'));
 });

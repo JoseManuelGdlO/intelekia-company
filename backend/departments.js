@@ -5,12 +5,14 @@ const buscadorProspectos = require('./agents/buscadorProspectos');
 const seguimientoCRM = require('./agents/seguimientoCRM');
 const cotizador = require('./agents/cotizador');
 const pm = require('./agents/pm');
+const revisorPRs = require('./agents/revisorPRs');
 
 function buildDepartments({ rootDir, config, createChatCompletion }) {
   const CONTEXT_PATH = path.join(rootDir, 'CONTEXTO-INTELEKIA.md');
   const MARKETING_DIR = path.join(rootDir, 'departamentos', 'marketing');
   const COMERCIAL_DIR = path.join(rootDir, 'departamentos', 'comercial');
   const ADMINISTRACION_DIR = path.join(rootDir, 'departamentos', 'administracion');
+  const DESARROLLO_DIR = path.join(rootDir, 'departamentos', 'desarrollo');
 
   const shared = { apiKey: config.openaiApiKey, model: config.openaiModel, createChatCompletion };
 
@@ -105,6 +107,27 @@ function buildDepartments({ rootDir, config, createChatCompletion }) {
             reportesDir: path.join(ADMINISTRACION_DIR, 'content', 'reportes-equipo'),
             // server.js conecta aquí el panorama real del equipo (lib/teamSnapshot.js).
             getTeamSnapshot: null,
+            ...shared,
+          },
+        },
+      ],
+    },
+    {
+      id: 'desarrollo',
+      label: 'Desarrollo',
+      agents: [
+        {
+          id: 'revisor-prs',
+          label: 'Revisor de PRs',
+          cicloHoras: 0.08, // ~5 min: revisa si hay PRs nuevos (editable en la app)
+          cicloSilencioso: true, // un ciclo sin PRs no escribe en memoria ni en la bitácora
+          module: revisorPRs,
+          deps: {
+            contextPath: CONTEXT_PATH,
+            rolePath: path.join(DESARROLLO_DIR, 'agentes', 'revisor-prs.md'),
+            revisionesPath: path.join(rootDir, 'backend', 'state', 'revisiones-pr.json'),
+            // server.js conecta aquí el acceso al plugin de GitHub (lib/githubPlugin.js).
+            github: null,
             ...shared,
           },
         },

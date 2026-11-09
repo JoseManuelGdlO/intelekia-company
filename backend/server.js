@@ -24,6 +24,8 @@ const { createMailer } = require('./lib/correo');
 const { createCorreoRouter } = require('./routes/correo');
 const { createAtrasadosFlow } = require('./lib/atrasados');
 const { createActividadStore } = require('./lib/actividad');
+const { createGithubPlugin } = require('./lib/githubPlugin');
+const { createRevisionesPRRouter } = require('./routes/revisionesPR');
 
 const config = loadConfig();
 const ROOT = path.join(__dirname, '..');
@@ -45,9 +47,10 @@ const departments = buildDepartments({ rootDir: ROOT, config, createChatCompleti
 const actividad = createActividadStore({ filePath: ACTIVIDAD_PATH });
 
 /** Envuelve un ciclo autónomo para registrar su inicio, fin y errores en la bitácora. */
-function conActividad(agentId, runCycle) {
+function conActividad(agentId, runCycle, { silencioso = false } = {}) {
   return async (deps) => {
-    actividad.log(agentId, 'inicio', '▶️ Inicia ciclo autónomo');
+    // Los agentes de ciclo muy corto (Revisor de PRs) no anuncian cada inicio.
+    if (!silencioso) actividad.log(agentId, 'inicio', '▶️ Inicia ciclo autónomo');
     try {
       return await runCycle(deps);
     } catch (err) {
@@ -123,6 +126,9 @@ for (const agent of allAgents) {
   if ('getTeamSnapshot' in agent.deps) {
     agent.deps.getTeamSnapshot = () => teamSnapshot.toText(teamSnapshot.build({ excluir: [agent.id] }));
   }
+  if ('github' in agent.deps) {
+    agent.deps.github = createGithubPlugin({ instalables, profiles, agentId: agent.id, owner: config.githubOwner });
+  }
 }
 
 const agentRunners = {};
@@ -132,12 +138,14 @@ for (const agent of allAgents) {
   agentRunners[agent.id] = wrapRunCycle({
     agentId: agent.id,
     statusPath: STATUS_PATH,
-    runCycle: conActividad(agent.id, agent.module.runCycle),
+    runCycle: conActividad(agent.id, agent.module.runCycle, { silencioso: Boolean(agent.cicloSilencioso) }),
     deps: agent.deps,
     describeSuccess: (result) => {
-      const patch = agent.module.describeSuccess(result);
-      profiles.remember(agent.id, `Ciclo autónomo: ${patch.ultimaAccion}`);
-      actividad.log(agent.id, 'fin', `🏁 Terminó: ${patch.ultimaAccion}`);
+      const { silencioso, ...patch } = agent.module.describeSuccess(result);
+      if (!silencioso) {
+        profiles.remember(agent.id, `Ciclo autónomo: ${patch.ultimaAccion}`);
+        actividad.log(agent.id, 'fin', `🏁 Terminó: ${patch.ultimaAccion}`);
+      }
       return patch;
     },
   });
@@ -202,6 +210,8 @@ app.use('/api/perfiles', createPerfilesRouter({ profiles }));
 app.use('/api/instalables', createInstalablesRouter({ instalables }));
 app.use('/api/base-datos', createBaseDatosRouter({ database }));
 app.use('/api/correo', createCorreoRouter({ mailer }));
+const revisorPRsAgent = allAgents.find((a) => a.id === 'revisor-prs');
+app.use('/api/revisiones-pr', createRevisionesPRRouter({ filePath: revisorPRsAgent.deps.revisionesPath }));
 app.use('/api/comunicacion', createComunicacionRouter({ comunicacion, conversaciones }));
 app.use(express.static(path.join(ROOT, 'frontend')));
 
