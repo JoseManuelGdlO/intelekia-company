@@ -24,6 +24,7 @@ const { createMailer } = require('./lib/correo');
 const { createMeta } = require('./lib/meta');
 const { createAprobaciones } = require('./lib/aprobaciones');
 const { createAprobacionesRouter } = require('./routes/aprobaciones');
+const { crearEjecutorRespuesta, AGENT_ID: RESPUESTAS_REDES_ID } = require('./agents/respuestasRedes');
 const { createCorreoRouter } = require('./routes/correo');
 const { createAtrasadosFlow } = require('./lib/atrasados');
 const { createActividadStore } = require('./lib/actividad');
@@ -87,8 +88,10 @@ const mailer = createMailer({ smtp: config.smtp, settingsPath: CORREO_SETTINGS_P
 // Graph API de Meta (Respuestas en Redes) y bandeja general de aprobaciones.
 const meta = createMeta({ config: config.meta });
 const aprobaciones = createAprobaciones({ filePath: path.join(__dirname, 'state', 'aprobaciones.json') });
-aprobaciones.registrarEjecutor('responder_comentario', (item) =>
-  meta.responder({ red: item.contexto.red, comentarioId: item.contexto.comentarioId, mensaje: item.propuesta })
+// Antes de publicar verifica que la página no lo haya respondido ya (p. ej. el fundador a mano).
+aprobaciones.registrarEjecutor(
+  'responder_comentario',
+  crearEjecutorRespuesta({ meta, log: (tipo, texto) => actividad.log(RESPUESTAS_REDES_ID, tipo, texto) })
 );
 // Skills (GitHub) y plugins (servidores MCP) instalados desde internet; cada agente elige cuáles usa.
 // 3 min de espera: algunos plugins (p. ej. mcp-remote) abren el navegador para iniciar sesión al conectar.

@@ -14,16 +14,23 @@ function comentario(id, texto, extra = {}) {
   return { id, red: 'instagram', texto, autor: `user-${id}`, creadoEn: '2026-11-09T10:00:00.000Z', publicacionId: 'M1', publicacionTexto: 'Tip', permalink: 'https://ig.com/m1', ...extra };
 }
 
-function fakeMeta({ comentarios = [], falla = null } = {}) {
+function fakeMeta({ comentarios = [], falla = null, errores = [], respondidos = [], fallaVerificar = null } = {}) {
   const publicadas = [];
   const pedidos = [];
+  const verificados = [];
   return {
     publicadas,
     pedidos,
+    verificados,
     estado: () => ({ ok: true, facebook: false, instagram: true }),
     comentariosRecientes: async (opts) => {
       pedidos.push(opts);
-      return { comentarios, errores: [] };
+      return { comentarios, errores };
+    },
+    yaRespondido: async (args) => {
+      verificados.push(args);
+      if (fallaVerificar) throw new Error(fallaVerificar);
+      return respondidos.includes(args.comentarioId);
     },
     responder: async (args) => {
       if (falla) throw new Error(falla);
@@ -149,7 +156,91 @@ test('no repite comentarios atendidos, respeta el tope de 20 y luego pide desde 
   assert.equal(r2.atendidos.length, 5);
   const r3 = await runCycle(d);
   assert.equal(r3.atendidos.length, 0);
-  assert.equal(d.meta.pedidos[1].desde.toISOString(), '2026-11-08T12:00:00.000Z');
+  // Tras un ciclo recortado, la revisión queda en la fecha del último comentario procesado (10:00), no en "ahora".
+  assert.equal(d.meta.pedidos[1].desde.toISOString(), '2026-11-08T10:00:00.000Z');
+  assert.equal(d.meta.pedidos[2].desde.toISOString(), '2026-11-08T12:00:00.000Z');
+});
+
+test('si el tope recorta la lista, ultimaRevision es el creadoEn del último procesado', async () => {
+  const muchos = Array.from({ length: 22 }, (_, i) => comentario(`c${i}`, 'spam', { creadoEn: `2026-11-09T0${Math.floor(i / 10)}:${String(i % 10).padStart(2, '0')}:00.000Z` }));
+  const d = deps({ meta: fakeMeta({ comentarios: muchos }) });
+  await runCycle(d);
+  const reg = JSON.parse(fs.readFileSync(d.atendidosPath, 'utf-8'));
+  assert.equal(reg.ultimaRevision, '2026-11-09T01:09:00.000Z');
+});
+
+test('errores de Meta: no avanza ultimaRevision y el estatus no es silencioso', async () => {
+  const d = deps({ meta: fakeMeta({ errores: ['Facebook: Meta: el token venció'] }) });
+  fs.writeFileSync(d.atendidosPath, JSON.stringify({ ultimaRevision: '2026-11-09T08:00:00.000Z', comentarios: {} }));
+  const result = await runCycle(d);
+  assert.deepEqual(result.errores, ['Facebook: Meta: el token venció']);
+  assert.equal(JSON.parse(fs.readFileSync(d.atendidosPath, 'utf-8')).ultimaRevision, '2026-11-09T08:00:00.000Z');
+  assert.deepEqual(describeSuccess(result), { estatus: 'error', ultimaAccion: 'Problema con Meta: Facebook: Meta: el token venció' });
+});
+
+test('errores de Meta con comentarios procesados: se agrega el aviso y no avanza ultimaRevision', async () => {
+  const d = deps({ meta: fakeMeta({ comentarios: [comentario('c1', 'me interesa')], errores: ['Instagram: M9: Meta: x', 'otro'] }) });
+  const result = await runCycle(d);
+  assert.equal(JSON.parse(fs.readFileSync(d.atendidosPath, 'utf-8')).ultimaRevision, null);
+  assert.deepEqual(describeSuccess(result), { estatus: 'listo_para_revision', ultimaAccion: 'Comentarios: 1 por aprobar · ⚠️ Instagram: M9: Meta: x' });
+  const soloIgnorados = describeSuccess({ omitido: false, atendidos: [{ resultado: 'ignorado' }], errores: ['e1'] });
+  assert.equal(soloIgnorados.silencioso, undefined);
+  assert.equal(soloIgnorados.ultimaAccion, 'Comentarios: 1 ignorado(s) · ⚠️ e1');
+});
+
+test('la decisión se pide sin memoria del agente', async () => {
+  const opciones = [];
+  const d = deps({
+    meta: fakeMeta({ comentarios: [comentario('c1', 'me interesa')] }),
+    createChatCompletion: async (args) => {
+      opciones.push(args.sinMemoria);
+      return iaFalsa(args);
+    },
+  });
+  await runCycle(d);
+  assert.deepEqual(opciones, [true]);
+});
+
+for (const [caso, respuesta] of [
+  ['un enlace', 'Mira https://intelekia.mx/precios'],
+  ['un www', 'Visita www.intelekia.mx'],
+  ['un correo', 'Escríbenos a hola@intelekia.mx'],
+  ['un teléfono', 'Llámanos al 33 1234 5678'],
+  ['una mención', 'Pregúntale a @juanperez'],
+]) {
+  test(`autónomo: una respuesta con ${caso} va a la bandeja en vez de publicarse`, async () => {
+    const d = deps({
+      autonomia: () => 'autonomo',
+      meta: fakeMeta({ comentarios: [comentario('c1', 'hola')] }),
+      createChatCompletion: async () => JSON.stringify({ accion: 'responder', respuesta, motivo: 'x' }),
+    });
+    const result = await runCycle(d);
+    assert.equal(result.atendidos[0].resultado, 'por_aprobar');
+    assert.equal(d.meta.publicadas.length, 0);
+    const [item] = d.aprobaciones.list({ estado: 'por_aprobar' });
+    assert.equal(item.motivo, 'Revisión: la respuesta incluye enlaces, contactos o menciones');
+    assert.equal(item.propuesta, respuesta);
+  });
+}
+
+test('autónomo: si la página ya respondió el comentario, no publica y lo marca ignorado', async () => {
+  const logs = [];
+  const d = deps({ autonomia: () => 'autonomo', meta: fakeMeta({ comentarios: [comentario('c1', 'me interesa')], respondidos: ['c1'] }) });
+  d.bitacora = (tipo, texto) => logs.push(texto);
+  const result = await runCycle(d);
+  assert.equal(result.atendidos[0].resultado, 'ignorado');
+  assert.equal(d.meta.publicadas.length, 0);
+  assert.deepEqual(d.meta.verificados, [{ red: 'instagram', comentarioId: 'c1' }]);
+  assert.ok(logs.some((t) => /ya tenía respuesta de la página/.test(t)));
+});
+
+test('autónomo: si falla la verificación de respuesta previa, publica igual y lo anota', async () => {
+  const logs = [];
+  const d = deps({ autonomia: () => 'autonomo', meta: fakeMeta({ comentarios: [comentario('c1', 'me interesa')], fallaVerificar: 'Meta: timeout' }) });
+  d.bitacora = (tipo, texto) => logs.push([tipo, texto]);
+  const result = await runCycle(d);
+  assert.equal(result.atendidos[0].resultado, 'publicado');
+  assert.ok(logs.some(([t, x]) => t === 'error' && /Meta: timeout/.test(x)));
 });
 
 test('el comentario va como dato JSON con aviso anti-instrucciones', async () => {
@@ -247,4 +338,22 @@ test('respuestas de más de 1000 caracteres se truncan en el último espacio', a
   const [item] = d.aprobaciones.list({ estado: 'por_aprobar' });
   assert.ok(item.propuesta.length <= 1001);
   assert.ok(item.propuesta.endsWith('palabra…'));
+});
+
+test('ejecutor de la bandeja: no publica si la página ya respondió; si la verificación falla, publica', async () => {
+  const { crearEjecutorRespuesta } = require('../agents/respuestasRedes');
+  const item = { propuesta: 'Gracias', contexto: { red: 'facebook', comentarioId: 'FC1' } };
+  const yaMeta = fakeMeta({ respondidos: ['FC1'] });
+  await assert.rejects(crearEjecutorRespuesta({ meta: yaMeta })(item), /^Error: Este comentario ya tiene respuesta de la página; descártalo$/);
+  assert.equal(yaMeta.publicadas.length, 0);
+
+  const logs = [];
+  const rotoMeta = fakeMeta({ fallaVerificar: 'Meta: timeout' });
+  await crearEjecutorRespuesta({ meta: rotoMeta, log: (tipo, texto) => logs.push([tipo, texto]) })(item);
+  assert.deepEqual(rotoMeta.publicadas, [{ red: 'facebook', comentarioId: 'FC1', mensaje: 'Gracias' }]);
+  assert.ok(logs.some(([t, x]) => t === 'error' && /Meta: timeout/.test(x)));
+
+  const libreMeta = fakeMeta();
+  await crearEjecutorRespuesta({ meta: libreMeta })(item);
+  assert.equal(libreMeta.publicadas.length, 1);
 });

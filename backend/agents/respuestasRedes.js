@@ -71,6 +71,8 @@ async function decidir({ comentario, sistema, apiKey, model, createChatCompletio
     apiKey,
     model,
     ajustarHerramientas: SIN_HERRAMIENTAS,
+    // La respuesta es pública: sin memoria del agente (incluye charlas privadas con el fundador).
+    sinMemoria: true,
     messages: [
       { role: 'system', content: sistema },
       {
@@ -86,7 +88,38 @@ async function decidir({ comentario, sistema, apiKey, model, createChatCompletio
   return parsearDecision(respuesta);
 }
 
-async function aplicar({ comentario, decision, autonomo, meta, aprobaciones }) {
+/** Enlaces, correos, teléfonos (8+ dígitos) o @menciones: nunca se publican sin que los vea el fundador. */
+const SENSIBLE = [/https?:\/\//i, /\bwww\./i, /\w@[\w-]+\.\w/, /(?:\d[\s().-]*){8,}/, /(?:^|[^\w@])@\w/];
+function tieneDatosSensibles(texto) {
+  return SENSIBLE.some((re) => re.test(String(texto || '')));
+}
+
+/**
+ * ¿La página ya respondió este comentario (p. ej. el fundador a mano)? Si la verificación
+ * falla se anota y se responde false: no debe bloquear el trabajo.
+ */
+async function yaTeniaRespuesta({ meta, red, comentarioId, log = () => {} }) {
+  if (typeof meta?.yaRespondido !== 'function') return false;
+  try {
+    return Boolean(await meta.yaRespondido({ red, comentarioId }));
+  } catch (err) {
+    log('error', `⚠️ No pude verificar si ${comentarioId} ya tenía respuesta: ${err.message}`);
+    return false;
+  }
+}
+
+/** Cómo se ejecuta una respuesta aprobada en la bandeja. */
+function crearEjecutorRespuesta({ meta, log = () => {} }) {
+  return async (item) => {
+    const { red, comentarioId } = item.contexto || {};
+    if (await yaTeniaRespuesta({ meta, red, comentarioId, log })) {
+      throw new Error('Este comentario ya tiene respuesta de la página; descártalo');
+    }
+    return meta.responder({ red, comentarioId, mensaje: item.propuesta });
+  };
+}
+
+async function aplicar({ comentario, decision, autonomo, meta, aprobaciones, log = () => {} }) {
   const contexto = {
     red: comentario.red,
     comentarioId: comentario.id,
@@ -107,6 +140,14 @@ async function aplicar({ comentario, decision, autonomo, meta, aprobaciones }) {
   if (!autonomo) {
     proponer(decision.motivo || 'Trabajador supervisado');
     return 'por_aprobar';
+  }
+  if (tieneDatosSensibles(decision.respuesta)) {
+    proponer('Revisión: la respuesta incluye enlaces, contactos o menciones');
+    return 'por_aprobar';
+  }
+  if (await yaTeniaRespuesta({ meta, red: comentario.red, comentarioId: comentario.id, log })) {
+    log('resultado', `⏭️ ${comentario.id}: ya tenía respuesta de la página`);
+    return 'ignorado';
   }
   try {
     await meta.responder({ red: comentario.red, comentarioId: comentario.id, mensaje: decision.respuesta });
@@ -155,8 +196,13 @@ async function runCycle({ contextPath, rolePath, atendidosPath, meta, aprobacion
     : new Date(fecha.getTime() - DIAS_PRIMER_ARRANQUE * 24 * 3600 * 1000);
   const { comentarios, errores } = await meta.comentariosRecientes({ desde });
   errores.forEach((e) => log('error', `⚠️ ${e}`));
-  const nuevos = comentarios.filter((c) => !registro.comentarios[c.id]).slice(0, MAX_POR_CICLO);
-  registro.ultimaRevision = fecha.toISOString();
+  const pendientes = comentarios.filter((c) => !registro.comentarios[c.id]);
+  const nuevos = pendientes.slice(0, MAX_POR_CICLO);
+  // Con errores de Meta no se avanza: lo que no se pudo leer se vuelve a pedir en el siguiente ciclo.
+  // Si el tope recortó la lista, se avanza solo hasta el último comentario procesado.
+  if (!errores.length) {
+    registro.ultimaRevision = pendientes.length > nuevos.length ? nuevos[nuevos.length - 1].creadoEn : fecha.toISOString();
+  }
   if (!nuevos.length) {
     guardarAtendidos(atendidosPath, registro);
     return { omitido: false, atendidos: [], errores };
@@ -185,7 +231,7 @@ async function runCycle({ contextPath, rolePath, atendidosPath, meta, aprobacion
         fecha: now().toISOString(),
       };
       guardarAtendidos(atendidosPath, registro);
-      resultado = await aplicar({ comentario, decision, autonomo, meta, aprobaciones });
+      resultado = await aplicar({ comentario, decision, autonomo, meta, aprobaciones, log });
       registro.comentarios[comentario.id].resultado = resultado;
       guardarAtendidos(atendidosPath, registro);
     } catch (err) {
@@ -234,7 +280,11 @@ async function chat({ message, contextPath, rolePath, atendidosPath, aprobacione
 
 function describeSuccess(result) {
   if (result.omitido) return { estatus: 'idle', ultimaAccion: `No revisó comentarios: ${result.motivo}`, silencioso: true };
-  if (!result.atendidos.length) return { estatus: 'idle', ultimaAccion: 'Sin comentarios nuevos', silencioso: true };
+  const errores = result.errores || [];
+  if (!result.atendidos.length) {
+    if (errores.length) return { estatus: 'error', ultimaAccion: `Problema con Meta: ${errores[0]}` };
+    return { estatus: 'idle', ultimaAccion: 'Sin comentarios nuevos', silencioso: true };
+  }
   const cuenta = (r) => result.atendidos.filter((a) => a.resultado === r).length;
   const partes = [
     cuenta('publicado') && `${cuenta('publicado')} respondido(s)`,
@@ -243,7 +293,8 @@ function describeSuccess(result) {
     cuenta('error') && `${cuenta('error')} con error`,
   ].filter(Boolean);
   const necesitaRevision = cuenta('por_aprobar') + cuenta('error') > 0;
-  return { estatus: necesitaRevision ? 'listo_para_revision' : 'idle', ultimaAccion: `Comentarios: ${partes.join(', ')}` };
+  const aviso = errores.length ? ` · ⚠️ ${errores[0]}` : '';
+  return { estatus: necesitaRevision ? 'listo_para_revision' : 'idle', ultimaAccion: `Comentarios: ${partes.join(', ')}${aviso}` };
 }
 
-module.exports = { runCycle, chat, describeSuccess, parsearDecision, AGENT_ID };
+module.exports = { runCycle, chat, describeSuccess, parsearDecision, crearEjecutorRespuesta, AGENT_ID };
