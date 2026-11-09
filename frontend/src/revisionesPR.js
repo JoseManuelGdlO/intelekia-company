@@ -13,8 +13,12 @@ function el(tag, props = {}) {
   return Object.assign(document.createElement(tag), props);
 }
 
+// Cada apertura del panel incrementa el contador; una respuesta vieja (doble clic rápido) se ignora.
+let solicitud = 0;
+
 /** Muestra la lista de PRs revisados en el panel, solo para el Revisor de PRs. */
 export async function mostrarRevisionesPR(agentId) {
+  const mia = ++solicitud;
   const box = document.getElementById('panel-prs');
   box.hidden = agentId !== 'revisor-prs';
   if (box.hidden) return;
@@ -25,9 +29,14 @@ export async function mostrarRevisionesPR(agentId) {
   try {
     items = await fetchRevisionesPR();
   } catch (err) {
+    if (mia !== solicitud) return;
+    count.textContent = '';
+    list.innerHTML = '';
     list.appendChild(el('div', { className: 'team-empty', textContent: `No se pudieron cargar: ${err.message}` }));
     return;
   }
+  if (mia !== solicitud) return;
+  list.innerHTML = '';
   count.textContent = items.length ? `(${items.length})` : '';
   if (!items.length) {
     list.appendChild(el('div', { className: 'team-empty', textContent: 'Todavía no ha revisado ningún PR.' }));

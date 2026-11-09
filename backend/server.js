@@ -211,7 +211,9 @@ app.use('/api/instalables', createInstalablesRouter({ instalables }));
 app.use('/api/base-datos', createBaseDatosRouter({ database }));
 app.use('/api/correo', createCorreoRouter({ mailer }));
 const revisorPRsAgent = allAgents.find((a) => a.id === 'revisor-prs');
-app.use('/api/revisiones-pr', createRevisionesPRRouter({ filePath: revisorPRsAgent.deps.revisionesPath }));
+if (revisorPRsAgent) {
+  app.use('/api/revisiones-pr', createRevisionesPRRouter({ filePath: revisorPRsAgent.deps.revisionesPath }));
+}
 app.use('/api/comunicacion', createComunicacionRouter({ comunicacion, conversaciones }));
 app.use(express.static(path.join(ROOT, 'frontend')));
 

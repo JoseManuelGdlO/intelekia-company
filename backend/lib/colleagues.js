@@ -10,7 +10,8 @@ const MAX_FILE_CHARS = 3000;
 const MAX_DIR_FILES = 3;
 const MAX_DIR_FILE_CHARS = 1200;
 // Archivos de deps que NO son "conocimiento de trabajo" de un agente.
-const PRIVATE_DEPS = new Set(['contextPath', 'rolePath', 'memoryPath']);
+// revisionesPath: títulos y motivos de PRs de terceros; no deben llegar a los prompts de otros agentes.
+const PRIVATE_DEPS = new Set(['contextPath', 'rolePath', 'memoryPath', 'revisionesPath']);
 
 function corto(text, max = 220) {
   const t = String(text ?? '').replace(/\s+/g, ' ').trim();
