@@ -63,7 +63,7 @@ function nombreFuncion(pluginId, tool) {
   return `mcp_${pluginId.replace(/-/g, '_')}__${tool}`.replace(/[^a-zA-Z0-9_-]/g, '_').slice(0, 64);
 }
 
-function textoDeResultado(result) {
+function textoDeResultado(result, maxChars = MAX_RESULTADO) {
   const partes = (result?.content || []).map((c) => {
     if (c.type === 'text') return c.text;
     if (c.type === 'resource') return c.resource?.text || `[recurso ${c.resource?.uri || ''}]`;
@@ -71,18 +71,26 @@ function textoDeResultado(result) {
   });
   if (!partes.length && result?.structuredContent) partes.push(JSON.stringify(result.structuredContent));
   const texto = partes.join('\n').trim() || '(sin contenido)';
-  const recortado = texto.length > MAX_RESULTADO ? `${texto.slice(0, MAX_RESULTADO)}\n…(recortado)` : texto;
+  const recortado = texto.length > maxChars ? `${texto.slice(0, maxChars)}\n…(recortado)` : texto;
   return result?.isError ? `Error del plugin: ${recortado}` : recortado;
 }
 
+/** Cabecera de autenticación para un plugin http que declara `tokenEnv` (el token vive en .env). */
+function opcionesHttp(plugin, env = process.env) {
+  if (!plugin.tokenEnv) return {};
+  const token = env[plugin.tokenEnv];
+  if (!token) throw new Error(`Falta ${plugin.tokenEnv} en backend/.env para conectar ${plugin.nombre}`);
+  return { requestInit: { headers: { Authorization: `Bearer ${token}` } } };
+}
+
 /** Conexión MCP real con el SDK oficial. Separada para poder simularla en pruebas. */
-async function conectarMcp(plugin) {
+async function conectarMcp(plugin, { env = process.env } = {}) {
   const { Client } = require('@modelcontextprotocol/sdk/client/index.js');
   const client = new Client(CLIENTE);
   let transport;
   if (plugin.transporte === 'http') {
     const { StreamableHTTPClientTransport } = require('@modelcontextprotocol/sdk/client/streamableHttp.js');
-    transport = new StreamableHTTPClientTransport(new URL(plugin.url));
+    transport = new StreamableHTTPClientTransport(new URL(plugin.url), opcionesHttp(plugin, env));
   } else {
     const { StdioClientTransport } = require('@modelcontextprotocol/sdk/client/stdio.js');
     transport = new StdioClientTransport({ command: 'npx', args: ['-y', plugin.paquete, ...(plugin.args || [])], stderr: 'ignore' });
@@ -91,7 +99,7 @@ async function conectarMcp(plugin) {
   return client;
 }
 
-function createInstalables({ dir, fetchImpl = (...a) => fetch(...a), conectar = conectarMcp, now = () => new Date(), timeoutMs = 60000 }) {
+function createInstalables({ dir, fetchImpl = (...a) => fetch(...a), conectar = conectarMcp, now = () => new Date(), timeoutMs = 60000, env = process.env }) {
   const skillsDir = path.join(dir, 'skills');
   const indicePath = path.join(dir, 'instalados.json');
   const clientes = new Map(); // pluginId -> Promise<Client>
@@ -219,7 +227,7 @@ function createInstalables({ dir, fetchImpl = (...a) => fetch(...a), conectar = 
 
   function clienteDe(plugin) {
     if (!clientes.has(plugin.id)) {
-      const p = conTiempo(conectar(plugin), `No se pudo conectar a ${plugin.nombre}`);
+      const p = conTiempo(conectar(plugin, { env }), `No se pudo conectar a ${plugin.nombre}`);
       p.catch(() => clientes.delete(plugin.id));
       clientes.set(plugin.id, p);
     }
@@ -238,11 +246,15 @@ function createInstalables({ dir, fetchImpl = (...a) => fetch(...a), conectar = 
     }
   }
 
-  function normalizarPlugin({ nombre, url, paquete, args }) {
+  function normalizarPlugin({ nombre, url, paquete, args, tokenEnv }) {
     const u = String(url || '').trim();
     const pkg = String(paquete || '').trim();
+    const variable = String(tokenEnv || '').trim();
     if (!u && !pkg) throw new Error('Indica la URL del servidor MCP o el paquete npm');
     if (u && pkg) throw new Error('Usa la URL o el paquete npm, no ambos');
+    if (variable && !u) throw new Error('La variable del token solo aplica a plugins por URL');
+    if (variable && !/^[A-Z_][A-Z0-9_]*$/.test(variable)) throw new Error('Nombre de variable inválido (usa MAYÚSCULAS, ej. GITHUB_TOKEN)');
+    if (variable && !env[variable]) throw new Error(`La variable ${variable} no está definida en backend/.env`);
     if (u) {
       let parsed;
       try {
@@ -251,7 +263,9 @@ function createInstalables({ dir, fetchImpl = (...a) => fetch(...a), conectar = 
         throw new Error('URL inválida');
       }
       if (!/^https?:$/.test(parsed.protocol)) throw new Error('La URL debe ser http(s)');
-      return { transporte: 'http', url: parsed.toString(), nombre: String(nombre || '').trim() || parsed.hostname };
+      const plugin = { transporte: 'http', url: parsed.toString(), nombre: String(nombre || '').trim() || parsed.hostname };
+      if (variable) plugin.tokenEnv = variable;
+      return plugin;
     }
     if (!/^(@[a-z0-9._-]+\/)?[a-z0-9._-]+(@[a-z0-9.^~_-]+)?$/i.test(pkg)) throw new Error('Nombre de paquete npm inválido');
     const lista = Array.isArray(args) ? args.map(String) : String(args || '').split(/\s+/).filter(Boolean);
@@ -308,11 +322,11 @@ function createInstalables({ dir, fetchImpl = (...a) => fetch(...a), conectar = 
     return { ok: true };
   }
 
-  async function llamar(pluginId, herramienta, args) {
+  async function llamar(pluginId, herramienta, args, { maxChars = MAX_RESULTADO } = {}) {
     const plugin = getPlugin(pluginId);
     try {
       const client = await clienteDe(plugin);
-      return textoDeResultado(await conTiempo(client.callTool({ name: herramienta, arguments: args || {} }), `${plugin.nombre} tardó demasiado`));
+      return textoDeResultado(await conTiempo(client.callTool({ name: herramienta, arguments: args || {} }), `${plugin.nombre} tardó demasiado`), maxChars);
     } catch (err) {
       await cerrar(pluginId); // la próxima vez reconecta
       throw err;
@@ -395,4 +409,4 @@ function createInstalables({ dir, fetchImpl = (...a) => fetch(...a), conectar = 
   return { list, instalarSkill, quitarSkill, leerArchivoSkill, instalarPlugin, probarPlugin, quitarPlugin, llamar, paraAgente, cerrarTodo };
 }
 
-module.exports = { createInstalables, parseGithubUrl, parseFrontmatter, nombreFuncion, textoDeResultado };
+module.exports = { createInstalables, parseGithubUrl, parseFrontmatter, nombreFuncion, textoDeResultado, opcionesHttp };

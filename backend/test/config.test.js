@@ -39,3 +39,8 @@ test('loadConfig lee el SMTP con valores por defecto para Hostinger (SSL 465) y 
   assert.equal(loadConfig({ SMTP_SECURE: 'false', SMTP_FIRMA: '' }).smtp.secure, false);
   assert.equal(loadConfig({ SMTP_FIRMA: '' }).smtp.firma, '');
 });
+
+test('loadConfig lee GITHUB_OWNER para el revisor de PRs', () => {
+  assert.equal(loadConfig({ GITHUB_OWNER: 'JoseManuelGdlO' }).githubOwner, 'JoseManuelGdlO');
+  assert.equal(loadConfig({}).githubOwner, '');
+});

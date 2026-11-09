@@ -16,6 +16,8 @@ function loadConfig(env = process.env) {
     openaiApiKey: env.OPENAI_API_KEY || '',
     openaiModel: env.OPENAI_MODEL || 'gpt-4o-mini',
     agentIntervalHours: Number(env.AGENT_INTERVAL_HOURS || 6),
+    // Revisor de PRs: cuenta de GitHub cuyos repos vigila (el token va en GITHUB_TOKEN, lo usa el plugin).
+    githubOwner: env.GITHUB_OWNER || '',
     // Base de datos externa que los agentes pueden consultar en SOLO LECTURA.
     db: {
       host: env.DB_HOST || '',

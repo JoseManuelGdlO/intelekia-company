@@ -667,10 +667,13 @@ export function createPerfilEditor({ accentOf, onSaved }) {
     if (!valor) return input.focus();
     const datos = /^https?:\/\//i.test(valor) ? { url: valor } : { paquete: valor };
     datos.nombre = $('inst-plugin-nombre').value.trim();
+    const tokenEnv = $('inst-plugin-token').value.trim();
+    if (tokenEnv) datos.tokenEnv = tokenEnv;
     const ok = await doInstall($('inst-plugin-btn'), () => instalarPlugin(datos), (p) => `✓ Plugin "${p.nombre}" conectado: ${p.herramientas.length} herramienta(s). Guarda para asignarlo.`);
     if (ok) {
       input.value = '';
       $('inst-plugin-nombre').value = '';
+      $('inst-plugin-token').value = '';
     }
   });
   $('inst-save').addEventListener('click', saveInstalados);

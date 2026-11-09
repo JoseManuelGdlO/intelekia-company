@@ -3,7 +3,7 @@ const assert = require('node:assert');
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
-const { createInstalables, parseGithubUrl, nombreFuncion, textoDeResultado } = require('../lib/instalables');
+const { createInstalables, parseGithubUrl, nombreFuncion, textoDeResultado, opcionesHttp } = require('../lib/instalables');
 
 function tmp() {
   return fs.mkdtempSync(path.join(os.tmpdir(), 'instalables-'));
@@ -120,4 +120,53 @@ test('nombreFuncion y textoDeResultado', () => {
   assert.ok(nombreFuncion('x'.repeat(80), 'y').length <= 64);
   assert.strictEqual(textoDeResultado({ content: [{ type: 'text', text: 'a' }, { type: 'image' }] }), 'a\n[image]');
   assert.strictEqual(textoDeResultado({ isError: true, content: [{ type: 'text', text: 'mal' }] }), 'Error del plugin: mal');
+});
+
+test('opcionesHttp agrega Authorization desde la variable de entorno', () => {
+  assert.deepStrictEqual(opcionesHttp({ tokenEnv: 'GITHUB_TOKEN', nombre: 'GitHub' }, { GITHUB_TOKEN: 'ghp_x' }), {
+    requestInit: { headers: { Authorization: 'Bearer ghp_x' } },
+  });
+  assert.deepStrictEqual(opcionesHttp({ nombre: 'X' }, {}), {});
+  assert.throws(() => opcionesHttp({ tokenEnv: 'GITHUB_TOKEN', nombre: 'GitHub' }, {}), /GITHUB_TOKEN/);
+});
+
+test('instalarPlugin con tokenEnv guarda solo el nombre de la variable y pasa env al conectar', async () => {
+  const dir = tmp();
+  let recibido;
+  const inst = createInstalables({
+    dir,
+    env: { GITHUB_TOKEN: 'ghp_secreto' },
+    conectar: async (plugin, opts) => {
+      recibido = { plugin, opts };
+      return fakeMcp()();
+    },
+  });
+  const p = await inst.instalarPlugin({ nombre: 'GitHub', url: 'https://api.githubcopilot.com/mcp/', tokenEnv: 'GITHUB_TOKEN' });
+  assert.strictEqual(p.tokenEnv, 'GITHUB_TOKEN');
+  assert.strictEqual(recibido.opts.env.GITHUB_TOKEN, 'ghp_secreto');
+  const guardado = fs.readFileSync(path.join(dir, 'instalados.json'), 'utf-8');
+  assert.ok(!guardado.includes('ghp_secreto'));
+  assert.ok(guardado.includes('"tokenEnv": "GITHUB_TOKEN"'));
+});
+
+test('instalarPlugin rechaza tokenEnv inválido, no definido o en paquetes npm', async () => {
+  const inst = createInstalables({ dir: tmp(), env: {}, conectar: fakeMcp() });
+  await assert.rejects(inst.instalarPlugin({ url: 'https://x.com/mcp', tokenEnv: 'github token' }), /inválido/);
+  await assert.rejects(inst.instalarPlugin({ url: 'https://x.com/mcp', tokenEnv: 'GITHUB_TOKEN' }), /no está definida/);
+  await assert.rejects(inst.instalarPlugin({ paquete: 'algo', tokenEnv: 'GITHUB_TOKEN' }), /solo aplica/);
+});
+
+test('llamar con maxChars Infinity devuelve el resultado completo', async () => {
+  const largo = 'x'.repeat(20000);
+  const inst = createInstalables({
+    dir: tmp(),
+    conectar: async () => ({
+      listTools: async () => ({ tools: [{ name: 'leer', inputSchema: { type: 'object', properties: {} } }] }),
+      callTool: async () => ({ content: [{ type: 'text', text: largo }] }),
+      close: async () => {},
+    }),
+  });
+  const p = await inst.instalarPlugin({ url: 'https://x.com/mcp' });
+  assert.ok((await inst.llamar(p.id, 'leer', {})).includes('…(recortado)'));
+  assert.strictEqual(await inst.llamar(p.id, 'leer', {}, { maxChars: Infinity }), largo);
 });
