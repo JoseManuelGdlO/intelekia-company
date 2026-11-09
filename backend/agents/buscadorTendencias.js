@@ -10,6 +10,8 @@ async function runCycle({ contextPath, rolePath, ideasPath, apiKey, model, creat
 
   const userPrompt =
     `Contexto de negocio:\n${context}\n\n` +
+    `Fecha y hora actual: ${new Date().toISOString()} (zona horaria de Intelekia: America/Monterrey). ` +
+    'Usa esta fecha para calcular rangos como "últimos 30 días".\n\n' +
     `Ideas que ya existen (no las repitas):\n${JSON.stringify(existingTexts)}\n\n` +
     'Dame entre 3 y 5 ideas nuevas de post/reel.';
 

@@ -17,6 +17,11 @@ test('strips a plain ``` fenced array (no language tag) before parsing', () => {
   assert.deepEqual(result, ['a', 'b']);
 });
 
+test('rescata el arreglo cuando el modelo agrega texto antes o después', () => {
+  const raw = 'No tengo acceso a datos. Aquí hay ideas: [\n "[Reel] Idea A",\n "[Carrusel] Idea B"\n] Espero que sirvan.';
+  assert.deepEqual(parseJsonArrayResponse(raw), ['[Reel] Idea A', '[Carrusel] Idea B']);
+});
+
 test('throws wrapping the original error when the response is not valid JSON', () => {
   assert.throws(() => parseJsonArrayResponse('esto no es json'), /La respuesta del modelo no es JSON válido/);
 });
