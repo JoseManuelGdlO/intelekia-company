@@ -100,3 +100,82 @@ test('rutas: listar, aprobar y descartar', async () => {
     server.close();
   }
 });
+
+test('archivo corrupto se respalda y no borra la bandeja en silencio', () => {
+  const filePath = tmpFile();
+  fs.writeFileSync(filePath, '{garbage');
+  const a = createAprobaciones({ filePath, now: () => new Date('2026-11-09T10:00:00Z') });
+  const warn = console.warn;
+  console.warn = () => {};
+  let item;
+  try {
+    item = a.proponer(BASE);
+  } finally {
+    console.warn = warn;
+  }
+  const dir = path.dirname(filePath);
+  const backups = fs.readdirSync(dir).filter((f) => f.includes('.corrupto-'));
+  assert.equal(backups.length, 1);
+  assert.equal(fs.readFileSync(path.join(dir, backups[0]), 'utf-8'), '{garbage');
+  assert.deepEqual(a.list().map((i) => i.id), [item.id]);
+});
+
+test('guardar es atómico: no deja .tmp', () => {
+  const filePath = tmpFile();
+  createAprobaciones({ filePath }).proponer(BASE);
+  assert.equal(fs.existsSync(`${filePath}.tmp`), false);
+  assert.ok(fs.existsSync(filePath));
+});
+
+test('una ejecución atascada más de 5 minutos se muestra como error', async () => {
+  const filePath = tmpFile();
+  let t = new Date('2026-11-09T10:00:00Z').getTime();
+  const a = createAprobaciones({ filePath, now: () => new Date(t) });
+  let liberar;
+  a.registrarEjecutor('responder_comentario', () => new Promise((r) => (liberar = r)));
+  const item = a.proponer(BASE);
+  const p = a.aprobar(item.id);
+  assert.equal(a.list()[0].estado, 'ejecutando');
+  t += 6 * 60 * 1000;
+  const visto = a.list()[0];
+  assert.equal(visto.estado, 'error');
+  assert.match(visto.error, /Se interrumpió/);
+  liberar();
+  await p;
+});
+
+test('doble aprobación simultánea ejecuta una sola vez', async () => {
+  const a = createAprobaciones({ filePath: tmpFile() });
+  let n = 0;
+  a.registrarEjecutor('responder_comentario', async () => {
+    n += 1;
+    await new Promise((r) => setTimeout(r, 30));
+  });
+  const item = a.proponer(BASE);
+  const res = await Promise.allSettled([a.aprobar(item.id), a.aprobar(item.id)]);
+  assert.equal(n, 1);
+  assert.equal(res.filter((r) => r.status === 'fulfilled').length, 1);
+  const ok = res.find((r) => r.status === 'fulfilled');
+  assert.equal(ok.value.estado, 'aprobado');
+  const ko = res.find((r) => r.status === 'rejected');
+  assert.match(ko.reason.message, /se está ejecutando ahora/);
+});
+
+test('al recortar se descartan primero los resueltos y nunca los abiertos', () => {
+  const a = createAprobaciones({ filePath: tmpFile() });
+  const abierto = a.proponer(BASE);
+  const resuelto = a.proponer(BASE);
+  a.descartar(resuelto.id);
+  for (let i = 0; i < 499; i++) a.proponer(BASE);
+  const ids = a.list({ limite: 1000 }).map((i) => i.id);
+  assert.ok(ids.includes(abierto.id));
+  assert.ok(!ids.includes(resuelto.id));
+  assert.equal(ids.length, 500);
+});
+
+test('la propuesta debe ser texto', async () => {
+  const a = createAprobaciones({ filePath: tmpFile() });
+  a.registrarEjecutor('responder_comentario', async () => {});
+  const item = a.proponer(BASE);
+  await assert.rejects(a.aprobar(item.id, { propuesta: 42 }), /La propuesta debe ser texto/);
+});

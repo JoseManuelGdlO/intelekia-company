@@ -17,7 +17,7 @@ function createAprobacionesRouter({ aprobaciones }) {
     '/',
     wrap((req) => {
       const { estado, agentId, limite } = req.query;
-      return { items: aprobaciones.list({ estado, agentId, limite: limite ? Number(limite) : undefined }), pendientes: aprobaciones.pendientes() };
+      return { items: aprobaciones.list({ estado, agentId, limite: Number.isInteger(Number(limite)) && Number(limite) > 0 ? Number(limite) : undefined }), pendientes: aprobaciones.pendientes() };
     })
   );
   router.post('/:id/aprobar', wrap((req) => aprobaciones.aprobar(req.params.id, { propuesta: (req.body || {}).propuesta })));
