@@ -14,6 +14,14 @@ function fecha(iso) {
 
 const ESTADO = { aprobado: '✓ Aprobado', descartado: '✕ Descartado' };
 
+// Lo que el fundador va escribiendo en cada tarjeta (id → texto). La bandeja se vuelve a pintar
+// cada pocos segundos; sin esto se perderían sus ediciones y se publicaría el texto original.
+const borradores = new Map();
+
+function esCampo(node) {
+  return Boolean(node) && (node.tagName === 'TEXTAREA' || node.tagName === 'INPUT');
+}
+
 /** Bandeja general: lo que los trabajadores proponen hacer y espera tu decisión. */
 export function createAprobacionesBandeja({ labelOf }) {
   const modal = $('apr-modal');
@@ -41,6 +49,13 @@ export function createAprobacionesBandeja({ labelOf }) {
 
   function renderPending(items) {
     const box = $('apr-pending');
+    // Conserva el foco y el cursor si el fundador estaba escribiendo.
+    const activo = box.contains(document.activeElement) && esCampo(document.activeElement) ? document.activeElement : null;
+    const foco = activo ? { id: activo.dataset.aprId, inicio: activo.selectionStart, fin: activo.selectionEnd } : null;
+    const abiertos = new Set(items.map((i) => i.id));
+    [...borradores.keys()].forEach((id) => {
+      if (!abiertos.has(id)) borradores.delete(id);
+    });
     box.innerHTML = '';
     if (!items.length) {
       box.append(el('div', { className: 'skill-empty', textContent: 'No hay nada esperando tu aprobación.' }));
@@ -55,8 +70,10 @@ export function createAprobacionesBandeja({ labelOf }) {
         head.append(el('b', { textContent: `${labelOf(item.agentId)} · ${item.titulo}` }), el('span', { className: 'when', textContent: fecha(item.creadoEn) }));
         const aviso = el('div', { className: 'tool-warning', textContent: item.estado === 'error' ? `Falló: ${item.error}` : item.motivo || 'Espera tu aprobación' });
         const wrap = el('label', { className: 'mail-edit' });
-        const texto = el('textarea', { rows: 4, value: item.propuesta || '' });
+        const texto = el('textarea', { rows: 4, value: borradores.has(item.id) ? borradores.get(item.id) : item.propuesta || '' });
         texto.spellcheck = true;
+        texto.dataset.aprId = item.id;
+        texto.addEventListener('input', () => borradores.set(item.id, texto.value));
         wrap.append(el('span', { textContent: 'Respuesta propuesta (puedes editarla)' }), texto);
 
         const actions = el('div', { className: 'perfil-actions' });
@@ -76,6 +93,7 @@ export function createAprobacionesBandeja({ labelOf }) {
           }
           try {
             await descartarAprobacion(item.id);
+            borradores.delete(item.id);
             notify('Descartado');
             await refresh();
           } catch (err) {
@@ -87,6 +105,7 @@ export function createAprobacionesBandeja({ labelOf }) {
           aprobar.textContent = 'Publicando…';
           try {
             const r = await aprobarAprobacion(item.id, { propuesta: texto.value });
+            if (r.estado === 'aprobado') borradores.delete(item.id);
             notify(r.estado === 'aprobado' ? 'Publicado ✓' : `No se pudo: ${r.error}`, r.estado !== 'aprobado');
             await refresh();
           } catch (err) {
@@ -99,6 +118,14 @@ export function createAprobacionesBandeja({ labelOf }) {
 
         card.append(head, aviso, original(item), wrap, actions);
         box.appendChild(card);
+        if (foco && foco.id === item.id) {
+          texto.focus();
+          try {
+            texto.setSelectionRange(foco.inicio, foco.fin);
+          } catch {
+            // algunos campos no admiten selección
+          }
+        }
       });
   }
 
@@ -126,17 +153,23 @@ export function createAprobacionesBandeja({ labelOf }) {
 
   async function refresh() {
     try {
-      const { items, pendientes } = await fetchAprobaciones({ limite: 200 });
+      // Los abiertos se piden aparte para que nunca se pierdan entre muchos resueltos.
+      const [porAprobar, conError, recientes] = await Promise.all([
+        fetchAprobaciones({ estado: 'por_aprobar', limite: 500 }),
+        fetchAprobaciones({ estado: 'error', limite: 500 }),
+        fetchAprobaciones({ limite: 200 }),
+      ]);
+      const { pendientes } = porAprobar;
       const badge = $('apr-inbox-count');
       badge.textContent = pendientes;
       badge.hidden = pendientes === 0;
       button.classList.toggle('pending', pendientes > 0);
       button.title = pendientes ? `${pendientes} acción(es) esperan tu aprobación` : 'Nada pendiente de aprobar';
       if (modal.classList.contains('visible')) {
-        const abiertos = items.filter((i) => i.estado === 'por_aprobar' || i.estado === 'error');
+        const abiertos = [...porAprobar.items, ...conError.items].sort((a, b) => String(a.creadoEn).localeCompare(String(b.creadoEn)));
         $('apr-pending-count').textContent = `(${abiertos.length})`;
         renderPending(abiertos);
-        renderDone(items.filter((i) => i.estado === 'aprobado' || i.estado === 'descartado').slice(-20));
+        renderDone(recientes.items.filter((i) => i.estado === 'aprobado' || i.estado === 'descartado').slice(-20));
       }
     } catch {
       // Si el backend no responde, el botón queda sin contador.
@@ -159,7 +192,13 @@ export function createAprobacionesBandeja({ labelOf }) {
     if (e.target === modal) close();
   });
   window.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape' && modal.classList.contains('visible')) close();
+    if (e.key !== 'Escape' || !modal.classList.contains('visible')) return;
+    // Esc dentro de un campo solo quita el foco: no cierra ni pierde lo escrito.
+    if (esCampo(e.target) && modal.contains(e.target)) {
+      e.target.blur();
+      return;
+    }
+    close();
   });
 
   return { refresh, open };

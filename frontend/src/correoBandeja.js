@@ -11,6 +11,15 @@ function splitList(value) {
     .filter(Boolean);
 }
 
+// Lo que el fundador va editando en cada correo (id → { para, cc, asunto, cuerpo }). La bandeja
+// se vuelve a pintar cada pocos segundos; sin esto se perderían sus ediciones.
+const borradores = new Map();
+const CAMPOS = ['para', 'cc', 'asunto', 'cuerpo'];
+
+function esCampo(node) {
+  return Boolean(node) && (node.tagName === 'TEXTAREA' || node.tagName === 'INPUT');
+}
+
 /**
  * Bandeja de correos "por aprobar": los que los agentes quisieron enviar fuera de la lista
  * permitida o por encima del límite diario. El fundador los edita, envía o descarta.
@@ -46,6 +55,13 @@ export function createCorreoBandeja({ labelOf, onCorreo }) {
 
   function renderPending(items) {
     const box = $('mail-pending');
+    // Conserva el foco y el cursor si el fundador estaba escribiendo.
+    const activo = box.contains(document.activeElement) && esCampo(document.activeElement) ? document.activeElement : null;
+    const foco = activo ? { id: activo.dataset.mailId, campo: activo.dataset.campo, inicio: activo.selectionStart, fin: activo.selectionEnd } : null;
+    const abiertos = new Set(items.map((i) => i.id));
+    [...borradores.keys()].forEach((id) => {
+      if (!abiertos.has(id)) borradores.delete(id);
+    });
     box.innerHTML = '';
     if (!items.length) {
       box.innerHTML = '<div class="skill-empty">No hay correos esperando tu aprobación.</div>';
@@ -67,10 +83,20 @@ export function createCorreoBandeja({ labelOf, onCorreo }) {
           className: 'tool-warning',
           textContent: item.estado === 'error' ? `Falló al enviar: ${item.error}` : item.motivo,
         });
-        const para = field('Para', item.para.join(', '));
-        const cc = field('CC', (item.cc || []).join(', '));
-        const asunto = field('Asunto', item.asunto);
-        const cuerpo = field('Mensaje', item.cuerpo, { multiline: true });
+        const guardado = borradores.get(item.id) || {};
+        const para = field('Para', guardado.para ?? item.para.join(', '));
+        const cc = field('CC', guardado.cc ?? (item.cc || []).join(', '));
+        const asunto = field('Asunto', guardado.asunto ?? item.asunto);
+        const cuerpo = field('Mensaje', guardado.cuerpo ?? item.cuerpo, { multiline: true });
+        const campos = { para, cc, asunto, cuerpo };
+        CAMPOS.forEach((nombre) => {
+          const { input } = campos[nombre];
+          input.dataset.mailId = item.id;
+          input.dataset.campo = nombre;
+          input.addEventListener('input', () => {
+            borradores.set(item.id, Object.fromEntries(CAMPOS.map((n) => [n, campos[n].input.value])));
+          });
+        });
 
         const actions = document.createElement('div');
         actions.className = 'perfil-actions';
@@ -90,6 +116,7 @@ export function createCorreoBandeja({ labelOf, onCorreo }) {
           }
           try {
             await descartarCorreo(item.id);
+            borradores.delete(item.id);
             notify('Correo descartado');
             await refresh();
           } catch (err) {
@@ -106,6 +133,7 @@ export function createCorreoBandeja({ labelOf, onCorreo }) {
               asunto: asunto.input.value,
               cuerpo: cuerpo.input.value,
             });
+            if (result.estado === 'enviado') borradores.delete(item.id);
             notify(result.estado === 'enviado' ? `Enviado a ${result.para.join(', ')} ✓` : `No se pudo enviar: ${result.error}`, result.estado !== 'enviado');
             await refresh();
           } catch (err) {
@@ -118,6 +146,15 @@ export function createCorreoBandeja({ labelOf, onCorreo }) {
 
         card.append(head, motivo, para.wrap, cc.wrap, asunto.wrap, cuerpo.wrap, actions);
         box.appendChild(card);
+        if (foco && foco.id === item.id && campos[foco.campo]) {
+          const { input } = campos[foco.campo];
+          input.focus();
+          try {
+            input.setSelectionRange(foco.inicio, foco.fin);
+          } catch {
+            // algunos campos no admiten selección
+          }
+        }
       });
   }
 
@@ -194,7 +231,13 @@ export function createCorreoBandeja({ labelOf, onCorreo }) {
     if (e.target === modal) close();
   });
   window.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape' && modal.classList.contains('visible')) close();
+    if (e.key !== 'Escape' || !modal.classList.contains('visible')) return;
+    // Esc dentro de un campo solo quita el foco: no cierra ni pierde lo escrito.
+    if (esCampo(e.target) && modal.contains(e.target)) {
+      e.target.blur();
+      return;
+    }
+    close();
   });
 
   return { refresh, open };
