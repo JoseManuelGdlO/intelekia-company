@@ -144,3 +144,27 @@ test('un ciclo que falla no detiene a los demás', async () => {
   assert.deepEqual(corridas, ['bueno']);
   assert.deepEqual(errores, ['malo: API caída']);
 });
+
+test('runOne rechaza forzar un ciclo que ya está en curso y el tick no lo encima', async () => {
+  let liberar;
+  let corridas = 0;
+  const scheduler = createScheduler({
+    intervalMs: 1,
+    agentRunners: {
+      a: async () => {
+        corridas += 1;
+        await new Promise((r) => { liberar = r; });
+        return 'listo';
+      },
+    },
+  });
+  const primera = scheduler.runOne('a');
+  assert.equal(scheduler.proximos().a.enCurso, true);
+  await assert.rejects(scheduler.runOne('a'), /El ciclo de este agente ya está en curso/);
+  scheduler.tick();
+  await new Promise((r) => setImmediate(r));
+  assert.equal(corridas, 1);
+  liberar();
+  assert.equal(await primera, 'listo');
+  assert.equal(scheduler.proximos().a.enCurso, false);
+});

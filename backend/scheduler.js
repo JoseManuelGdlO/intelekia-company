@@ -12,7 +12,8 @@ const DEFAULT_TICK_MS = 60 * 1000;
  *   dos ejecuciones del mismo agente.
  * - La última ejecución de cada agente se guarda en `statePath`, así un reinicio del servidor
  *   no reinicia los contadores. Un agente nuevo empieza a contar desde que se ve por primera vez.
- * - `runOne` (Forzar ciclo) corre de inmediato y también reinicia el contador de ese agente.
+ * - `runOne` (Forzar ciclo) corre de inmediato y también reinicia el contador de ese agente;
+ *   falla si ese agente ya tiene un ciclo en curso.
  */
 function createScheduler({
   intervalMs,
@@ -120,8 +121,17 @@ function createScheduler({
     if (!runner) {
       throw new Error(`Agente desconocido: ${agentId}`);
     }
+    if (running.has(agentId)) {
+      throw new Error('El ciclo de este agente ya está en curso');
+    }
+    // Se marca en curso para que un tick no lo arranque encima mientras corre.
+    running.add(agentId);
     markRun(agentId);
-    return runner();
+    try {
+      return await runner();
+    } finally {
+      running.delete(agentId);
+    }
   }
 
   /** Para la interfaz: intervalo, última y próxima ejecución de cada agente con ciclo. */
