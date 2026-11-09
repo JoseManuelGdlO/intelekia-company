@@ -22,9 +22,16 @@ function parsePrUrl(url) {
   return m ? { owner: m[1], repo: m[2], numero: Number(m[3]) } : null;
 }
 
-/** Hilos de review sin resolver (los "outdated" también cuentan: el autor debe marcarlos). */
+/**
+ * Hilos de review sin resolver (los "outdated" también cuentan: el autor debe marcarlos).
+ * Falla cerrado: devuelve Infinity si no puede estar seguro (respuesta mal formada,
+ * sin `review_threads`, o lista parcial por paginación), para que nunca se interprete como "todo resuelto".
+ */
 function hilosAbiertos(respuesta) {
-  const hilos = Array.isArray(respuesta?.review_threads) ? respuesta.review_threads : [];
+  if (!Array.isArray(respuesta?.review_threads)) return Infinity;
+  const hilos = respuesta.review_threads;
+  if (respuesta.pageInfo?.hasNextPage === true) return Infinity;
+  if (Number.isFinite(respuesta.totalCount) && respuesta.totalCount > hilos.length) return Infinity;
   return hilos.filter((h) => !h.is_resolved).length;
 }
 
@@ -139,6 +146,7 @@ function herramientasRevision({ pr, github }) {
         if (herramienta !== 'merge_pull_request') return original(args);
         const hilos = await github.llamar('pull_request_read', { method: 'get_review_comments', owner: pr.owner, repo: pr.repo, pullNumber: pr.numero, perPage: 100 });
         const abiertos = hilosAbiertos(hilos);
+        if (abiertos === Infinity) return 'Merge bloqueado: no se pudo confirmar que todos los comentarios estén resueltos.';
         if (abiertos > 0) return `Merge bloqueado: el PR tiene ${abiertos} comentario(s) sin resolver.`;
         return original({ ...args, expectedHeadSha: pr.sha });
       };

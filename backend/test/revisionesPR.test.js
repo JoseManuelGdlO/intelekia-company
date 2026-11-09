@@ -37,7 +37,10 @@ test('parsePrUrl y hilosAbiertos', () => {
   assert.deepEqual(parsePrUrl('https://github.com/jose/app/pull/12'), { owner: 'jose', repo: 'app', numero: 12 });
   assert.equal(parsePrUrl('https://github.com/jose/app/issues/12'), null);
   assert.equal(hilosAbiertos({ review_threads: [{ is_resolved: true }, { is_resolved: false }, { is_resolved: false, is_outdated: true }] }), 2);
-  assert.equal(hilosAbiertos(null), 0);
+  assert.equal(hilosAbiertos(null), Infinity);
+  assert.equal(hilosAbiertos({ review_threads: [], pageInfo: { hasNextPage: true } }), Infinity);
+  assert.equal(hilosAbiertos({ review_threads: [{ is_resolved: true }], totalCount: 3 }), Infinity);
+  assert.equal(hilosAbiertos({ review_threads: [{ is_resolved: true }], totalCount: 1 }), 0);
 });
 
 test('el store guarda, lee y lista; tolera archivo corrupto', () => {
@@ -149,6 +152,20 @@ test('el merge se bloquea con hilos sin resolver y fuerza el SHA revisado', asyn
   const permitido = herramientasRevision({ pr: PR, github: fakeGithub({ hilos: { 7: [{ is_resolved: true }] } }) })(limpio);
   assert.equal(await permitido.handlers.mcp_github__merge_pull_request({ ...MIO, expectedHeadSha: 'otro' }), 'ok merge_pull_request');
   assert.equal(limpio.llamadas[0].args.expectedHeadSha, 'abc123');
+});
+
+test('el merge se bloquea (fail closed) si la respuesta de hilos es inválida', async () => {
+  const t = toolsDePlugin(TODAS);
+  const { handlers } = herramientasRevision({ pr: PR, github: { owner: 'Jose', llamar: async () => 'oops' } })(t);
+  assert.match(await handlers.mcp_github__merge_pull_request({ ...MIO }), /no se pudo confirmar/);
+  assert.equal(t.llamadas.length, 0);
+});
+
+test('el merge de otro repo se bloquea sin llamar al handler original', async () => {
+  const t = toolsDePlugin(TODAS);
+  const { handlers } = herramientasRevision({ pr: PR, github: fakeGithub() })(t);
+  assert.match(await handlers.mcp_github__merge_pull_request({ owner: 'jose', repo: 'otro', pullNumber: 7 }), /^Bloqueado/);
+  assert.equal(t.llamadas.length, 0);
 });
 
 test('herramientasSoloLectura deja solo consultas para el chat', () => {
