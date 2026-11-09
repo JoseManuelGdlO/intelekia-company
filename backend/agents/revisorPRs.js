@@ -1,5 +1,5 @@
 const fs = require('fs');
-const { createRevisionesStore, detectar, herramientasRevision, herramientasSoloLectura } = require('../lib/revisionesPR');
+const { createRevisionesStore, detectar, herramientasRevision, herramientasSoloLectura, hilosAbiertos } = require('../lib/revisionesPR');
 
 /**
  * Revisor de PRs (Desarrollo).
@@ -12,6 +12,7 @@ const MAX_RONDAS = 15;
 const MAX_INTENTOS = 3;
 const MAX_MOTIVO = 300;
 const VEREDICTO_RE = /VEREDICTO:\s*(APROBADO|CAMBIOS|BLOQUEADO)/i;
+const MOTIVO_SIN_MERGE = 'Aprobado; GitHub aún no permite el merge (checks pendientes o reglas del repo)';
 const MENSAJE_CONFLICTO =
   'Este PR tiene conflictos con la rama base. Actualízalo (merge o rebase de la rama base) y lo vuelvo a revisar automáticamente.';
 
@@ -33,7 +34,8 @@ function prompt(pr, diff) {
     '3) pull_request_review_write con method "submit_pending", event "REQUEST_CHANGES" y body con el resumen. Termina con VEREDICTO: CAMBIOS\n' +
     '- Si no hay problemas que bloqueen: pull_request_review_write con method "create", event "APPROVE" y body con lo que revisaste; ' +
     'después merge_pull_request. Termina con VEREDICTO: APROBADO\n' +
-    '- Si el merge es rechazado o bloqueado, explica por qué y termina con VEREDICTO: BLOQUEADO\n\n' +
+    '- Si ya publicaste el APPROVE pero el merge fue rechazado (checks pendientes, checks requeridos o reglas del repo), ' +
+    'explica por qué y termina igual con VEREDICTO: APROBADO (el sistema verifica el merge y lo reintenta solo)\n\n' +
     'Respuesta final: un resumen breve de lo que hiciste y, en la última línea, el VEREDICTO.'
   );
 }
@@ -65,13 +67,36 @@ async function revisarUno({ pr, github, role, apiKey, model, createChatCompletio
 
   const dicho = (String(respuesta || '').match(VEREDICTO_RE) || [])[1]?.toUpperCase() || null;
   const actual = await github.llamar('pull_request_read', { method: 'get', ...ids });
-  if (actual?.merged) return { veredicto: 'aprobado_mergeado', motivo: null };
+  if (actual?.merged === true) return { veredicto: 'aprobado_mergeado', motivo: null };
   if (dicho === 'CAMBIOS') return { veredicto: 'cambios_pedidos', motivo: resumenDe(respuesta) };
   if (dicho === 'BLOQUEADO') return { veredicto: 'bloqueado', motivo: resumenDe(respuesta) };
-  return {
-    veredicto: 'error',
-    motivo: dicho === 'APROBADO' ? 'Dijo que aprobó pero el PR no quedó mergeado' : 'La revisión terminó sin VEREDICTO',
-  };
+  if (dicho === 'APROBADO') {
+    const resumen = resumenDe(respuesta);
+    return { veredicto: 'aprobado_sin_merge', motivo: resumen ? `${MOTIVO_SIN_MERGE}: ${resumen}` : MOTIVO_SIN_MERGE };
+  }
+  return { veredicto: 'error', motivo: 'La revisión terminó sin VEREDICTO' };
+}
+
+/**
+ * PR ya aprobado (mismo commit) que GitHub no dejó mergear: solo se reintenta el merge, sin IA.
+ * Mismo candado que en la revisión: cero hilos sin resolver y fijado al SHA aprobado.
+ * Sin límite de intentos (es barato); nunca termina en `error`.
+ */
+async function reintentarMerge({ pr, github }) {
+  const ids = { owner: pr.owner, repo: pr.repo, pullNumber: pr.numero };
+  try {
+    const abiertos = hilosAbiertos(await github.llamar('pull_request_read', { method: 'get_review_comments', ...ids, perPage: 100 }));
+    if (abiertos === Infinity) {
+      return { veredicto: 'aprobado_sin_merge', motivo: 'Aprobado; no se pudo confirmar que todos los comentarios estén resueltos para el merge' };
+    }
+    if (abiertos > 0) return { veredicto: 'aprobado_sin_merge', motivo: `Aprobado; el merge espera a que se resuelvan ${abiertos} comentario(s)` };
+    await github.llamar('merge_pull_request', { ...ids, expectedHeadSha: pr.sha });
+    const actual = await github.llamar('pull_request_read', { method: 'get', ...ids });
+    if (actual?.merged === true) return { veredicto: 'aprobado_mergeado', motivo: null };
+    return { veredicto: 'aprobado_sin_merge', motivo: MOTIVO_SIN_MERGE };
+  } catch (err) {
+    return { veredicto: 'aprobado_sin_merge', motivo: `${MOTIVO_SIN_MERGE}: ${err.message}`.slice(0, MAX_MOTIVO) };
+  }
 }
 
 async function runCycle({ contextPath, rolePath, revisionesPath, github, apiKey, model, createChatCompletion, now = () => new Date() }) {
@@ -82,14 +107,22 @@ async function runCycle({ contextPath, rolePath, revisionesPath, github, apiKey,
   const pendientes = await detectar({ github, store });
   if (!pendientes.length) return { omitido: false, revisados: [] };
 
-  const context = fs.readFileSync(contextPath, 'utf-8');
-  const role = `${fs.readFileSync(rolePath, 'utf-8')}\n\nContexto de negocio:\n${context}`;
+  let role = null;
+  const rolCompleto = () => {
+    if (role === null) {
+      const context = fs.readFileSync(contextPath, 'utf-8');
+      role = `${fs.readFileSync(rolePath, 'utf-8')}\n\nContexto de negocio:\n${context}`;
+    }
+    return role;
+  };
   const revisados = [];
   for (const pr of pendientes) {
     const previo = store.get(pr.clave);
     let r;
     try {
-      r = await revisarUno({ pr, github, role, apiKey, model, createChatCompletion });
+      r = pr.soloMerge
+        ? await reintentarMerge({ pr, github })
+        : await revisarUno({ pr, github, role: rolCompleto(), apiKey, model, createChatCompletion });
     } catch (err) {
       r = { veredicto: 'error', motivo: err.message };
     }
@@ -110,7 +143,7 @@ async function runCycle({ contextPath, rolePath, revisionesPath, github, apiKey,
       motivo: r.motivo,
       intentos,
     });
-    revisados.push({ clave: pr.clave, veredicto: r.veredicto, motivo: r.motivo });
+    revisados.push({ clave: pr.clave, veredicto: r.veredicto, motivo: r.motivo, ...(pr.soloMerge ? { soloMerge: true } : {}) });
   }
   return { omitido: false, revisados };
 }
@@ -135,9 +168,14 @@ async function chat({ message, contextPath, rolePath, revisionesPath, apiKey, mo
 function describeSuccess(result) {
   if (result.omitido) return { estatus: 'idle', ultimaAccion: `No revisó PRs: ${result.motivo}`, silencioso: true };
   if (!result.revisados.length) return { estatus: 'idle', ultimaAccion: 'Sin PRs nuevos por revisar', silencioso: true };
+  // Reintentos de merge que siguen igual: no se anuncian (si no, saldrían en cada ciclo de 5 minutos).
+  if (result.revisados.every((r) => r.soloMerge && r.veredicto === 'aprobado_sin_merge')) {
+    return { estatus: 'idle', ultimaAccion: `${result.revisados.length} PR(s) aprobado(s) esperando merge`, silencioso: true };
+  }
   const cuenta = (v) => result.revisados.filter((r) => r.veredicto === v).length;
   const partes = [
     cuenta('aprobado_mergeado') && `${cuenta('aprobado_mergeado')} aprobado(s) y mergeado(s)`,
+    cuenta('aprobado_sin_merge') && `${cuenta('aprobado_sin_merge')} aprobado(s) esperando merge`,
     cuenta('cambios_pedidos') && `${cuenta('cambios_pedidos')} con cambios pedidos`,
     cuenta('bloqueado') && `${cuenta('bloqueado')} bloqueado(s)`,
     cuenta('error') && `${cuenta('error')} con error`,

@@ -73,7 +73,9 @@ function createRevisionesStore({ filePath, now = () => new Date() }) {
 /**
  * PRs abiertos de los repos de `github.owner` que hay que revisar en este ciclo:
  *  - nuevos (sin registro) o en `error` (el agente decide si ya agotó sus intentos);
+ *  - `aprobado_sin_merge`: mismo commit → solo reintentar el merge (`soloMerge`, sin IA); commit nuevo → revisión completa;
  *  - `bloqueado` solo si llegó un commit nuevo;
+ *  - se salta (sin registrar) el PR cuyo mergeable_state aún es "unknown";
  *  - `cambios_pedidos` solo si llegó un commit nuevo Y no quedan hilos sin resolver.
  */
 async function detectar({ github, store, max = MAX_POR_CICLO }) {
@@ -89,24 +91,37 @@ async function detectar({ github, store, max = MAX_POR_CICLO }) {
     const autor = String(item.user?.login || '');
     if (autor.toLowerCase() === owner.toLowerCase()) continue;
 
-    const pr = await github.llamar('pull_request_read', { method: 'get', owner: ref.owner, repo: ref.repo, pullNumber: ref.numero });
-    const sha = pr?.head?.sha;
-    if (!sha) continue;
     const clave = claveDe(ref);
-    const candidato = { ...ref, clave, sha, titulo: item.title || pr.title || '', autor, url: item.html_url, mergeableState: pr.mergeable_state || null };
-
-    const previo = store.get(clave);
-    const shaNuevo = previo && previo.sha !== sha;
-    if (!previo || previo.veredicto === 'error') {
-      pendientes.push(candidato);
-    } else if (previo.veredicto === 'bloqueado') {
-      if (shaNuevo) pendientes.push(candidato);
-    } else if (previo.veredicto === 'cambios_pedidos' && shaNuevo) {
-      const hilos = await github.llamar('pull_request_read', { method: 'get_review_comments', owner: ref.owner, repo: ref.repo, pullNumber: ref.numero, perPage: 100 });
-      if (hilosAbiertos(hilos) === 0) pendientes.push(candidato);
+    try {
+      const candidato = await evaluar({ github, store, ref, clave, item, autor });
+      if (candidato) pendientes.push(candidato);
+    } catch (err) {
+      // Un PR que falla (GitHub caído, respuesta rara) no debe impedir revisar los demás.
+      console.warn(`Revisor de PRs: no se pudo evaluar ${clave}: ${err.message}`);
     }
   }
   return pendientes;
+}
+
+/** Decide si un PR abierto va en este ciclo; devuelve el candidato o null. */
+async function evaluar({ github, store, ref, clave, item, autor }) {
+  const pr = await github.llamar('pull_request_read', { method: 'get', owner: ref.owner, repo: ref.repo, pullNumber: ref.numero });
+  const sha = pr?.head?.sha;
+  if (!sha) return null;
+  // GitHub aún calcula si se puede mergear: se reintenta en el próximo ciclo.
+  if (pr.mergeable_state === 'unknown') return null;
+  const candidato = { ...ref, clave, sha, titulo: item.title || pr.title || '', autor, url: item.html_url, mergeableState: pr.mergeable_state || null };
+
+  const previo = store.get(clave);
+  const shaNuevo = previo && previo.sha !== sha;
+  if (!previo || previo.veredicto === 'error') return candidato;
+  if (previo.veredicto === 'aprobado_sin_merge') return shaNuevo ? candidato : { ...candidato, soloMerge: true };
+  if (previo.veredicto === 'bloqueado') return shaNuevo ? candidato : null;
+  if (previo.veredicto === 'cambios_pedidos' && shaNuevo) {
+    const hilos = await github.llamar('pull_request_read', { method: 'get_review_comments', owner: ref.owner, repo: ref.repo, pullNumber: ref.numero, perPage: 100 });
+    return hilosAbiertos(hilos) === 0 ? candidato : null;
+  }
+  return null;
 }
 
 /** "mcp_github__merge_pull_request" → "merge_pull_request"; null si no es de un plugin. */

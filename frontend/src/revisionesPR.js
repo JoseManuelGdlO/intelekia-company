@@ -3,6 +3,7 @@ import { fechaCorta, haceCuanto } from './fechas.js';
 
 const ETIQUETAS = {
   aprobado_mergeado: '✅ Aprobado y mergeado',
+  aprobado_sin_merge: '🕒 Aprobado, esperando merge',
   cambios_pedidos: '✏️ Cambios pedidos',
   bloqueado: '⛔ Bloqueado',
   error: '⚠️ Error (se reintenta)',

@@ -58,7 +58,7 @@ repositorios de la cuenta de GitHub del fundador, los revisa con IA y:
 Lógica sin IA, probada de forma aislada:
 
 - `leerEstado()` / `guardarEstado()` sobre `revisiones-pr.json`. Por PR (`owner/repo#n`) guarda:
-  `ultimoShaRevisado`, `veredicto` (`aprobado_mergeado` | `cambios_pedidos` | `error` | `bloqueado`),
+  `ultimoShaRevisado`, `veredicto` (`aprobado_mergeado` | `aprobado_sin_merge` | `cambios_pedidos` | `error` | `bloqueado`),
   `motivo`, `revisadoEn`, `url`.
 - `detectar({ llamarHerramienta, owner, now })`:
   1. Llama directo (sin IA) a `search_pull_requests` con `is:pr is:open draft:false user:<owner>`.
@@ -117,8 +117,13 @@ Lógica sin IA, probada de forma aislada:
 ## Errores
 
 - Falta configuración o plugin → ciclo omitido con motivo claro.
-- Error en un PR (GitHub caído, merge rechazado por reglas del repo) → `veredicto: error`, se
-  reintenta el siguiente ciclo; los demás PRs continúan.
+- Error en un PR (GitHub caído, revisión sin VEREDICTO) → `veredicto: error`, se reintenta el
+  siguiente ciclo; los demás PRs continúan. Un PR que falla al detectarse se salta sin frenar a los demás.
+- Aprobado pero GitHub rechaza el merge (checks pendientes o requeridos, reglas del repo) →
+  `veredicto: aprobado_sin_merge`. Con el mismo SHA, los siguientes ciclos solo reintentan el merge
+  sin IA (cero hilos abiertos + `expectedHeadSha`), sin límite de intentos y en silencio mientras
+  siga igual; si llega un commit nuevo se revisa completo otra vez.
+- `mergeable_state: unknown` (GitHub aún lo calcula) → el PR se salta en ese ciclo, sin registrar nada.
 - Conflictos de merge → comentario "tiene conflictos con la rama base, actualízalo";
   `veredicto: bloqueado` hasta que cambie el SHA.
 - Un ciclo no se encima con otro (el scheduler ya lo garantiza).
@@ -148,7 +153,7 @@ Lógica sin IA, probada de forma aislada:
   desde el chat.
 - **Veredicto verificado.** La respuesta final del modelo termina en
   `VEREDICTO: APROBADO | CAMBIOS | BLOQUEADO`. `aprobado_mergeado` solo se registra si el plugin
-  confirma `merged: true`; si dijo APROBADO pero no quedó mergeado, es `error`.
+  confirma `merged: true`; si dijo APROBADO pero no quedó mergeado, es `aprobado_sin_merge`.
 - **Reintentos acotados.** Un PR en `error` se reintenta como máximo 3 veces con el mismo SHA;
   después queda `bloqueado` hasta que llegue un commit nuevo.
 - **Conflictos sin IA.** Si `mergeable_state` es `dirty`, el código publica el comentario de

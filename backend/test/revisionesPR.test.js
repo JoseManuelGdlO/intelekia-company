@@ -215,3 +215,45 @@ test('las lecturas solo aceptan el PR en revisión y su repo', async () => {
   assert.equal(await handlers.mcp_github__get_file_contents({ owner: 'Jose', repo: 'APP', path: 'x.js', ref: 'refs/heads/feature' }), 'ok get_file_contents');
   assert.equal(t.llamadas.length, 2);
 });
+
+test('detectar: mergeable_state "unknown" se salta este ciclo sin registrar nada', async () => {
+  const store = createRevisionesStore({ filePath: tmpFile() });
+  const github = fakeGithub({ items: [item(1), item(2)] });
+  const original = github.llamar;
+  github.llamar = async (tool, args) => {
+    const r = await original(tool, args);
+    return args.method === 'get' && args.pullNumber === 1 ? { ...r, mergeable_state: 'unknown' } : r;
+  };
+  const pendientes = await detectar({ github, store });
+  assert.deepEqual(pendientes.map((p) => p.numero), [2]);
+  assert.equal(store.get('jose/app#1'), null);
+});
+
+test('detectar: aprobado_sin_merge con el mismo sha vuelve solo para merge; con sha nuevo, revisión completa', async () => {
+  const store = createRevisionesStore({ filePath: tmpFile() });
+  store.registrar('jose/app#1', { sha: 's', veredicto: 'aprobado_sin_merge' });
+  store.registrar('jose/app#2', { sha: 's', veredicto: 'aprobado_sin_merge' });
+  const github = fakeGithub({ items: [item(1), item(2)], shas: { 1: 's', 2: 'nuevo' } });
+  const pendientes = await detectar({ github, store });
+  assert.deepEqual(pendientes.map((p) => [p.numero, p.soloMerge]), [[1, true], [2, undefined]]);
+});
+
+test('detectar: un PR que falla no impide devolver los demás', async () => {
+  const store = createRevisionesStore({ filePath: tmpFile() });
+  const github = fakeGithub({ items: [item(1), item(2)] });
+  const original = github.llamar;
+  github.llamar = async (tool, args) => {
+    if (args.method === 'get' && args.pullNumber === 1) throw new Error('GitHub 502');
+    return original(tool, args);
+  };
+  const warn = console.warn;
+  const avisos = [];
+  console.warn = (...a) => avisos.push(a.join(' '));
+  try {
+    const pendientes = await detectar({ github, store });
+    assert.deepEqual(pendientes.map((p) => p.numero), [2]);
+  } finally {
+    console.warn = warn;
+  }
+  assert.match(avisos.join('\n'), /jose\/app#1/);
+});
