@@ -127,7 +127,7 @@ html, body { margin: 0; height: 100%; overflow: hidden; background: #dfe9e6; }
 
 /* ---------- Panel de chat ---------- */
 #panel {
-  position: fixed; top: 16px; right: 16px; bottom: 16px; width: 360px; max-width: calc(100vw - 32px);
+  position: fixed; top: 16px; right: 16px; bottom: 16px; width: var(--panel-ancho, 360px); max-width: calc(100vw - 32px);
   display: flex; flex-direction: column; color: var(--text);
   background: var(--glass); border: 1px solid var(--glass-border); border-radius: 18px;
   backdrop-filter: blur(16px); box-shadow: 0 20px 60px rgba(10, 15, 30, 0.35);
@@ -135,6 +135,17 @@ html, body { margin: 0; height: 100%; overflow: hidden; background: #dfe9e6; }
   pointer-events: none;
 }
 #panel.visible { transform: none; opacity: 1; pointer-events: auto; }
+/* Tirador para cambiar el ancho del panel (borde izquierdo). */
+.panel-resizer {
+  position: absolute; top: 18px; bottom: 18px; left: -5px; width: 10px; cursor: ew-resize; z-index: 2; touch-action: none;
+}
+.panel-resizer::after {
+  content: ''; position: absolute; top: 50%; left: 3px; width: 4px; height: 44px; transform: translateY(-50%);
+  border-radius: 999px; background: var(--glass-border); opacity: .6; transition: opacity .15s, background .15s;
+}
+.panel-resizer:hover::after, #panel.redimensionando .panel-resizer::after { opacity: 1; background: var(--intelekia-green-light); }
+#panel.redimensionando { transition: none; user-select: none; }
+#panel.redimensionando * { user-select: none; }
 .panel-header { display: flex; align-items: center; gap: 12px; padding: 16px 16px 12px; }
 .panel-avatar {
   width: 44px; height: 44px; border-radius: 14px; display: grid; place-items: center; flex-shrink: 0;

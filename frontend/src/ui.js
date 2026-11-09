@@ -14,6 +14,71 @@ const STATUS_VARS = {
   error: 'var(--c-error)',
 };
 
+const PANEL_ANCHO_KEY = 'intelekia.panelAncho';
+const PANEL_ANCHO_MIN = 320;
+const PANEL_MARGEN = 16;
+
+function anchoMaximo() {
+  return Math.max(PANEL_ANCHO_MIN, window.innerWidth - PANEL_MARGEN * 2);
+}
+
+function limitarAncho(px) {
+  return Math.round(Math.min(Math.max(px, PANEL_ANCHO_MIN), anchoMaximo()));
+}
+
+/**
+ * Tirador en el borde izquierdo del panel para cambiar su ancho arrastrando.
+ * El ancho elegido se recuerda en este navegador; doble clic vuelve al ancho original.
+ */
+function habilitarRedimension(panel) {
+  const tirador = Object.assign(document.createElement('div'), { className: 'panel-resizer', title: 'Arrastra para cambiar el ancho (doble clic: ancho original)' });
+  panel.appendChild(tirador);
+
+  const aplicar = (px) => panel.style.setProperty('--panel-ancho', `${limitarAncho(px)}px`);
+  try {
+    const guardado = Number(localStorage.getItem(PANEL_ANCHO_KEY));
+    if (guardado > 0) aplicar(guardado);
+  } catch {
+    // sin almacenamiento local: se usa el ancho por defecto
+  }
+
+  tirador.addEventListener('pointerdown', (e) => {
+    e.preventDefault();
+    tirador.setPointerCapture(e.pointerId);
+    panel.classList.add('redimensionando');
+    const mover = (ev) => aplicar(window.innerWidth - PANEL_MARGEN - ev.clientX);
+    const soltar = () => {
+      panel.classList.remove('redimensionando');
+      tirador.removeEventListener('pointermove', mover);
+      tirador.removeEventListener('pointerup', soltar);
+      tirador.removeEventListener('pointercancel', soltar);
+      try {
+        localStorage.setItem(PANEL_ANCHO_KEY, String(parseInt(panel.style.getPropertyValue('--panel-ancho'), 10)));
+      } catch {
+        // ignorar
+      }
+    };
+    tirador.addEventListener('pointermove', mover);
+    tirador.addEventListener('pointerup', soltar);
+    tirador.addEventListener('pointercancel', soltar);
+  });
+
+  tirador.addEventListener('dblclick', () => {
+    panel.style.removeProperty('--panel-ancho');
+    try {
+      localStorage.removeItem(PANEL_ANCHO_KEY);
+    } catch {
+      // ignorar
+    }
+  });
+
+  // Si la ventana se achica, el panel nunca queda más ancho que la pantalla.
+  window.addEventListener('resize', () => {
+    const actual = parseInt(panel.style.getPropertyValue('--panel-ancho'), 10);
+    if (actual) aplicar(actual);
+  });
+}
+
 export function createPanel({ onSend, onForzar, onClose, onEdit }) {
   const panel = document.getElementById('panel');
   const title = document.getElementById('panel-title');
@@ -214,6 +279,8 @@ export function createPanel({ onSend, onForzar, onClose, onEdit }) {
     title.textContent = label;
     avatar.textContent = label.charAt(0).toUpperCase();
   }
+  habilitarRedimension(panel);
+
   window.addEventListener('keydown', (e) => {
     // Si hay un editor abierto encima, Escape cierra ese editor, no el panel.
     if (e.key === 'Escape' && currentAgentId && !document.querySelector('#perfil-modal.visible, #com-modal.visible, #mail-modal.visible')) close();
