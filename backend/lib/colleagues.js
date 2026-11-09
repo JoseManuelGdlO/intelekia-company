@@ -274,7 +274,7 @@ function createColleagues({
         if (Array.isArray(ajustado.instrucciones)) instrucciones.splice(0, instrucciones.length, ...ajustado.instrucciones);
       }
 
-      const act =(tipo, texto, detalle) => actividad?.log(agentId, tipo, texto, detalle);
+      const act = (tipo, texto, detalle) => actividad?.log(agentId, tipo, texto, detalle);
       const labelOf = (id) => comunicacion.findAgent(id)?.agent.label || id;
 
       if (!tools.length) {
