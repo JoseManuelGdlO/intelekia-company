@@ -302,3 +302,53 @@ test('la bitácora registra en vivo lo que piensa y hace el agente (y lo que res
   ]);
   assert.deepEqual(actividad.list('prospectos').map((e) => e.tipo), ['chat', 'respuesta']);
 });
+
+test('ajustarHerramientas filtra y envuelve herramientas, y maxRondas amplía los pasos', async () => {
+  const llamadas = [];
+  const resultados = [];
+  const instalables = {
+    paraAgente: () => ({
+      tools: [
+        { type: 'function', function: { name: 'mcp_gh__leer', parameters: { type: 'object', properties: {} } } },
+        { type: 'function', function: { name: 'mcp_gh__borrar', parameters: { type: 'object', properties: {} } } },
+      ],
+      handlers: { mcp_gh__leer: async () => 'leído', mcp_gh__borrar: async () => 'borrado' },
+      describir: {},
+      instrucciones: ['Tienes plugins'],
+    }),
+  };
+  const profiles = { decorate: (id, m) => m, instaladosOf: () => ({ skills: [], plugins: ['gh'] }), hasTool: () => false, remember: () => {} };
+  const departments = [{ id: 'dev', agents: [{ id: 'revisor', label: 'Revisor', deps: {} }] }];
+  const colleagues = createColleagues({
+    comunicacion: createComunicacionStore({ configPath: tmp('com.json'), departments }),
+    conversaciones: createConversacionesStore({ filePath: tmp('conv.json') }),
+    profiles,
+    instalables,
+    createChatCompletion: async () => 'no debería usarse',
+    createChatCompletionMessage: async ({ tools, messages }) => {
+      llamadas.push(tools.map((t) => t.function.name));
+      messages.filter((m) => m.role === 'tool').forEach((m) => resultados.push(m.content));
+      if (llamadas.length <= 4) {
+        return { content: null, tool_calls: [{ id: `c${llamadas.length}`, function: { name: 'mcp_gh__leer', arguments: '{}' } }] };
+      }
+      return { content: 'fin' };
+    },
+    contextPath: tmp('ctx.md', '# Intelekia'),
+  });
+
+  const respuesta = await colleagues.completionFor('revisor')({
+    ...base,
+    maxRondas: 6,
+    ajustarHerramientas: ({ tools, handlers }) => ({
+      tools: tools.filter((t) => t.function.name === 'mcp_gh__leer'),
+      handlers: { mcp_gh__leer: async () => `envuelto(${await handlers.mcp_gh__leer()})` },
+      instrucciones: ['Solo lectura'],
+    }),
+  });
+
+  assert.equal(respuesta, 'fin');
+  assert.deepEqual(llamadas[0], ['mcp_gh__leer']);
+  // 4 rondas con herramienta + la respuesta: con el tope por defecto (3) no habría llegado a 'fin'.
+  assert.equal(llamadas.length, 5);
+  assert.ok(resultados.includes('envuelto(leído)'));
+});

@@ -183,7 +183,7 @@ function createColleagues({
   }
 
   function completionFor(agentId) {
-    return async function completionWithColleagues({ apiKey, model, messages: original }) {
+    return async function completionWithColleagues({ apiKey, model, messages: original, ajustarHerramientas, maxRondas }) {
       // Skills, plugins y memoria del perfil del agente.
       const messages = profiles ? profiles.decorate(agentId, original) : original;
 
@@ -265,7 +265,16 @@ function createColleagues({
         instrucciones.push(...extra.instrucciones);
       }
 
-      const act = (tipo, texto, detalle) => actividad?.log(agentId, tipo, texto, detalle);
+      // El agente puede restringir o envolver sus herramientas para esta llamada (p. ej. el revisor de PRs).
+      if (typeof ajustarHerramientas === 'function') {
+        const ajustado = ajustarHerramientas({ tools: [...tools], handlers: { ...handlers }, instrucciones: [...instrucciones] });
+        tools.splice(0, tools.length, ...ajustado.tools);
+        Object.keys(handlers).forEach((k) => delete handlers[k]);
+        Object.assign(handlers, ajustado.handlers);
+        if (Array.isArray(ajustado.instrucciones)) instrucciones.splice(0, instrucciones.length, ...ajustado.instrucciones);
+      }
+
+      const act =(tipo, texto, detalle) => actividad?.log(agentId, tipo, texto, detalle);
       const labelOf = (id) => comunicacion.findAgent(id)?.agent.label || id;
 
       if (!tools.length) {
@@ -295,7 +304,7 @@ function createColleagues({
         ...messages.slice(1),
       ];
       // Explorar una base de datos suele requerir varias consultas.
-      const rounds = handlers[DB_TOOL_NAME] ? Math.max(maxRounds, MAX_DB_ROUNDS) : maxRounds;
+      const rounds = Number.isInteger(maxRondas) && maxRondas > 0 ? maxRondas : handlers[DB_TOOL_NAME] ? Math.max(maxRounds, MAX_DB_ROUNDS) : maxRounds;
 
       try {
         for (let round = 0; round < rounds; round += 1) {
