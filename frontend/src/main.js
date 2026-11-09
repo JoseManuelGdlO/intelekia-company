@@ -5,6 +5,7 @@ import { fechaCorta } from './fechas.js';
 import { createComunicacionEditor } from './comunicacionEditor.js';
 import { createPerfilEditor } from './perfilEditor.js';
 import { createCorreoBandeja } from './correoBandeja.js';
+import { mostrarRevisionesPR } from './revisionesPR.js';
 import { themeFor, hex } from './world/materials.js';
 import { loadBrandAssets } from './world/brand.js';
 
@@ -312,6 +313,7 @@ async function bootstrap() {
       panel.open(agentId, agentLabels[agentId] || agentId, latestStatus[agentId], agentAccents[agentId]);
       renderPanelTeam();
       seguirActividad(agentId);
+      mostrarRevisionesPR(agentId);
     },
   });
   buildDepartmentNav(departments);

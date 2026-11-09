@@ -200,3 +200,6 @@ export const quitarSkillInstalada = (id) => sendJson(`${INSTALABLES_URL}/skills/
 export const instalarPlugin = (datos) => sendJson(`${INSTALABLES_URL}/plugins`, 'POST', datos);
 export const probarPlugin = (id) => sendJson(`${INSTALABLES_URL}/plugins/${encodeURIComponent(id)}/probar`, 'POST');
 export const quitarPlugin = (id) => sendJson(`${INSTALABLES_URL}/plugins/${encodeURIComponent(id)}`, 'DELETE');
+export async function fetchRevisionesPR() {
+  return jsonOrThrow(await fetch('/api/revisiones-pr'));
+}
