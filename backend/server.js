@@ -82,7 +82,8 @@ if (database.isConfigured() && config.db.user === 'root') {
 // Correo saliente (SMTP) para los agentes que lo tengan activado.
 const mailer = createMailer({ smtp: config.smtp, settingsPath: CORREO_SETTINGS_PATH, logPath: CORREOS_PATH });
 // Skills (GitHub) y plugins (servidores MCP) instalados desde internet; cada agente elige cuáles usa.
-const instalables = createInstalables({ dir: path.join(__dirname, 'state', 'instalados') });
+// 3 min de espera: algunos plugins (p. ej. mcp-remote) abren el navegador para iniciar sesión al conectar.
+const instalables = createInstalables({ dir: path.join(__dirname, 'state', 'instalados'), timeoutMs: 180000 });
 const colleagues = createColleagues({
   instalables,
   profiles,

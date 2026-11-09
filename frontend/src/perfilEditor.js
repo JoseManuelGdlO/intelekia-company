@@ -669,11 +669,14 @@ export function createPerfilEditor({ accentOf, onSaved }) {
     datos.nombre = $('inst-plugin-nombre').value.trim();
     const tokenEnv = $('inst-plugin-token').value.trim();
     if (tokenEnv) datos.tokenEnv = tokenEnv;
+    const args = $('inst-plugin-args').value.trim();
+    if (args) datos.args = args;
     const ok = await doInstall($('inst-plugin-btn'), () => instalarPlugin(datos), (p) => `✓ Plugin "${p.nombre}" conectado: ${p.herramientas.length} herramienta(s). Guarda para asignarlo.`);
     if (ok) {
       input.value = '';
       $('inst-plugin-nombre').value = '';
       $('inst-plugin-token').value = '';
+      $('inst-plugin-args').value = '';
     }
   });
   $('inst-save').addEventListener('click', saveInstalados);
