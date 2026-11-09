@@ -51,6 +51,7 @@ function buildDepartments({ rootDir, config, createChatCompletion }) {
           label: 'Respuestas en Redes',
           cicloHoras: 0.17, // ~10 min: revisa comentarios nuevos en FB e IG (editable en la app)
           cicloSilencioso: true,
+          usaAutonomia: true, // muestra el switch Autónomo/Supervisado en su perfil
           module: respuestasRedes,
           deps: {
             contextPath: CONTEXT_PATH,

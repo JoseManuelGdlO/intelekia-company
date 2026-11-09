@@ -225,6 +225,8 @@ function createAgentProfiles({
       instalados: instaladosOf(agentId),
       ciclo: agent.isCustom && !agent.autonomous ? null : cicloOf(agentId),
       autonomia: autonomiaOf(agentId),
+      // Solo los agentes que consultan el switch lo muestran en su perfil.
+      soportaAutonomia: Boolean(agent.usaAutonomia),
       memoria: { caracteres: memoria.length },
       limites: { contenido: MAX_CONTENIDO },
     };

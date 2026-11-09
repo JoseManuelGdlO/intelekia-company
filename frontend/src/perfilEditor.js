@@ -166,6 +166,7 @@ export function createPerfilEditor({ accentOf, onSaved }) {
     $('perfil-label').value = perfil.label;
     $('perfil-autonomous').checked = Boolean(perfil.autonomous);
     $('perfil-rol').value = perfil.rol;
+    $('perfil-autonomia-row').hidden = !perfil.soportaAutonomia;
     $('perfil-autonomia').checked = perfil.autonomia === 'autonomo';
     fillAutonomiaHint();
     fillCiclo();
@@ -242,7 +243,7 @@ export function createPerfilEditor({ accentOf, onSaved }) {
     setBusy(button, true);
     try {
       const patch = { rol: $('perfil-rol').value };
-      patch.autonomia = $('perfil-autonomia').checked ? 'autonomo' : 'supervisado';
+      if (perfil.soportaAutonomia) patch.autonomia = $('perfil-autonomia').checked ? 'autonomo' : 'supervisado';
       if (cicloDirty) patch.cicloHoras = cicloValor;
       if (perfil.tipo === 'custom') {
         patch.label = $('perfil-label').value;

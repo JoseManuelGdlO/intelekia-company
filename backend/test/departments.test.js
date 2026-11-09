@@ -94,6 +94,7 @@ test('desarrollo tiene al Revisor de PRs con ciclo corto y silencioso', () => {
   assert.equal(revisor.module, require('../agents/revisorPRs'));
   assert.equal(revisor.cicloHoras, 0.08);
   assert.equal(revisor.cicloSilencioso, true);
+  assert.equal(revisor.usaAutonomia, undefined, 'solo Respuestas en Redes usa el switch de autonomía');
   assert.equal(revisor.deps.github, null);
   assert.equal(revisor.deps.revisionesPath, path.join('/fake/root', 'backend', 'state', 'revisiones-pr.json'));
   assert.equal(revisor.deps.rolePath, path.join('/fake/root', 'departamentos', 'desarrollo', 'agentes', 'revisor-prs.md'));
@@ -105,6 +106,7 @@ test('marketing tiene a Respuestas en Redes con ciclo de ~10 min, silencioso y d
   assert.equal(agente.module, require('../agents/respuestasRedes'));
   assert.equal(agente.cicloHoras, 0.17);
   assert.equal(agente.cicloSilencioso, true);
+  assert.equal(agente.usaAutonomia, true);
   for (const dep of ['meta', 'aprobaciones', 'autonomia', 'bitacora']) assert.equal(agente.deps[dep], null);
   assert.equal(agente.deps.atendidosPath, path.join('/fake/root', 'backend', 'state', 'comentarios-atendidos.json'));
   assert.equal(agente.deps.rolePath, path.join('/fake/root', 'departamentos', 'marketing', 'agentes', 'respuestas-redes.md'));

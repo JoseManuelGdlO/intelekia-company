@@ -175,3 +175,19 @@ test('autonomia: por defecto supervisado, se guarda y se valida', () => {
   assert.throws(() => profiles.updateProfile('publicador', { autonomia: 'a veces' }), /autonomo.*supervisado/);
   assert.throws(() => profiles.autonomiaOf('nadie'), /desconocido/);
 });
+
+test('soportaAutonomia solo es true en agentes con usaAutonomia', () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'perfiles-'));
+  const profiles = createAgentProfiles({
+    profilesPath: path.join(dir, 'perfiles.json'),
+    memoriasDir: path.join(dir, 'memorias'),
+    departments: [{ id: 'm', label: 'M', agents: [
+      { id: 'redes', label: 'Redes', usaAutonomia: true, roleText: 'x', deps: {} },
+      { id: 'otro', label: 'Otro', roleText: 'y', deps: {} },
+    ] }],
+    createChatCompletion: async () => '',
+    config: {},
+  });
+  assert.equal(profiles.getProfile('redes').soportaAutonomia, true);
+  assert.equal(profiles.getProfile('otro').soportaAutonomia, false);
+});
