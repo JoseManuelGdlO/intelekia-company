@@ -7,6 +7,7 @@ const GRAPH = 'https://graph.facebook.com';
 const MAX_COMENTARIOS_POR_PUBLICACION = 50;
 const TIMEOUT_MS = 20000;
 const enc = encodeURIComponent;
+const TOKEN_INVALIDO = 'Meta: el token venció o no es válido (genera uno nuevo y actualiza META_PAGE_TOKEN)';
 
 function createMeta({ config, fetchImpl = (...a) => fetch(...a), timeoutMs = TIMEOUT_MS }) {
   const { pageToken, pageId, igUserId, apiVersion = 'v21.0' } = config || {};
@@ -33,63 +34,79 @@ function createMeta({ config, fetchImpl = (...a) => fetch(...a), timeoutMs = TIM
       throw new Error(`Meta: no se pudo conectar (${err.message})`);
     }
     const data = await res.json().catch(() => ({}));
-    if (!res.ok || data.error) throw new Error(`Meta: ${data.error?.message || `respuesta ${res.status}`}`);
+    if (!res.ok || data.error) {
+      if (data.error?.code === 190) throw new Error(TOKEN_INVALIDO);
+      throw new Error(`Meta: ${data.error?.message || `respuesta ${res.status}`}`);
+    }
     return data;
+  }
+
+  // Usuario de la cuenta de Instagram: se pide una vez y se guarda.
+  let igUsername = null;
+  async function usuarioInstagram() {
+    if (igUsername === null) igUsername = (await api(enc(igUserId), { params: { fields: 'username' } })).username || '';
+    return igUsername;
+  }
+
+  /** Recorre las publicaciones aislando fallas: si una falla, se anota y se sigue con las demás. */
+  async function porPublicacion(items, red, errores, fn) {
+    const lista = [];
+    for (const item of items) {
+      try {
+        lista.push(...(await fn(item)));
+      } catch (err) {
+        errores.push(`${red}: ${item.id}: ${err.message}`);
+      }
+    }
+    return lista;
   }
 
   // Facebook devuelve "2026-11-09T10:00:00+0000" (sin ":" en la zona): se normaliza antes de parsear.
   const fechaDe = (valor) => new Date(String(valor).replace(/([+-]\d{2})(\d{2})$/, '$1:$2'));
   const iso = (valor) => fechaDe(valor).toISOString();
 
-  async function comentariosFacebook(desde, maxPublicaciones) {
+  async function comentariosFacebook(desde, maxPublicaciones, errores) {
     const posts = (await api(`${enc(pageId)}/posts`, { params: { fields: 'id,message,permalink_url', limit: maxPublicaciones } })).data || [];
-    const lista = [];
-    for (const post of posts) {
+    return porPublicacion(posts, 'Facebook', errores, async (post) => {
       const comentarios = (
         await api(`${enc(post.id)}/comments`, {
           params: { fields: 'id,message,from,created_time', filter: 'toplevel', order: 'reverse_chronological', limit: MAX_COMENTARIOS_POR_PUBLICACION },
         })
       ).data || [];
-      comentarios
+      // Sin "from" (Meta lo oculta sin pages_read_user_content) se trata como externo.
+      return comentarios
         .filter((c) => c.from?.id !== pageId && fechaDe(c.created_time) >= desde)
-        .forEach((c) =>
-          lista.push({
-            id: c.id,
-            red: 'facebook',
-            texto: c.message || '',
-            autor: c.from?.name || 'Alguien',
-            creadoEn: iso(c.created_time),
-            publicacionId: post.id,
-            publicacionTexto: post.message || '',
-            permalink: post.permalink_url || null,
-          })
-        );
-    }
-    return lista;
+        .map((c) => ({
+          id: c.id,
+          red: 'facebook',
+          texto: c.message || '',
+          autor: c.from?.name || 'Desconocido',
+          creadoEn: iso(c.created_time),
+          publicacionId: post.id,
+          publicacionTexto: post.message || '',
+          permalink: post.permalink_url || null,
+        }));
+    });
   }
 
-  async function comentariosInstagram(desde, maxPublicaciones) {
-    const cuenta = await api(enc(igUserId), { params: { fields: 'username' } });
+  async function comentariosInstagram(desde, maxPublicaciones, errores) {
+    const usuario = await usuarioInstagram();
     const media = (await api(`${enc(igUserId)}/media`, { params: { fields: 'id,caption,permalink', limit: maxPublicaciones } })).data || [];
-    const lista = [];
-    for (const m of media) {
+    return porPublicacion(media, 'Instagram', errores, async (m) => {
       const comentarios = (await api(`${enc(m.id)}/comments`, { params: { fields: 'id,text,username,timestamp', limit: MAX_COMENTARIOS_POR_PUBLICACION } })).data || [];
-      comentarios
-        .filter((c) => c.username !== cuenta.username && fechaDe(c.timestamp) >= desde)
-        .forEach((c) =>
-          lista.push({
-            id: c.id,
-            red: 'instagram',
-            texto: c.text || '',
-            autor: c.username || 'Alguien',
-            creadoEn: iso(c.timestamp),
-            publicacionId: m.id,
-            publicacionTexto: m.caption || '',
-            permalink: m.permalink || null,
-          })
-        );
-    }
-    return lista;
+      return comentarios
+        .filter((c) => c.username !== usuario && fechaDe(c.timestamp) >= desde)
+        .map((c) => ({
+          id: c.id,
+          red: 'instagram',
+          texto: c.text || '',
+          autor: c.username || 'Alguien',
+          creadoEn: iso(c.timestamp),
+          publicacionId: m.id,
+          publicacionTexto: m.caption || '',
+          permalink: m.permalink || null,
+        }));
+    });
   }
 
   /** Comentarios de las últimas publicaciones; si una red falla, devuelve la otra y reporta el error. */
@@ -101,14 +118,14 @@ function createMeta({ config, fetchImpl = (...a) => fetch(...a), timeoutMs = TIM
     const errores = [];
     if (e.facebook) {
       try {
-        comentarios.push(...(await comentariosFacebook(desde, maxPublicaciones)));
+        comentarios.push(...(await comentariosFacebook(desde, maxPublicaciones, errores)));
       } catch (err) {
         errores.push(`Facebook: ${err.message}`);
       }
     }
     if (e.instagram) {
       try {
-        comentarios.push(...(await comentariosInstagram(desde, maxPublicaciones)));
+        comentarios.push(...(await comentariosInstagram(desde, maxPublicaciones, errores)));
       } catch (err) {
         errores.push(`Instagram: ${err.message}`);
       }
@@ -125,7 +142,21 @@ function createMeta({ config, fetchImpl = (...a) => fetch(...a), timeoutMs = TIM
     throw new Error(`Red desconocida: ${red}`);
   }
 
-  return { estado, comentariosRecientes, responder };
+  /** ¿La página/cuenta ya respondió este comentario (p. ej. el fundador a mano)? */
+  async function yaRespondido({ red, comentarioId }) {
+    if (red === 'facebook') {
+      const respuestas = (await api(`${enc(comentarioId)}/comments`, { params: { fields: 'from', limit: MAX_COMENTARIOS_POR_PUBLICACION } })).data || [];
+      return respuestas.some((r) => r.from?.id === pageId);
+    }
+    if (red === 'instagram') {
+      const usuario = await usuarioInstagram();
+      const respuestas = (await api(`${enc(comentarioId)}/replies`, { params: { fields: 'username', limit: MAX_COMENTARIOS_POR_PUBLICACION } })).data || [];
+      return Boolean(usuario) && respuestas.some((r) => r.username === usuario);
+    }
+    throw new Error(`Red desconocida: ${red}`);
+  }
+
+  return { estado, comentariosRecientes, responder, yaRespondido };
 }
 
 module.exports = { createMeta };
