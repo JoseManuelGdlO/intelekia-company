@@ -1,4 +1,5 @@
 require('dotenv').config();
+const { normalizarNumero } = require('./lib/whatsapp');
 
 const DEFAULT_DB_TABLES = 'Projects,Tasks,BoardColumns,TaskActivities,Notes,ProjectMembers,Users,FinanceItems';
 const DEFAULT_DB_BLOCKED_COLUMNS = 'passwordHash,email';
@@ -31,11 +32,13 @@ function loadConfig(env = process.env) {
       phoneNumberId: env.WHATSAPP_PHONE_NUMBER_ID || '',
       verifyToken: env.WHATSAPP_VERIFY_TOKEN || '',
       appSecret: env.WHATSAPP_APP_SECRET || '',
-      permitidos: list(env.WHATSAPP_PERMITIDOS || '').map((n) => n.replace(/\D/g, '')).filter(Boolean),
+      permitidos: list(env.WHATSAPP_PERMITIDOS || '').map(normalizarNumero).filter(Boolean),
       plantillaAviso: env.WHATSAPP_PLANTILLA_AVISO || '',
       plantillaIdioma: env.WHATSAPP_PLANTILLA_IDIOMA || 'es_MX',
       apiVersion: env.WHATSAPP_API_VERSION || 'v21.0',
       voz: env.WHATSAPP_VOZ || 'alloy',
+      // Puerto aparte SOLO para el webhook: es el único que se expone con ngrok (nunca el de la oficina).
+      webhookPort: Number(env.WHATSAPP_WEBHOOK_PORT || 3100),
     },
     // Base de datos externa que los agentes pueden consultar en SOLO LECTURA.
     db: {

@@ -1,7 +1,7 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const crypto = require('crypto');
-const { createWhatsapp, partirTexto, extraerMensajes } = require('../lib/whatsapp');
+const { createWhatsapp, partirTexto, extraerMensajes, normalizarNumero } = require('../lib/whatsapp');
 
 const CONFIG = { token: 'tok', phoneNumberId: 'PHONE', verifyToken: 'v', appSecret: 'secreto', permitidos: ['5218710000000'], apiVersion: 'v21.0' };
 
@@ -36,7 +36,7 @@ test('enviarTexto manda mensajes de texto con Bearer al endpoint del número', a
   assert.equal(partes, 1);
   assert.equal(llamadas[0].url, 'https://graph.facebook.com/v21.0/PHONE/messages');
   assert.equal(llamadas[0].auth, 'Bearer tok');
-  assert.deepEqual(JSON.parse(llamadas[0].body), { messaging_product: 'whatsapp', to: '5218710000000', type: 'text', text: { body: 'Hola', preview_url: false } });
+  assert.deepEqual(JSON.parse(llamadas[0].body), { messaging_product: 'whatsapp', to: '528710000000', type: 'text', text: { body: 'Hola', preview_url: false } });
 });
 
 test('enviarAudio sube el archivo y manda el audio con su id', async () => {
@@ -45,13 +45,14 @@ test('enviarAudio sube el archivo y manda el audio con su id', async () => {
   await wa.enviarAudio('5218710000000', Buffer.from('ogg'));
   assert.equal(llamadas[0].url, 'https://graph.facebook.com/v21.0/PHONE/media');
   assert.ok(llamadas[0].body instanceof FormData);
-  assert.deepEqual(JSON.parse(llamadas[1].body), { messaging_product: 'whatsapp', to: '5218710000000', type: 'audio', audio: { id: 'MED1' } });
+  assert.deepEqual(JSON.parse(llamadas[1].body), { messaging_product: 'whatsapp', to: '528710000000', type: 'audio', audio: { id: 'MED1' } });
 });
 
 test('enviarPlantilla arma la plantilla con sus parámetros', async () => {
   const llamadas = [];
   const wa = createWhatsapp({ config: CONFIG, fetchImpl: fakeFetch({}, llamadas) });
   await wa.enviarPlantilla('5218710000000', 'aviso', 'es_MX', [3]);
+  assert.equal(JSON.parse(llamadas[0].body).to, '528710000000');
   assert.deepEqual(JSON.parse(llamadas[0].body).template, {
     name: 'aviso', language: { code: 'es_MX' }, components: [{ type: 'body', parameters: [{ type: 'text', text: '3' }] }],
   });
@@ -101,4 +102,47 @@ test('extraerMensajes normaliza texto, audio y otros; ignora statuses', () => {
     { id: 'm3', de: '5218710000000', tipo: 'otro', texto: '', mediaId: null, fecha: new Date(1794300002 * 1000).toISOString() },
   ]);
   assert.deepEqual(extraerMensajes({}), []);
+});
+
+test('normalizarNumero deja solo dígitos y quita el 1 de los celulares de México', () => {
+  assert.equal(normalizarNumero('5218710000000'), '528710000000');
+  assert.equal(normalizarNumero('+52 1 871 000 0000'), '528710000000');
+  assert.equal(normalizarNumero('528710000000'), '528710000000');
+  assert.equal(normalizarNumero('15551234567'), '15551234567');
+  assert.equal(normalizarNumero(''), '');
+  assert.equal(normalizarNumero(undefined), '');
+});
+
+test('descargarMedia no manda el token a hosts que no son de Meta', async () => {
+  for (const url of ['https://evil.example.com/x', 'http://lookaside.fbsbx.com/x', 'https://fbsbx.com.evil.io/x']) {
+    const llamadas = [];
+    const wa = createWhatsapp({ config: CONFIG, fetchImpl: fakeFetch({ '/MEDIA9': { url, mime_type: 'audio/ogg' } }, llamadas) });
+    await assert.rejects(wa.descargarMedia('MEDIA9'), /WhatsApp: URL de descarga no confiable/);
+    assert.equal(llamadas.length, 1);
+  }
+  for (const url of ['https://mmg.whatsapp.net/a', 'https://scontent.xx.fbcdn.net/a', 'https://x.facebook.com/a']) {
+    const wa = createWhatsapp({ config: CONFIG, fetchImpl: fakeFetch({ '/MEDIA9': { url, mime_type: 'audio/ogg' }, [url]: Buffer.from('ok') }) });
+    assert.equal((await wa.descargarMedia('MEDIA9')).buffer.toString(), 'ok');
+  }
+});
+
+test('descargarMedia rechaza audios de más de 16 MB', async () => {
+  const info = { url: 'https://lookaside.fbsbx.com/x', mime_type: 'audio/ogg' };
+  const porCabecera = async (url) => (url.includes('/MEDIA9')
+    ? { ok: true, status: 200, json: async () => info }
+    : { ok: true, status: 200, headers: new Headers({ 'content-length': String(17 * 1024 * 1024) }), arrayBuffer: async () => { throw new Error('no debía leerse'); } });
+  await assert.rejects(createWhatsapp({ config: CONFIG, fetchImpl: porCabecera }).descargarMedia('MEDIA9'), /demasiado grande/);
+  const porTamano = async (url) => (url.includes('/MEDIA9')
+    ? { ok: true, status: 200, json: async () => info }
+    : { ok: true, status: 200, headers: new Headers(), arrayBuffer: async () => new ArrayBuffer(16 * 1024 * 1024 + 1) });
+  await assert.rejects(createWhatsapp({ config: CONFIG, fetchImpl: porTamano }).descargarMedia('MEDIA9'), /demasiado grande/);
+});
+
+test('partirTexto no parte un emoji (par sustituto) en un corte forzado', () => {
+  const texto = `${'a'.repeat(9)}😀${'b'.repeat(20)}`;
+  const partes = partirTexto(texto, 10);
+  assert.equal(partes[0], 'a'.repeat(9));
+  assert.ok(partes[1].startsWith('😀'));
+  assert.equal(partes.join(''), texto);
+  assert.ok(partes.every((p) => !/[\uD800-\uDBFF]$/.test(p) && !/^[\uDC00-\uDFFF]/.test(p)));
 });

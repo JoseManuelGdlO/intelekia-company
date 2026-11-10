@@ -58,7 +58,9 @@ test('loadConfig lee la configuración de WhatsApp', () => {
   });
   assert.deepEqual(c.whatsapp, {
     token: 't', phoneNumberId: 'p', verifyToken: 'v', appSecret: 's',
-    permitidos: ['5218710000000', '5218719999999'], plantillaAviso: 'aviso', plantillaIdioma: 'es_MX', apiVersion: 'v21.0', voz: 'alloy',
+    permitidos: ['528710000000', '528719999999'], plantillaAviso: 'aviso', plantillaIdioma: 'es_MX', apiVersion: 'v21.0', voz: 'alloy',
+    webhookPort: 3100,
   });
   assert.deepEqual(loadConfig({}).whatsapp.permitidos, []);
+  assert.equal(loadConfig({ WHATSAPP_WEBHOOK_PORT: '3194' }).whatsapp.webhookPort, 3194);
 });
