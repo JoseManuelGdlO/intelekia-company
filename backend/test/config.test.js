@@ -64,3 +64,8 @@ test('loadConfig lee la configuración de WhatsApp', () => {
   assert.deepEqual(loadConfig({}).whatsapp.permitidos, []);
   assert.equal(loadConfig({ WHATSAPP_WEBHOOK_PORT: '3194' }).whatsapp.webhookPort, 3194);
 });
+
+test('loadConfig lee el usuario y contraseña de la oficina', () => {
+  assert.deepEqual(loadConfig({ OFICINA_USUARIO: 'jose', OFICINA_PASSWORD: 'x' }).acceso, { usuario: 'jose', password: 'x' });
+  assert.deepEqual(loadConfig({}).acceso, { usuario: '', password: '' });
+});

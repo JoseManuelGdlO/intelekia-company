@@ -27,6 +27,11 @@ function loadConfig(env = process.env) {
       apiVersion: env.META_API_VERSION || 'v21.0',
     },
     // Canal de WhatsApp (Cloud API de Meta).
+    // Acceso a la oficina (Basic Auth). Obligatorio en un servidor público como EasyPanel.
+    acceso: {
+      usuario: env.OFICINA_USUARIO || '',
+      password: env.OFICINA_PASSWORD || '',
+    },
     whatsapp: {
       token: env.WHATSAPP_TOKEN || '',
       phoneNumberId: env.WHATSAPP_PHONE_NUMBER_ID || '',

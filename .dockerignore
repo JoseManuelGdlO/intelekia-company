@@ -1,0 +1,17 @@
+**/node_modules
+.git
+.gitignore
+.claude
+.superpowers
+docs
+Dockerfile
+.dockerignore
+
+# Secretos: en EasyPanel se configuran como variables de entorno, nunca dentro de la imagen.
+.env
+**/.env
+
+# Basura de ejecución local
+**/*.log
+backend/state/**/*.tmp
+backend/state/**/*.corrupto-*

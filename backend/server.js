@@ -35,6 +35,7 @@ const { createVoz } = require('./lib/voz');
 const { createRecepcionWhatsapp, crearEnrutadorIA } = require('./lib/recepcionWhatsapp');
 const { createWhatsappEstadoRouter, createWhatsappWebhookApp } = require('./routes/whatsapp');
 
+const { createAcceso } = require('./lib/acceso');
 const config = loadConfig();
 const ROOT = path.join(__dirname, '..');
 const STATUS_PATH = path.join(__dirname, 'state', 'agents-status.json');
@@ -264,6 +265,12 @@ const recepcionWhatsapp = createRecepcionWhatsapp({
 aprobaciones.suscribir((item) => recepcionWhatsapp.avisarAprobacion(item));
 
 const app = express();
+// Usuario y contraseña para toda la oficina (si OFICINA_USUARIO/OFICINA_PASSWORD están definidos).
+const acceso = createAcceso(config.acceso);
+if (!acceso.activo && process.env.NODE_ENV === 'production') {
+  console.warn('⚠️  La oficina está SIN contraseña: define OFICINA_USUARIO y OFICINA_PASSWORD.');
+}
+app.use(acceso);
 app.use(express.json());
 app.use('/api/agents', createAgentsRouter({ statusPath: STATUS_PATH, readStatus, scheduler, chatHandlers, actividad }));
 app.use(
