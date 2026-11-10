@@ -305,12 +305,14 @@ app.listen(config.port, () => {
 // El webhook de WhatsApp vive en OTRA app y OTRO puerto: es lo único que se expone con ngrok,
 // así la oficina (puerto principal) nunca queda en internet.
 const webhookApp = createWhatsappWebhookApp({ whatsapp, recepcion: recepcionWhatsapp, config: config.whatsapp, registrar: registrarWhatsapp });
-if (whatsapp.estado().ok) {
-  webhookApp.listen(config.whatsapp.webhookPort, () => {
-    console.log(
-      `Webhook de WhatsApp escuchando en http://localhost:${config.whatsapp.webhookPort}/webhook/whatsapp (apunta ngrok a este puerto)`
-    );
-  });
-}
+// Siempre escucha: así Meta puede verificar el webhook aunque falte otra variable; los mensajes
+// solo se procesan cuando la configuración está completa.
+webhookApp.listen(config.whatsapp.webhookPort, () => {
+  const estadoWhatsapp = whatsapp.estado();
+  console.log(
+    `Webhook de WhatsApp escuchando en el puerto ${config.whatsapp.webhookPort} (/webhook/whatsapp)` +
+      (estadoWhatsapp.ok ? ' — configuración completa ✓' : ` — ⚠️ ${estadoWhatsapp.motivo}`)
+  );
+});
 
 module.exports = app;
