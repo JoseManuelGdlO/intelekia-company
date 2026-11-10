@@ -5,3 +5,5 @@ backend/.env
 backend/state/revisiones-pr.json
 backend/state/aprobaciones.json
 backend/state/comentarios-atendidos.json
+
+backend/state/whatsapp.json

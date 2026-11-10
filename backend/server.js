@@ -30,6 +30,10 @@ const { createAtrasadosFlow } = require('./lib/atrasados');
 const { createActividadStore } = require('./lib/actividad');
 const { createGithubPlugin } = require('./lib/githubPlugin');
 const { createRevisionesPRRouter } = require('./routes/revisionesPR');
+const { createWhatsapp } = require('./lib/whatsapp');
+const { createVoz } = require('./lib/voz');
+const { createRecepcionWhatsapp, crearEnrutadorIA } = require('./lib/recepcionWhatsapp');
+const { createWhatsappRouter } = require('./routes/whatsapp');
 
 const config = loadConfig();
 const ROOT = path.join(__dirname, '..');
@@ -209,8 +213,54 @@ const scheduler = createScheduler({
   statePath: CICLOS_PATH,
 });
 
+// Canal de WhatsApp: el fundador le escribe a la oficina (texto o audio).
+const whatsapp = createWhatsapp({ config: config.whatsapp });
+const voz = createVoz({ apiKey: config.openaiApiKey, voz: config.whatsapp.voz });
+function registrarWhatsapp(agentId, tipo, texto) {
+  if (agentId) actividad.log(agentId, tipo, texto);
+  else console.warn(texto);
+}
+function agentesParaWhatsapp() {
+  return departments
+    .flatMap((d) => d.agents)
+    .filter((a) => chatHandlers[a.id])
+    .map((a) => {
+      let rol = '';
+      try {
+        rol = String(profiles.getProfile(a.id).rol || '').slice(0, 300);
+      } catch {
+        rol = '';
+      }
+      return { id: a.id, label: a.label, rol };
+    });
+}
+const recepcionWhatsapp = createRecepcionWhatsapp({
+  whatsapp,
+  voz,
+  estadoPath: path.join(__dirname, 'state', 'whatsapp.json'),
+  permitidos: config.whatsapp.permitidos,
+  agentes: agentesParaWhatsapp,
+  chatDe: async (agentId, texto) => {
+    const handler = chatHandlers[agentId];
+    if (!handler) throw new Error(`No existe el trabajador ${agentId}`);
+    const result = await handler({ message: texto });
+    return result.reply;
+  },
+  forzarCiclo: async (agentId) => {
+    await scheduler.runOne(agentId);
+    return readStatus(STATUS_PATH)[agentId]?.ultimaAccion || 'Listo';
+  },
+  aprobaciones,
+  enrutarConIA: crearEnrutadorIA({ createChatCompletion, apiKey: config.openaiApiKey, model: config.openaiModel }),
+  labelOf: (id) => departments.flatMap((d) => d.agents).find((a) => a.id === id)?.label || id,
+  registrar: registrarWhatsapp,
+  plantilla: config.whatsapp.plantillaAviso ? { nombre: config.whatsapp.plantillaAviso, idioma: config.whatsapp.plantillaIdioma } : null,
+});
+aprobaciones.suscribir((item) => recepcionWhatsapp.avisarAprobacion(item));
+
 const app = express();
-app.use(express.json());
+// Se guarda el cuerpo crudo para verificar la firma del webhook de WhatsApp.
+app.use(express.json({ verify: (req, res, buf) => { req.rawBody = buf; } }));
 app.use('/api/agents', createAgentsRouter({ statusPath: STATUS_PATH, readStatus, scheduler, chatHandlers, actividad }));
 app.use(
   '/api/departments',
@@ -233,6 +283,7 @@ if (revisorPRsAgent) {
   app.use('/api/revisiones-pr', createRevisionesPRRouter({ filePath: revisorPRsAgent.deps.revisionesPath }));
 }
 app.use('/api/comunicacion', createComunicacionRouter({ comunicacion, conversaciones }));
+app.use(createWhatsappRouter({ whatsapp, recepcion: recepcionWhatsapp, config: config.whatsapp, registrar: registrarWhatsapp }));
 app.use(express.static(path.join(ROOT, 'frontend')));
 
 app.listen(config.port, () => {
