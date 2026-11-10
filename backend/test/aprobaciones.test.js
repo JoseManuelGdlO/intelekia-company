@@ -179,3 +179,17 @@ test('la propuesta debe ser texto', async () => {
   const item = a.proponer(BASE);
   await assert.rejects(a.aprobar(item.id, { propuesta: 42 }), /La propuesta debe ser texto/);
 });
+
+test('suscribir avisa de cada propuesta y los errores del oyente no rompen proponer', async () => {
+  const a = createAprobaciones({ filePath: tmpFile() });
+  const vistos = [];
+  const quitar = a.suscribir((item) => vistos.push(item.id));
+  a.suscribir(() => { throw new Error('oyente roto'); });
+  a.suscribir(async () => { throw new Error('oyente async roto'); });
+  const item = a.proponer(BASE);
+  assert.deepEqual(vistos, [item.id]);
+  quitar();
+  a.proponer(BASE);
+  assert.equal(vistos.length, 1);
+  await new Promise((r) => setImmediate(r));
+});

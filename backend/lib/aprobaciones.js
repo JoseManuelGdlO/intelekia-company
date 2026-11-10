@@ -12,6 +12,7 @@ const MAX_EJECUTANDO_MS = 5 * 60 * 1000;
 
 function createAprobaciones({ filePath, now = () => new Date() }) {
   const ejecutores = {};
+  const oyentes = new Set();
   let counter = 0;
 
   function leer() {
@@ -73,6 +74,23 @@ function createAprobaciones({ filePath, now = () => new Date() }) {
     return item;
   }
 
+  /** Avisa a `fn(item)` cada vez que se propone algo (p. ej. para notificar por WhatsApp). */
+  function suscribir(fn) {
+    oyentes.add(fn);
+    return () => oyentes.delete(fn);
+  }
+
+  function notificar(item) {
+    oyentes.forEach((fn) => {
+      try {
+        const r = fn(item);
+        if (r && typeof r.catch === 'function') r.catch(() => {});
+      } catch {
+        // un oyente roto nunca debe impedir proponer
+      }
+    });
+  }
+
   function registrarEjecutor(tipo, fn) {
     ejecutores[tipo] = fn;
   }
@@ -96,6 +114,7 @@ function createAprobaciones({ filePath, now = () => new Date() }) {
     const items = leer();
     items.push(item);
     guardar(items);
+    notificar(item);
     return item;
   }
 
@@ -139,7 +158,7 @@ function createAprobaciones({ filePath, now = () => new Date() }) {
     return leer().filter((i) => ABIERTOS.includes(i.estado)).length;
   }
 
-  return { registrarEjecutor, proponer, aprobar, descartar, list, pendientes };
+  return { registrarEjecutor, suscribir, proponer, aprobar, descartar, list, pendientes };
 }
 
 module.exports = { createAprobaciones };
