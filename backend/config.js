@@ -25,6 +25,18 @@ function loadConfig(env = process.env) {
       igUserId: env.META_IG_USER_ID || '',
       apiVersion: env.META_API_VERSION || 'v21.0',
     },
+    // Canal de WhatsApp (Cloud API de Meta).
+    whatsapp: {
+      token: env.WHATSAPP_TOKEN || '',
+      phoneNumberId: env.WHATSAPP_PHONE_NUMBER_ID || '',
+      verifyToken: env.WHATSAPP_VERIFY_TOKEN || '',
+      appSecret: env.WHATSAPP_APP_SECRET || '',
+      permitidos: list(env.WHATSAPP_PERMITIDOS || '').map((n) => n.replace(/\D/g, '')).filter(Boolean),
+      plantillaAviso: env.WHATSAPP_PLANTILLA_AVISO || '',
+      plantillaIdioma: env.WHATSAPP_PLANTILLA_IDIOMA || 'es_MX',
+      apiVersion: env.WHATSAPP_API_VERSION || 'v21.0',
+      voz: env.WHATSAPP_VOZ || 'alloy',
+    },
     // Base de datos externa que los agentes pueden consultar en SOLO LECTURA.
     db: {
       host: env.DB_HOST || '',

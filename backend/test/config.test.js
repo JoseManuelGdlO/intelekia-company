@@ -50,3 +50,15 @@ test('loadConfig lee la configuración de Meta', () => {
   assert.deepEqual(c.meta, { pageToken: 't', pageId: 'p', igUserId: 'i', apiVersion: 'v21.0' });
   assert.equal(loadConfig({ META_API_VERSION: 'v22.0' }).meta.apiVersion, 'v22.0');
 });
+
+test('loadConfig lee la configuración de WhatsApp', () => {
+  const c = loadConfig({
+    WHATSAPP_TOKEN: 't', WHATSAPP_PHONE_NUMBER_ID: 'p', WHATSAPP_VERIFY_TOKEN: 'v', WHATSAPP_APP_SECRET: 's',
+    WHATSAPP_PERMITIDOS: '+52 1 871 000 0000, 5218719999999', WHATSAPP_PLANTILLA_AVISO: 'aviso',
+  });
+  assert.deepEqual(c.whatsapp, {
+    token: 't', phoneNumberId: 'p', verifyToken: 'v', appSecret: 's',
+    permitidos: ['5218710000000', '5218719999999'], plantillaAviso: 'aviso', plantillaIdioma: 'es_MX', apiVersion: 'v21.0', voz: 'alloy',
+  });
+  assert.deepEqual(loadConfig({}).whatsapp.permitidos, []);
+});
