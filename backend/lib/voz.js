@@ -39,9 +39,14 @@ function createVoz({
     return texto;
   }
 
-  /** Quita el formato de WhatsApp y recorta a ~1500 caracteres en un final de oración. */
+  /** Quita el formato de WhatsApp y los emojis (✅/⚠️…) y recorta a ~1500 caracteres en un final de oración. */
   function recortar(texto) {
-    const limpio = String(texto || '').replace(/[*_~`]/g, '').trim();
+    const limpio = String(texto || '')
+      .replace(/[*_~`]/g, '')
+      .replace(/[\p{Extended_Pictographic}\p{Emoji_Modifier}‍️]/gu, '')
+      .replace(/[ \t]+([:;,.!?])/g, '$1')
+      .replace(/[ \t]{2,}/g, ' ')
+      .trim();
     if (limpio.length <= MAX_VOZ) return limpio;
     const corte = limpio.lastIndexOf('. ', MAX_VOZ);
     const base = corte > MAX_VOZ * 0.5 ? limpio.slice(0, corte + 1) : limpio.slice(0, MAX_VOZ);

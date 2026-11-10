@@ -45,3 +45,10 @@ test('recortar deja máximo ~1500 caracteres y avisa que el resto va por escrito
   assert.match(r, /El resto te lo dejé por escrito\.$/);
   assert.equal(voz.recortar('corto'), 'corto');
 });
+
+test('recortar quita emojis y los marcadores ✅/⚠️ para que la voz no los lea', () => {
+  const voz = createVoz({ apiKey: 'sk' });
+  assert.equal(voz.recortar('✅ Ciclo terminado 🚀: 3 ideas 💡'), 'Ciclo terminado: 3 ideas');
+  assert.equal(voz.recortar('⚠️ Falló el envío'), 'Falló el envío');
+  assert.equal(voz.recortar('Listo 👍🏽 #3'), 'Listo #3');
+});
