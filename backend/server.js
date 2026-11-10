@@ -33,7 +33,7 @@ const { createRevisionesPRRouter } = require('./routes/revisionesPR');
 const { createWhatsapp } = require('./lib/whatsapp');
 const { createVoz } = require('./lib/voz');
 const { createRecepcionWhatsapp, crearEnrutadorIA } = require('./lib/recepcionWhatsapp');
-const { createWhatsappRouter } = require('./routes/whatsapp');
+const { createWhatsappEstadoRouter, createWhatsappWebhookApp } = require('./routes/whatsapp');
 
 const config = loadConfig();
 const ROOT = path.join(__dirname, '..');
@@ -216,9 +216,14 @@ const scheduler = createScheduler({
 // Canal de WhatsApp: el fundador le escribe a la oficina (texto o audio).
 const whatsapp = createWhatsapp({ config: config.whatsapp });
 const voz = createVoz({ apiKey: config.openaiApiKey, voz: config.whatsapp.voz });
+// Los avisos del canal que no son de un trabajador quedan en la bitácora bajo el id 'whatsapp'.
 function registrarWhatsapp(agentId, tipo, texto) {
-  if (agentId) actividad.log(agentId, tipo, texto);
-  else console.warn(texto);
+  if (agentId) {
+    actividad.log(agentId, tipo, texto);
+    return;
+  }
+  actividad.log('whatsapp', tipo, texto);
+  console.warn(texto);
 }
 function agentesParaWhatsapp() {
   return departments
@@ -259,8 +264,7 @@ const recepcionWhatsapp = createRecepcionWhatsapp({
 aprobaciones.suscribir((item) => recepcionWhatsapp.avisarAprobacion(item));
 
 const app = express();
-// Se guarda el cuerpo crudo para verificar la firma del webhook de WhatsApp.
-app.use(express.json({ verify: (req, res, buf) => { req.rawBody = buf; } }));
+app.use(express.json());
 app.use('/api/agents', createAgentsRouter({ statusPath: STATUS_PATH, readStatus, scheduler, chatHandlers, actividad }));
 app.use(
   '/api/departments',
@@ -283,12 +287,23 @@ if (revisorPRsAgent) {
   app.use('/api/revisiones-pr', createRevisionesPRRouter({ filePath: revisorPRsAgent.deps.revisionesPath }));
 }
 app.use('/api/comunicacion', createComunicacionRouter({ comunicacion, conversaciones }));
-app.use(createWhatsappRouter({ whatsapp, recepcion: recepcionWhatsapp, config: config.whatsapp, registrar: registrarWhatsapp }));
+app.use(createWhatsappEstadoRouter({ whatsapp, recepcion: recepcionWhatsapp }));
 app.use(express.static(path.join(ROOT, 'frontend')));
 
 app.listen(config.port, () => {
   console.log(`Servidor corriendo en http://localhost:${config.port}`);
   scheduler.start();
 });
+
+// El webhook de WhatsApp vive en OTRA app y OTRO puerto: es lo único que se expone con ngrok,
+// así la oficina (puerto principal) nunca queda en internet.
+const webhookApp = createWhatsappWebhookApp({ whatsapp, recepcion: recepcionWhatsapp, config: config.whatsapp, registrar: registrarWhatsapp });
+if (whatsapp.estado().ok) {
+  webhookApp.listen(config.whatsapp.webhookPort, () => {
+    console.log(
+      `Webhook de WhatsApp escuchando en http://localhost:${config.whatsapp.webhookPort}/webhook/whatsapp (apunta ngrok a este puerto)`
+    );
+  });
+}
 
 module.exports = app;
