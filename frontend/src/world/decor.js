@@ -21,6 +21,7 @@ import {
   createReceptionDesk,
 } from './furniture.js';
 import { buildShell, mirrorFor } from './room.js';
+import { trimShadows, mergeStatic } from './optimize.js';
 
 const WHITE = 0xf4f5f3;
 const STEEL = 0x9aa1a9;
@@ -197,6 +198,8 @@ export function buildDecorRoom({ tipo, label, theme = DECOR_THEMES[tipo], center
   }[tipo] || {};
   buildShell({ group, W, D, theme, label, rng, sideSign, ...shell });
   FURNISH[tipo]?.({ group, put, W, D, theme, rng, updatables });
+  trimShadows(group);
+  mergeStatic(group);
 
   return {
     group,

@@ -369,7 +369,8 @@ export class Screen {
 
   update(status, t) {
     const animated = status === 'trabajando' || status === 'error';
-    if (status === this.status && (!animated || t - this.lastDraw < 0.1)) return;
+    // Animación a ~4 cuadros por segundo: redibujar el canvas y subir la textura cuesta.
+    if (status === this.status && (!animated || t - this.lastDraw < 0.25)) return;
     this.status = status;
     this.lastDraw = t;
     this.draw(status, t);

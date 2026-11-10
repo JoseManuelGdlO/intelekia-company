@@ -7,6 +7,7 @@ import { buildRoom, computeRoomSize, WALL_T } from './world/room.js';
 import { buildDecorRoom } from './world/decor.js';
 import { createCharacter } from './world/character.js';
 import { createEntrance, createPlant } from './world/furniture.js';
+import { trimShadows } from './world/optimize.js';
 import { BRAND } from './world/brand.js';
 
 export const STATUS_COLORS = {
@@ -72,6 +73,28 @@ function slotSize(slot) {
   return computeRoomSize(slot.department.agents.length);
 }
 
+/** Ajusta la cámara de sombras del sol para cubrir justo el edificio y la entrada. */
+function fitShadowCamera(sun, bounds) {
+  const probe = new THREE.OrthographicCamera();
+  probe.position.copy(sun.position);
+  probe.lookAt(sun.target.position);
+  probe.updateMatrixWorld(true);
+  const box = new THREE.Box3();
+  const p = new THREE.Vector3();
+  [bounds.minX - 1, bounds.maxX + 1].forEach((x) => [bounds.minZ - 1, bounds.maxZ + 4].forEach((z) => [0, 3].forEach((y) => {
+    box.expandByPoint(p.set(x, y, z).applyMatrix4(probe.matrixWorldInverse));
+  })));
+  Object.assign(sun.shadow.camera, {
+    left: box.min.x,
+    right: box.max.x,
+    bottom: box.min.y,
+    top: box.max.y,
+    near: Math.max(0.5, -box.max.z - 1),
+    far: -box.min.z + 1,
+  });
+  sun.shadow.camera.updateProjectionMatrix();
+}
+
 function createAgentTag(label, accent) {
   const el = document.createElement('div');
   el.className = 'agent-tag status-idle';
@@ -97,10 +120,10 @@ export function createScene({ container, departments, onAgentClick }) {
   scene.fog = new THREE.Fog(0xdfe9e6, 45, 110);
 
   const renderer = new THREE.WebGLRenderer({ antialias: true });
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));
   renderer.setSize(container.clientWidth, container.clientHeight);
   renderer.shadowMap.enabled = true;
-  renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+  renderer.shadowMap.type = THREE.PCFShadowMap;
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
   renderer.toneMappingExposure = 1.05;
   container.appendChild(renderer.domElement);
@@ -263,7 +286,7 @@ export function createScene({ container, departments, onAgentClick }) {
   scene.add(entrance);
 
   // Piso exterior
-  const ground = new THREE.Mesh(new THREE.CircleGeometry(Math.max(totalWidth, maxDepth) * 1.6 + 20, 64), new THREE.MeshStandardMaterial({ color: 0xcdd8d4, roughness: 0.95 }));
+  const ground = new THREE.Mesh(new THREE.CircleGeometry(Math.max(totalWidth, maxDepth) * 1.6 + 20, 48), new THREE.MeshStandardMaterial({ color: 0xcdd8d4, roughness: 0.95 }));
   ground.rotation.x = -Math.PI / 2;
   ground.position.y = -0.11;
   ground.receiveShadow = true;
@@ -275,9 +298,8 @@ export function createScene({ container, departments, onAgentClick }) {
   sun.position.set(midX - totalWidth * 0.3 - 6, 22, maxDepth * 0.6 + 10);
   sun.target.position.set(midX, 0, 0);
   sun.castShadow = true;
-  sun.shadow.mapSize.set(4096, 4096);
-  const half = Math.max(totalWidth, maxDepth) / 2 + 6;
-  Object.assign(sun.shadow.camera, { left: -half, right: half, top: half, bottom: -half, near: 1, far: 80 });
+  sun.shadow.mapSize.set(2048, 2048);
+  fitShadowCamera(sun, bounds);
   sun.shadow.bias = -0.0004;
   sun.shadow.normalBias = 0.02;
   scene.add(sun, sun.target);
@@ -594,10 +616,66 @@ export function createScene({ container, departments, onAgentClick }) {
     });
   }
 
-  // --- Loop ---
+  // --- Loop (pausa con la pestaña oculta y calidad adaptable) ---
   const clock = new THREE.Clock();
+  const BLUR_IDLE_MS = 20000; // tras 20 s sin foco se dibuja a ~2 cuadros por segundo
+  let rafId = null;
+  let blurredAt = null;
+  let lastFrameAt = 0;
+  const perf = { frames: 0, since: performance.now(), degraded: false, frame: 0 };
+
+  /** Si el promedio de ~3 s baja de 30 fps: menos resolución y sombras cada dos cuadros. */
+  function adaptQuality(now) {
+    perf.frames += 1;
+    const elapsed = now - perf.since;
+    if (elapsed < 3000) return;
+    const fps = (perf.frames * 1000) / elapsed;
+    perf.frames = 0;
+    perf.since = now;
+    if (perf.degraded || fps >= 30) return;
+    perf.degraded = true;
+    renderer.setPixelRatio(1);
+    renderer.setSize(container.clientWidth, container.clientHeight);
+    renderer.shadowMap.autoUpdate = false;
+    renderer.shadowMap.needsUpdate = true;
+    Object.values(agents).forEach((entry) => trimShadows(entry.character.root, { minSize: 0.35, minThickness: 0.08 }));
+  }
+
+  function resetPerfWindow() {
+    perf.frames = 0;
+    perf.since = performance.now();
+  }
+
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden) {
+      if (rafId !== null) cancelAnimationFrame(rafId);
+      rafId = null;
+    } else if (rafId === null) {
+      clock.getDelta(); // no "saltar" el tiempo acumulado mientras estuvo oculta
+      resetPerfWindow();
+      animate();
+    }
+  });
+  window.addEventListener('blur', () => {
+    blurredAt = performance.now();
+  });
+  window.addEventListener('focus', () => {
+    blurredAt = null;
+    resetPerfWindow();
+  });
+
   function animate() {
-    requestAnimationFrame(animate);
+    rafId = requestAnimationFrame(animate);
+    const now = performance.now();
+    if (blurredAt !== null && now - blurredAt > BLUR_IDLE_MS) {
+      if (now - lastFrameAt < 500) return;
+      resetPerfWindow();
+    } else {
+      adaptQuality(now);
+    }
+    lastFrameAt = now;
+    perf.frame += 1;
+    if (perf.degraded) renderer.shadowMap.needsUpdate = perf.frame % 2 === 0;
     const rawDt = clock.getDelta();
     const dt = Math.min(rawDt, 0.05);
     const t = clock.elapsedTime;

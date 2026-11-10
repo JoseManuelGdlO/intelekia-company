@@ -42,24 +42,38 @@ function prep(mesh) {
   return mesh;
 }
 
+// Geometrías compartidas: la misma medida se crea una sola vez (no se deben modificar ni liberar).
+const geometryCache = new Map();
+function cachedGeometry(key, make) {
+  if (!geometryCache.has(key)) geometryCache.set(key, make());
+  return geometryCache.get(key);
+}
+const r3 = (n) => Math.round(n * 1000) / 1000;
+
 export function box(w, h, d, material) {
-  return prep(new THREE.Mesh(new THREE.BoxGeometry(w, h, d), material));
+  const geo = cachedGeometry(`box|${r3(w)}|${r3(h)}|${r3(d)}`, () => new THREE.BoxGeometry(w, h, d));
+  return prep(new THREE.Mesh(geo, material));
 }
 
 export function rbox(w, h, d, r, material) {
-  return prep(new THREE.Mesh(new RoundedBoxGeometry(w, h, d, 3, Math.min(r, w / 2, h / 2, d / 2)), material));
+  const rr = Math.min(r, w / 2, h / 2, d / 2);
+  const geo = cachedGeometry(`rbox|${r3(w)}|${r3(h)}|${r3(d)}|${r3(rr)}`, () => new RoundedBoxGeometry(w, h, d, 2, rr));
+  return prep(new THREE.Mesh(geo, material));
 }
 
 export function cyl(rt, rb, h, material, seg = 20) {
-  return prep(new THREE.Mesh(new THREE.CylinderGeometry(rt, rb, h, seg), material));
+  const geo = cachedGeometry(`cyl|${r3(rt)}|${r3(rb)}|${r3(h)}|${seg}`, () => new THREE.CylinderGeometry(rt, rb, h, seg));
+  return prep(new THREE.Mesh(geo, material));
 }
 
 export function sphere(r, material, ws = 18, hs = 14) {
-  return prep(new THREE.Mesh(new THREE.SphereGeometry(r, ws, hs), material));
+  const geo = cachedGeometry(`sphere|${r3(r)}|${ws}|${hs}`, () => new THREE.SphereGeometry(r, ws, hs));
+  return prep(new THREE.Mesh(geo, material));
 }
 
 export function capsule(r, len, material) {
-  return prep(new THREE.Mesh(new THREE.CapsuleGeometry(r, len, 4, 12), material));
+  const geo = cachedGeometry(`capsule|${r3(r)}|${r3(len)}`, () => new THREE.CapsuleGeometry(r, len, 4, 12));
+  return prep(new THREE.Mesh(geo, material));
 }
 
 export function at(obj, x, y, z) {

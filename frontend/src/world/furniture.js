@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { mat, box, rbox, cyl, sphere, at, pick, shade } from './materials.js';
 import { BRAND } from './brand.js';
 import { iconTexture, logoPanelTexture } from './textures.js';
+import { keepDynamic, trimShadows, mergeStatic } from './optimize.js';
 
 let iconDecalMaterial = null;
 /** Calcomanía con el ícono de Intelekia (material compartido). */
@@ -41,9 +42,9 @@ export function createDesk({ rng, accent, screen }) {
   g.add(at(rbox(0.66, 0.4, 0.035, 0.012, mat(0x1d1f24, { roughness: 0.4 })), 0, 1.08, 0.16));
   const screenMesh = new THREE.Mesh(new THREE.PlaneGeometry(0.62, 0.36), screen.material);
   screenMesh.rotation.y = Math.PI;
-  g.add(at(screenMesh, 0, 1.08, 0.141));
+  g.add(at(keepDynamic(screenMesh), 0, 1.08, 0.141));
   const led = new THREE.Mesh(new THREE.SphereGeometry(0.018, 10, 8), new THREE.MeshBasicMaterial({ color: 0x888888, toneMapped: false }));
-  g.add(at(led, 0, 1.08, 0.18));
+  g.add(at(keepDynamic(led), 0, 1.08, 0.18));
 
   // Teclado y mouse
   g.add(at(rbox(0.45, 0.02, 0.15, 0.008, mat(0x2b2d33)), 0, 0.755, -0.17));
@@ -92,7 +93,11 @@ export function createDesk({ rng, accent, screen }) {
       g.add(at(box(0.22, 0.035, 0.16, mat(col)), 0.4, 0.765 + i * 0.036, 0.2));
     });
   }
-  return { group: g, led };
+  // Se fusiona por dentro (menos draw calls), pero el grupo queda aparte: se puede
+  // seleccionar y su pantalla/LED cambian.
+  trimShadows(g);
+  mergeStatic(g);
+  return { group: keepDynamic(g), led };
 }
 
 /** Silla de oficina con ruedas. Origen: centro del asiento a nivel de piso. */
@@ -111,6 +116,8 @@ export function createChair(accent) {
     g.add(at(leg, Math.cos(a) * 0.13, 0.06, -Math.sin(a) * 0.13));
     g.add(at(sphere(0.03, dark, 8, 6), Math.cos(a) * 0.26, 0.03, -Math.sin(a) * 0.26));
   }
+  trimShadows(g);
+  mergeStatic(g);
   return g;
 }
 
@@ -155,6 +162,12 @@ export function createPlant(rng, scale = 1) {
     }
   }
   g.scale.setScalar(scale);
+  // Las hojas se mecen (no se fusionan) y no proyectan sombra.
+  foliage.traverse((o) => {
+    if (o.isMesh) o.castShadow = false;
+  });
+  mergeStatic(foliage);
+  keepDynamic(foliage);
   const phase = rng() * Math.PI * 2;
   return {
     group: g,
@@ -321,7 +334,7 @@ export function createClock(accent) {
     g.add(at(box(0.015, i % 3 === 0 ? 0.06 : 0.035, 0.01, mat(0x222222)), Math.sin(a) * 0.2, Math.cos(a) * 0.2, 0.03));
   }
   const makeHand = (len, w, color) => {
-    const pivot = new THREE.Group();
+    const pivot = keepDynamic(new THREE.Group());
     pivot.position.z = 0.035;
     pivot.add(at(box(w, len, 0.008, mat(color)), 0, len / 2 - 0.02, 0));
     g.add(pivot);
@@ -330,9 +343,13 @@ export function createClock(accent) {
   const hourHand = makeHand(0.13, 0.022, 0x222222);
   const minHand = makeHand(0.19, 0.015, 0x222222);
   const secHand = makeHand(0.21, 0.006, 0xe63946);
+  let lastTick = -1;
   return {
     group: g,
-    update: () => {
+    update: (t) => {
+      // Basta con mover las manecillas unas 4 veces por segundo.
+      if (t !== undefined && Math.abs(t - lastTick) < 0.25) return;
+      lastTick = t;
       const d = new Date();
       const s = d.getSeconds() + d.getMilliseconds() / 1000;
       const m = d.getMinutes() + s / 60;

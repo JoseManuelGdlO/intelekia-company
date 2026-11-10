@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { mat, pick, at, box, rbox, sphere, cyl, shade } from './materials.js';
+import { keepDynamic, mergeStatic } from './optimize.js';
 
 const SKIN = [0xf1c27d, 0xe0ac69, 0xc68642, 0x8d5524, 0xffdbac, 0xd9a066, 0xb07a4f];
 const HAIR = [0x2c1b10, 0x4a2c17, 0x0f0f0f, 0x8b5a2b, 0xc89f5d, 0x6b4423, 0x9a3b2a, 0x1b1b2f];
@@ -35,7 +36,7 @@ function blob(r, material, [x, y, z], [sx, sy, sz], segs = [16, 12]) {
 
 /** Cápsula con más caras que la genérica: se ve lisa aunque la cámara esté muy cerca. */
 function smoothCapsule(r, len, material) {
-  const m = new THREE.Mesh(new THREE.CapsuleGeometry(r, len, 8, 20), material);
+  const m = new THREE.Mesh(new THREE.CapsuleGeometry(r, len, 6, 16), material);
   m.castShadow = true;
   return m;
 }
@@ -52,7 +53,7 @@ function colorDistance(a, b) {
 }
 
 function hairShell(r, hairMat, phiStart, phiLength, thetaStart, thetaLength) {
-  const m = new THREE.Mesh(new THREE.SphereGeometry(r, 32, 20, phiStart, phiLength, thetaStart, thetaLength), hairMat);
+  const m = new THREE.Mesh(new THREE.SphereGeometry(r, 24, 16, phiStart, phiLength, thetaStart, thetaLength), hairMat);
   m.castShadow = true;
   m.position.y = 0.165;
   return m;
@@ -205,7 +206,7 @@ export function createCharacter({ agentId, rng, accent, crowd = null }) {
   [-1, 1].forEach((s) => head.add(blob(0.024, blush, [s * 0.095, 0.122, 0.128], [1, 0.6, 0.35])));
   buildHair(look.style, hairMat, head);
   if (look.beard) {
-    const beard = new THREE.Mesh(new THREE.SphereGeometry(0.168, 32, 16, Math.PI * 0.05, Math.PI * 0.9, Math.PI * 0.56, Math.PI * 0.32), hairMat);
+    const beard = new THREE.Mesh(new THREE.SphereGeometry(0.168, 24, 12, Math.PI * 0.05, Math.PI * 0.9, Math.PI * 0.56, Math.PI * 0.32), hairMat);
     beard.position.set(0, 0.16, 0.004);
     beard.castShadow = true;
     head.add(beard);
@@ -272,6 +273,11 @@ export function createCharacter({ agentId, rng, accent, crowd = null }) {
   ring.position.y = 0.012;
   ring.renderOrder = 2;
   root.add(ring);
+
+  // Rendimiento: cada articulación queda aparte y sus piezas fijas se fusionan en pocas mallas.
+  const joints = [pelvis, torso, head, ...arms.flatMap((a) => [a.shoulder, a.elbow]), ...legs.flatMap((l) => [l.hip, l.knee])];
+  [...joints, ...eyes, ...arms.map((a) => a.hand), heldMug, ring].forEach(keepDynamic);
+  [root, ...joints, ...eyes].forEach(mergeStatic);
 
   root.traverse((o) => {
     if (o.isMesh) {

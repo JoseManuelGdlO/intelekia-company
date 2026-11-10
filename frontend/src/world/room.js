@@ -30,6 +30,7 @@ import {
   createLogoFrame,
   createRoundTable,
 } from './furniture.js';
+import { keepDynamic, trimShadows, mergeStatic } from './optimize.js';
 
 const MAX_COLS = 4;
 const DESK_SPACING_X = 2.3;
@@ -237,7 +238,7 @@ export function buildRoom({ department, theme, centerX, centerZ = 0, width, dept
     const screen = new Screen(accent, agent.id);
     const desk = createDesk({ rng: agentRng, accent, screen });
     put(group, desk.group, x, 0, z + 0.65);
-    const chair = createChair(accent);
+    const chair = keepDynamic(createChair(accent));
     put(group, chair, x, 0, z - 0.02);
     [desk.group, chair].forEach((obj) => obj.traverse((o) => {
       if (o.isMesh) o.userData.agentId = agent.id;
@@ -256,6 +257,10 @@ export function buildRoom({ department, theme, centerX, centerZ = 0, width, dept
 
   // Lugares de la zona de café, separados para que dos personas nunca queden encimadas.
   const spots = [0, 1, 2].map((k) => world(laneX + k * 0.75, spotZ));
+
+  // Rendimiento: sin sombras en objetos chicos y mallas estáticas fusionadas por material.
+  trimShadows(group);
+  mergeStatic(group);
 
   return {
     group,
