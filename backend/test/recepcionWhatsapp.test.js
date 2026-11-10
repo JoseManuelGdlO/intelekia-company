@@ -7,6 +7,7 @@ const { createRecepcionWhatsapp, crearEnrutadorIA, detectarPorNombre } = require
 const { createAprobaciones } = require('../lib/aprobaciones');
 
 const YO = '5218710000000';
+const YO_N = '528710000000'; // como se le contesta (sin el 1 de los celulares de México)
 const AGENTES = [
   { id: 'pm', label: 'PM', rol: 'Da seguimiento al equipo' },
   { id: 'cotizador', label: 'Cotizador', rol: 'Cotiza proyectos' },
@@ -79,7 +80,7 @@ test('ignora números no permitidos y mensajes repetidos', async () => {
   await r.procesar(msg('m1', 'PM hola'));
   await r.procesar(msg('m1', 'PM hola'));
   assert.equal(chats.length, 1);
-  assert.ok(enviados.every((e) => e.to === YO));
+  assert.ok(enviados.every((e) => e.to === YO_N));
 });
 
 test('por nombre: avisa, conversa con el trabajador y le contesta', async () => {
@@ -168,10 +169,10 @@ test('comandos: pendientes, aprobar y descartar por número corto', async () => 
   assert.match(textos(enviados).at(-1), /#1.*Instagram · carla.*#2.*Facebook · ana/s);
   await r.procesar(msg('m2', 'aprobar 1'));
   assert.equal(aprob.list({ estado: 'aprobado' })[0].id, a1.id);
-  assert.equal(textos(enviados).at(-1), '✅ #1 aprobado y ejecutado.');
+  assert.equal(textos(enviados).at(-1), '✅ #1 aprobado y ejecutado (Instagram · carla).');
   await r.procesar(msg('m3', 'Descartar #2'));
   assert.equal(aprob.list({ estado: 'descartado' })[0].id, a2.id);
-  assert.equal(textos(enviados).at(-1), '🗑️ #2 descartado.');
+  assert.equal(textos(enviados).at(-1), '🗑️ #2 descartado (Facebook · ana).');
   await r.procesar(msg('m4', 'aprobar 9'));
   assert.match(textos(enviados).at(-1), /No encuentro el pendiente #9/);
   await r.procesar(msg('m5', 'pendientes'));
@@ -206,16 +207,22 @@ test('fuera de la ventana con plantilla: una sola plantilla por periodo', async 
   await r.avisarAprobacion(aprob.proponer(ITEM));
   const plantillas = enviados.filter((e) => e.tipo === 'plantilla');
   assert.equal(plantillas.length, 1);
-  assert.deepEqual(plantillas[0], { to: YO, tipo: 'plantilla', nombre: 'aviso_pendientes', idioma: 'es_MX', params: ['1'] });
+  assert.deepEqual(plantillas[0], { to: YO_N, tipo: 'plantilla', nombre: 'aviso_pendientes', idioma: 'es_MX', params: ['1'] });
 });
 
-test('los números cortos vuelven a 1 cuando ya no hay pendientes', async () => {
-  const { r, enviados, aprob } = setup();
+test('los números cortos nunca se reutilizan, aunque ya no haya pendientes', async () => {
+  const { r, enviados, aprob, deps } = setup();
   await r.procesar(msg('m1', 'pendientes'));
   await r.avisarAprobacion(aprob.proponer(ITEM));
   await r.procesar(msg('m2', 'descartar 1'));
   await r.avisarAprobacion(aprob.proponer(ITEM));
-  assert.match(textos(enviados).at(-1), /✋ #1 /);
+  assert.match(textos(enviados).at(-1), /✋ #2 /);
+  await r.procesar(msg('m3', 'aprobar 1'));
+  assert.match(textos(enviados).at(-1), /No encuentro el pendiente #1/);
+  // también tras reiniciar (el contador se guarda)
+  const r2 = createRecepcionWhatsapp(deps);
+  await r2.avisarAprobacion(aprob.proponer(ITEM));
+  assert.match(textos(enviados).at(-1), /✋ #3 /);
 });
 
 test('estado dañado se respalda y el canal sigue funcionando', async () => {
@@ -233,6 +240,167 @@ test('estadoCanal enmascara números e indica la ventana', async () => {
   assert.deepEqual(r.estadoCanal(), { permitidos: ['…0000'], ventanas: { '…0000': false } });
   await r.procesar(msg('m1', 'pendientes'));
   assert.deepEqual(r.estadoCanal().ventanas, { '…0000': true });
+});
+
+test('normaliza los números de México: llega 521…, se compara y se contesta como 52…', async () => {
+  const { r, enviados, chats } = setup({ permitidos: [YO_N] });
+  await r.procesar(msg('m1', 'PM hola'));
+  assert.equal(chats.length, 1);
+  assert.ok(enviados.length > 0 && enviados.every((e) => e.to === YO_N));
+  assert.deepEqual(r.estadoCanal().ventanas, { '…0000': true });
+});
+
+test('mensajes viejos (reintentos de Meta) no ejecutan nada y se avisa', async () => {
+  const { r, enviados, chats, ciclos, aprob } = setup();
+  aprob.proponer(ITEM);
+  const largo = 'PM, revisa todo ahora por favor y dime qué pasó con los proyectos de esta semana y la anterior';
+  await r.procesar(msg('m1', largo, { fecha: '2026-11-10T11:45:00Z' }));
+  await r.procesar(msg('m2', 'aprobar 1', { fecha: '2026-11-10T11:40:00Z' }));
+  assert.equal(chats.length, 0);
+  assert.equal(ciclos.length, 0);
+  assert.equal(aprob.list({ estado: 'aprobado' }).length, 0);
+  const t = textos(enviados);
+  assert.equal(t.length, 2);
+  assert.match(t[0], /^⏰ Me llegó tarde tu mensaje del .*5:45/);
+  assert.ok(t[0].endsWith(`(«${largo.slice(0, 80)}»). Si aún lo necesitas, mándamelo de nuevo.`));
+  assert.ok(t[1].includes('(«aprobar 1»)'));
+  await r.procesar(msg('m3', 'PM hola', { fecha: '2026-11-10T11:55:00Z' }));
+  assert.equal(chats.length, 1);
+});
+
+test('la ventana de 24 h se cuenta desde la hora del mensaje, no desde que llegó', async () => {
+  const { r, enviados, aprob, reloj } = setup();
+  await r.procesar(msg('m1', 'pendientes', { fecha: '2026-11-10T11:51:00Z' }));
+  reloj.avanzar(24 * 3600 * 1000 - 5 * 60 * 1000);
+  const antes = enviados.length;
+  await r.avisarAprobacion(aprob.proponer(ITEM));
+  assert.equal(enviados.length, antes);
+});
+
+test('plantilla: dos avisos simultáneos mandan una sola; si falla se puede reintentar', async () => {
+  const lento = setup({ plantilla: { nombre: 'aviso', idioma: 'es_MX' } });
+  lento.deps.whatsapp.enviarPlantilla = async (to) => {
+    await new Promise((res) => setTimeout(res, 10));
+    lento.enviados.push({ to, tipo: 'plantilla' });
+  };
+  await Promise.all([lento.r.avisarAprobacion(lento.aprob.proponer(ITEM)), lento.r.avisarAprobacion(lento.aprob.proponer(ITEM))]);
+  assert.equal(lento.enviados.filter((e) => e.tipo === 'plantilla').length, 1);
+
+  const intentos = [];
+  const falla = setup({ plantilla: { nombre: 'aviso', idioma: 'es_MX' } });
+  falla.deps.whatsapp.enviarPlantilla = async () => {
+    intentos.push(1);
+    if (intentos.length === 1) throw new Error('caído');
+  };
+  await falla.r.avisarAprobacion(falla.aprob.proponer(ITEM));
+  await falla.r.avisarAprobacion(falla.aprob.proponer(ITEM));
+  await falla.r.avisarAprobacion(falla.aprob.proponer(ITEM));
+  assert.equal(intentos.length, 2);
+});
+
+test('los mensajes del mismo número se atienden en orden, uno tras otro', async () => {
+  const { r, enviados } = setup({
+    chatDe: async (id, texto) => {
+      await new Promise((res) => setTimeout(res, texto === 'primero' ? 30 : 1));
+      return `re: ${texto}`;
+    },
+  });
+  await Promise.all([r.procesar(msg('m1', 'PM primero')), r.procesar(msg('m2', 'PM segundo'))]);
+  assert.deepEqual(textos(enviados), ['⏳ Se lo paso a PM…', '*PM:* re: primero', '⏳ Se lo paso a PM…', '*PM:* re: segundo']);
+});
+
+test('comandos con puntuación y números en palabras (dictados por voz)', async () => {
+  const { r, enviados, aprob } = setup();
+  const items = [1, 2, 3].map((i) => aprob.proponer({ ...ITEM, titulo: `Item ${i}` }));
+  await r.procesar(msg('m1', 'Pendientes.'));
+  assert.match(textos(enviados).at(-1), /Tienes 3 pendiente/);
+  await r.procesar(msg('m2', '¿pendientes?'));
+  assert.match(textos(enviados).at(-1), /Tienes 3 pendiente/);
+  await r.procesar(msg('m3', 'Aprobar tres.'));
+  assert.equal(textos(enviados).at(-1), '✅ #3 aprobado y ejecutado (Item 3).');
+  assert.equal(aprob.list({ estado: 'aprobado' })[0].id, items[2].id);
+  await r.procesar(msg('m4', 'descarta #2!'));
+  assert.equal(textos(enviados).at(-1), '🗑️ #2 descartado (Item 2).');
+  await r.procesar(msg('m5', 'Aprueba uno'));
+  assert.equal(textos(enviados).at(-1), '✅ #1 aprobado y ejecutado (Item 1).');
+  await r.procesar(msg('m6', '?'));
+  assert.match(textos(enviados).at(-1), /Trabajadores:/);
+});
+
+test('detectarPorNombre: nombre sin la última palabra y palabras distintivas al inicio', () => {
+  assert.deepEqual(detectarPorNombre('Revisor de PR, revisa lo nuevo', AGENTES), { agente: AGENTES[5], resto: 'revisa lo nuevo' });
+  assert.deepEqual(detectarPorNombre('Tendencias: ideas para hoy', AGENTES), { agente: AGENTES[3], resto: 'ideas para hoy' });
+  assert.equal(detectarPorNombre('prospectos dame 5', AGENTES).agente.id, 'buscador-prospectos');
+  assert.equal(detectarPorNombre('Buscador de algo', AGENTES), null);
+  assert.equal(detectarPorNombre('hoy tendencias', AGENTES), null);
+  assert.equal(detectarPorNombre('de nada', AGENTES), null);
+});
+
+test('al contestar a "¿a quién se lo paso?" con el nombre (o casi) usa el mensaje pendiente', async () => {
+  const duda = async () => ({ agentId: null, accion: 'chat', duda: ['buscador-tendencias', 'buscador-prospectos'] });
+  const casos = [
+    ['Prospectos', 'Búscame algo nuevo'],
+    ['Buscador de Prospectos, va', 'Búscame algo nuevo'],
+    ['Prospectos porfa', 'porfa'],
+  ];
+  for (const [respuesta, esperado] of casos) {
+    const { r, chats } = setup({ enrutarConIA: duda });
+    await r.procesar(msg('m1', 'Búscame algo nuevo'));
+    await r.procesar(msg('m2', respuesta));
+    assert.deepEqual(chats, [{ id: 'buscador-prospectos', texto: esperado }], respuesta);
+  }
+  const { r, chats } = setup({ enrutarConIA: duda });
+  await r.procesar(msg('m1', 'Búscame algo nuevo'));
+  await r.procesar(msg('m2', 'Seguimiento proyectos'));
+  assert.deepEqual(chats, [{ id: 'seguimiento-crm', texto: 'Búscame algo nuevo' }]);
+});
+
+test('solo se pregunta a la IA por el ciclo si el texto lo sugiere (por nombre y en seguimiento)', async () => {
+  const rutas = [];
+  const { r, chats, ciclos } = setup({
+    enrutarConIA: async (texto, lista) => {
+      rutas.push({ texto, ids: lista.map((a) => a.id) });
+      return { agentId: lista[0].id, accion: /ciclo/.test(texto) ? 'forzar_ciclo' : 'chat', duda: [] };
+    },
+  });
+  await r.procesar(msg('m1', 'PM, ¿cómo va el equipo?'));
+  assert.equal(rutas.length, 0);
+  await r.procesar(msg('m2', '¿y ayer?'));
+  assert.equal(rutas.length, 0);
+  assert.deepEqual(chats.map((c) => c.id), ['pm', 'pm']);
+  await r.procesar(msg('m3', 'Corre tu ciclo ahora.'));
+  assert.deepEqual(rutas, [{ texto: 'Corre tu ciclo ahora.', ids: ['pm'] }]);
+  assert.deepEqual(ciclos, ['pm']);
+});
+
+test('el seguimiento de 15 min cuenta desde que llegó la respuesta', async () => {
+  const chats = [];
+  const { r, rutas, reloj } = setup({
+    chatDe: async (id, texto) => {
+      chats.push({ id, texto });
+      reloj.avanzar(14 * 60 * 1000); // el trabajador tardó en contestar
+      return 'ok';
+    },
+  });
+  await r.procesar(msg('m1', 'PM, ¿cómo va el equipo?'));
+  reloj.avanzar(10 * 60 * 1000);
+  await r.procesar(msg('m2', '¿y ayer?'));
+  assert.deepEqual(chats.map((c) => c.id), ['pm', 'pm']);
+  assert.equal(rutas.length, 0);
+});
+
+test('si el comando es "pendientes" no repite los avisos acumulados', async () => {
+  const { r, enviados, aprob, reloj } = setup();
+  await r.procesar(msg('m1', 'pendientes'));
+  reloj.avanzar(25 * 3600 * 1000);
+  await r.avisarAprobacion(aprob.proponer(ITEM));
+  const antes = enviados.length;
+  await r.procesar(msg('m2', 'pendientes'));
+  const nuevos = textos(enviados.slice(antes));
+  assert.equal(nuevos.length, 1);
+  assert.match(nuevos[0], /Tienes 1 pendiente/);
+  await r.procesar(msg('m3', 'PM hola'));
+  assert.ok(!textos(enviados.slice(antes)).some((t) => /Mientras no estabas/.test(t)));
 });
 
 test('crearEnrutadorIA valida la respuesta del modelo', async () => {

@@ -26,7 +26,8 @@ Fuera de alcance: otros usuarios (solo números permitidos), imágenes/documento
 
 ### Configuración (`.env` / `config.js` → `config.whatsapp`)
 `WHATSAPP_TOKEN`, `WHATSAPP_PHONE_NUMBER_ID`, `WHATSAPP_VERIFY_TOKEN`, `WHATSAPP_APP_SECRET`,
-`WHATSAPP_PERMITIDOS` (coma separada, formato internacional sin `+`, p. ej. `5218711234567`),
+`WHATSAPP_PERMITIDOS` (coma separada, formato internacional sin `+`, p. ej. `528711234567`; los celulares
+de México que Meta manda como `521…` se normalizan a `52…` con `normalizarNumero`), `WHATSAPP_WEBHOOK_PORT` (3100),
 `WHATSAPP_PLANTILLA_AVISO` (opcional, plantilla con un parámetro numérico), `WHATSAPP_PLANTILLA_IDIOMA`
 (por defecto `es_MX`), `WHATSAPP_API_VERSION` (por defecto `v21.0`), `WHATSAPP_VOZ` (por defecto `alloy`).
 
@@ -48,13 +49,19 @@ Fuera de alcance: otros usuarios (solo números permitidos), imágenes/documento
 `createRecepcionWhatsapp({ whatsapp, voz, estadoPath, agentes, chatDe, forzarCiclo, aprobaciones, enrutarConIA, labelOf, registrar, plantilla, now })`
 - `agentes()` → `[{ id, label, rol }]` (rol resumido a 300 caracteres).
 - `procesar(mensaje)`:
-  1. Ignora números no permitidos (lo registra) y mensajes ya vistos (guarda últimos 500 ids).
-  2. Actualiza `ultimoMensaje[de]` (ventana de 24 h). Si había avisos acumulados, primero los entrega.
+  1. Ignora números no permitidos (lo registra) y mensajes ya vistos (guarda últimos 500 ids). El número
+     se normaliza (`521…` → `52…`). Los mensajes de un mismo número se atienden en orden, uno tras otro.
+  2. Actualiza `ultimoMensaje[de]` con la hora del mensaje (`fecha`; ventana de 24 h). Si el mensaje tiene más
+     de 10 min (reintento de Meta), no ejecuta nada y contesta `⏰ Me llegó tarde tu mensaje del <hora> («…»)…`.
+     Si había avisos acumulados, primero los entrega (salvo que el mensaje sea `pendientes`).
   3. Audio → `descargarMedia` + `transcribir`; responde con lo entendido si falla.
-  4. Comandos: `pendientes` | `aprobar N` | `descartar N` | `ayuda`.
-  5. Ruteo: nombre al inicio (sin acentos/mayúsculas, por label completo o primera palabra si es única) →
-     agente; si no, seguimiento (último agente < 15 min); si no, `enrutarConIA(texto, agentes)` →
-     `{ agentId | null, accion: 'chat'|'forzar_ciclo', duda?: [ids] }`. Con duda → pregunta.
+  4. Comandos: `pendientes` | `aprobar N` | `descartar N` | `ayuda` (ignora puntuación y acepta números en
+     palabra: "Aprobar tres." → `aprobar 3`).
+  5. Ruteo: nombre al inicio (sin acentos/mayúsculas, por label completo, sin la última palabra o en singular,
+     primera palabra si es única o una palabra que solo tiene ese nombre) → agente; si no, seguimiento (último
+     agente < 15 min desde la última respuesta); si no, `enrutarConIA(texto, agentes)` →
+     `{ agentId | null, accion: 'chat'|'forzar_ciclo', duda?: [ids] }`. Con duda → pregunta. Por nombre o en
+     seguimiento solo se pregunta a la IA "¿chat o ciclo?" si el texto menciona ciclo/corre/ejecuta/revisa/genera/ahora/forzar.
   6. Aviso `⏳ Se lo paso a <label>…`; ejecuta `chatDe(agentId, texto)` → respuesta, o
      `forzarCiclo(agentId)` → `ultimaAccion`.
   7. Responde `*<label>:* <texto>`; si el mensaje fue audio, además nota de voz (si la voz falla, solo texto).
@@ -63,7 +70,8 @@ Fuera de alcance: otros usuarios (solo números permitidos), imágenes/documento
 - Estado persistente en `backend/state/whatsapp.json` (ignorado en git): `ultimoMensaje`, `vistos`,
   `numeros` (n → id de aprobación), `siguienteNumero`, `colaAvisos`, `ultimoAgente`, `plantillaEnviadaEn`.
   Escritura atómica; archivo dañado → respaldo `.corrupto-<ms>` y estado vacío.
-- Números cortos: se reutilizan desde 1 cuando ya no hay pendientes abiertos.
+- Números cortos: los números cortos nunca se reutilizan (`siguienteNumero` solo crece), para que un `aprobar N`
+  viejo nunca apruebe otra cosa; la confirmación repite el título del pendiente.
 
 ### Enrutador con IA (`enrutarConIA`)
 Llamada al modelo sin herramientas (`ajustarHerramientas` vacío, `sinMemoria: true`) con la lista de
@@ -76,8 +84,11 @@ desconocido → pregunta al fundador con la lista de trabajadores.
 - `POST /webhook/whatsapp`: verifica firma con el cuerpo crudo; responde 200 de inmediato y procesa en
   segundo plano cada mensaje (`recepcion.procesar`), sin bloquear.
 - `GET /api/whatsapp/estado`: `{ configurado, permitidos (enmascarados), ventanaAbierta }` para la oficina.
-- `server.js`: `express.json({ verify })` guarda `req.rawBody`; la bandeja de aprobaciones avisa a la
-  recepción al crear un pendiente (`aprobaciones.suscribir(fn)`).
+- El webhook se sirve desde una app de Express APARTE (`createWhatsappWebhookApp`) en su propio puerto
+  (`WHATSAPP_WEBHOOK_PORT`, 3100): solo `express.json({ limit: '1mb', verify })` (guarda `req.rawBody`), las dos
+  rutas del webhook y 404 para todo lo demás. Solo se levanta si la configuración está completa. El estado
+  (`createWhatsappEstadoRouter`) se monta en la app de la oficina.
+- `server.js`: la bandeja de aprobaciones avisa a la recepción al crear un pendiente (`aprobaciones.suscribir(fn)`).
 
 ### Cambios en módulos existentes
 - `lib/aprobaciones.js`: `suscribir(fn)` — llama a `fn(item)` tras cada `proponer` (errores del listener no rompen).
@@ -98,6 +109,8 @@ cortos), rutas del webhook (verificación, firma, 200 inmediato), `aprobaciones.
 ## Validación en vivo (requiere al fundador)
 1. App en developers.facebook.com con el producto WhatsApp; número de la oficina; token permanente de
    usuario del sistema con `whatsapp_business_messaging` y `whatsapp_business_management`.
-2. ngrok con dominio fijo apuntando al puerto de la oficina; en Meta configurar el webhook
-   `https://<dominio>/webhook/whatsapp` con el verify token y suscribir `messages`.
+2. ngrok con dominio fijo apuntando al puerto del webhook (`WHATSAPP_WEBHOOK_PORT`, por defecto 3100),
+   NUNCA al puerto de la oficina (3000): `ngrok http --domain=<dominio> 3100`. En Meta configurar el webhook
+   `https://<dominio>/webhook/whatsapp` con el verify token y suscribir `messages`. Comprobar que
+   `https://<dominio>/api/agents` responde 404.
 3. Variables en `backend/.env`, reiniciar, mandar texto, audio, `pendientes`, `aprobar N`, forzar ciclo.
