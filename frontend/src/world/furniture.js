@@ -465,6 +465,57 @@ export function createLogoFrame(w = 1.0, h = 1.0) {
   return g;
 }
 
+/** Mesa redonda con sillas alrededor mirando al centro. Origen: centro de la mesa a nivel de piso. */
+export function createRoundTable({ accent, chairs = 4, radius = 0.6, top = WOOD_LIGHT }) {
+  const g = new THREE.Group();
+  g.add(at(cyl(radius, radius, 0.05, mat(top, { roughness: 0.5 }), 32), 0, 0.74, 0));
+  g.add(at(cyl(0.05, 0.05, 0.7, mat(METAL, { metalness: 0.6, roughness: 0.4 }), 12), 0, 0.37, 0));
+  g.add(at(cyl(0.3, 0.32, 0.03, mat(METAL, { metalness: 0.6, roughness: 0.4 }), 20), 0, 0.015, 0));
+  const reach = radius + 0.38;
+  for (let i = 0; i < chairs; i += 1) {
+    const a = (i / chairs) * Math.PI * 2 + Math.PI / chairs;
+    const chair = createChair(accent);
+    chair.rotation.y = a + Math.PI;
+    g.add(at(chair, Math.sin(a) * reach, 0, Math.cos(a) * reach));
+  }
+  return g;
+}
+
+/** Sillón individual acolchonado. Mira hacia +z. */
+export function createArmchair(color, accent) {
+  const g = new THREE.Group();
+  const fabric = mat(color, { roughness: 0.9 });
+  g.add(at(rbox(0.9, 0.32, 0.8, 0.06, fabric), 0, 0.22, 0));
+  g.add(at(rbox(0.62, 0.14, 0.62, 0.06, mat(shade(color, 0.12), { roughness: 0.95 })), 0, 0.44, 0.05));
+  g.add(at(rbox(0.9, 0.55, 0.2, 0.08, fabric), 0, 0.6, -0.3));
+  [-0.38, 0.38].forEach((x) => g.add(at(rbox(0.16, 0.48, 0.8, 0.06, fabric), x, 0.4, 0)));
+  const pillow = rbox(0.32, 0.3, 0.1, 0.05, mat(accent, { roughness: 0.9 }));
+  pillow.rotation.x = -0.25;
+  g.add(at(pillow, 0, 0.66, -0.15));
+  return g;
+}
+
+/** Mostrador de recepción con monitor (la pantalla mira a -z, hacia quien atiende). */
+export function createReceptionDesk(accent) {
+  const g = new THREE.Group();
+  g.add(at(rbox(2.6, 1.05, 0.6, 0.03, mat(WHITE, { roughness: 0.5 })), 0, 0.525, 0));
+  g.add(at(box(2.7, 0.05, 0.75, mat(WOOD_LIGHT, { roughness: 0.5 })), 0, 1.075, 0.05));
+  g.add(at(box(2.62, 0.08, 0.02, mat(accent)), 0, 0.82, 0.305));
+  g.add(at(createLogoDecal(0.42), 0, 0.5, 0.31));
+  // Escritorio interior más bajo
+  g.add(at(box(2.4, 0.04, 0.5, mat(WOOD_LIGHT)), 0, 0.74, -0.5));
+  g.add(at(rbox(0.66, 0.4, 0.035, 0.012, mat(0x1d1f24, { roughness: 0.4 })), 0.4, 1.04, -0.55));
+  g.add(at(box(0.04, 0.26, 0.03, mat(METAL)), 0.4, 0.86, -0.53));
+  const glow = new THREE.Mesh(new THREE.PlaneGeometry(0.62, 0.36), new THREE.MeshBasicMaterial({ color: 0x9fd8c8, toneMapped: false }));
+  glow.rotation.y = Math.PI;
+  g.add(at(glow, 0.4, 1.04, -0.57));
+  g.add(at(rbox(0.45, 0.02, 0.15, 0.008, mat(0x2b2d33)), 0.4, 0.77, -0.75));
+  // Campanita y folletos
+  g.add(at(cyl(0.06, 0.07, 0.05, mat(0xd4a017, { metalness: 0.8, roughness: 0.25 }), 14), -0.8, 1.125, 0.15));
+  g.add(at(box(0.25, 0.02, 0.32, mat(accent)), -0.3, 1.11, 0.15));
+  return g;
+}
+
 /** Entrada de la oficina: tapete con logo y tótem de bienvenida. */
 export function createEntrance() {
   const g = new THREE.Group();

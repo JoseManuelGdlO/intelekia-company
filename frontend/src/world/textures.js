@@ -337,6 +337,20 @@ export function rugTexture(color) {
   return toTexture(c);
 }
 
+/** Piso de azulejo claro (baño). */
+export function tileFloorTexture(base, repeat) {
+  const { c, ctx } = makeCanvas(256, 256);
+  ctx.fillStyle = hex(shade(base, -0.12));
+  ctx.fillRect(0, 0, 256, 256);
+  for (let i = 0; i < 4; i += 1) {
+    for (let j = 0; j < 4; j += 1) {
+      ctx.fillStyle = hex(shade(base, (i + j) % 2 ? 0.0 : 0.06));
+      ctx.fillRect(i * 64 + 2, j * 64 + 2, 60, 60);
+    }
+  }
+  return toTexture(c, repeat);
+}
+
 const CODE_COLORS = ['#7aa2f7', '#9ece6a', '#e0af68', '#bb9af7', '#f7768e', '#c0caf5', '#7dcfff'];
 
 /** Pantalla de monitor animada según el estatus del agente. */

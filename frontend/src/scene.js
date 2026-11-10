@@ -3,9 +3,10 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { CSS2DRenderer, CSS2DObject } from 'three/addons/renderers/CSS2DRenderer.js';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { themeFor, hashString, seededRandom, hex } from './world/materials.js';
-import { buildRoom, computeRoomSize } from './world/room.js';
+import { buildRoom, computeRoomSize, WALL_T } from './world/room.js';
+import { buildDecorRoom } from './world/decor.js';
 import { createCharacter } from './world/character.js';
-import { createEntrance } from './world/furniture.js';
+import { createEntrance, createPlant } from './world/furniture.js';
 import { BRAND } from './world/brand.js';
 
 export const STATUS_COLORS = {
@@ -22,11 +23,53 @@ export const STATUS_LABELS = {
   error: 'Error',
 };
 
-const ROOM_GAP = 1.4;
+const CORRIDOR_W = 3.0;
+const MIN_ROOM_W = 9.5;
+const MIN_ROW_D = 7.0;
+const BANO_W = 3.8;
+const CAFE_MIN_W = 7.0;
 const CLICK_DRAG_TOLERANCE = 6;
 
 function easeInOutCubic(x) {
   return x < 0.5 ? 4 * x * x * x : 1 - (-2 * x + 2) ** 3 / 2;
+}
+
+/**
+ * Planta de la oficina (vista desde arriba, el frente/entrada es +Z):
+ *   Desarrollo | pasillo | Diseño
+ *   Ventas     | pasillo | Dirección y Reuniones
+ *   Recepción  | pasillo | Café · Baño
+ *                ENTRADA
+ * Los departamentos que no estén en el plano se agregan en filas extra al fondo.
+ */
+const PLANTA = [
+  { left: { dept: 'desarrollo', label: 'Desarrollo' }, right: { dept: 'marketing', label: 'Diseño' } },
+  { left: { dept: 'comercial', label: 'Ventas' }, right: { dept: 'administracion', label: 'Dirección y Reuniones' } },
+  { left: { decor: 'recepcion', label: 'Recepción' }, right: { decor: 'cafe-bano' } },
+];
+
+/** Arma la cuadrícula de filas (del fondo al frente) con lo que cada lugar contiene. */
+function planLayout(departments) {
+  const byId = new Map(departments.map((d, index) => [d.id, { department: d, index }]));
+  const fill = (slot) => {
+    if (!slot) return null;
+    if (slot.decor) return { ...slot };
+    const found = byId.get(slot.dept);
+    return found ? { ...found, label: slot.label } : null;
+  };
+  const mapped = new Set(PLANTA.flatMap((r) => [r.left?.dept, r.right?.dept]).filter(Boolean));
+  const extras = departments.map((d, index) => ({ department: d, index })).filter(({ department }) => !mapped.has(department.id));
+  const extraRows = [];
+  for (let i = 0; i < extras.length; i += 2) extraRows.unshift({ left: extras[i], right: extras[i + 1] || null });
+  return [...extraRows, ...PLANTA.map((r) => ({ left: fill(r.left), right: fill(r.right) }))];
+}
+
+/** Tamaño mínimo que pide un lugar de la cuadrícula. */
+function slotSize(slot) {
+  if (!slot) return { width: 0, depth: 0 };
+  if (slot.decor === 'cafe-bano') return { width: CAFE_MIN_W + BANO_W + WALL_T, depth: MIN_ROW_D };
+  if (slot.decor) return { width: MIN_ROOM_W, depth: MIN_ROW_D };
+  return computeRoomSize(slot.department.agents.length);
 }
 
 function createAgentTag(label, accent) {
@@ -70,11 +113,25 @@ export function createScene({ container, departments, onAgentClick }) {
   const pmrem = new THREE.PMREMGenerator(renderer);
   scene.environment = pmrem.fromScene(new RoomEnvironment(renderer), 0.04).texture;
 
-  // --- Oficinas en fila a lo largo de X ---
-  const sizes = departments.map((d) => computeRoomSize(d.agents.length));
-  const totalWidth = sizes.reduce((acc, s) => acc + s.width, 0) + ROOM_GAP * Math.max(departments.length - 1, 0);
-  const maxDepth = Math.max(...sizes.map((s) => s.depth), 6);
-  let cursor = -totalWidth / 2;
+  // --- Planta: dos columnas de salas con un pasillo central ---
+  const rows = planLayout(departments);
+  const colW = { left: MIN_ROOM_W, right: MIN_ROOM_W };
+  rows.forEach((r) => ['left', 'right'].forEach((side) => {
+    colW[side] = Math.max(colW[side], slotSize(r[side]).width);
+  }));
+  const rowD = rows.map((r) => Math.max(MIN_ROW_D, slotSize(r.left).depth, slotSize(r.right).depth));
+  const totalDepth = rowD.reduce((acc, d) => acc + d + WALL_T, 0);
+  const bounds = {
+    minX: -CORRIDOR_W / 2 - colW.left - WALL_T,
+    maxX: CORRIDOR_W / 2 + colW.right + WALL_T,
+    minZ: -totalDepth / 2,
+    maxZ: totalDepth / 2,
+  };
+  const totalWidth = bounds.maxX - bounds.minX;
+  const maxDepth = totalDepth;
+  const midX = (bounds.minX + bounds.maxX) / 2;
+  const colCenter = { left: -CORRIDOR_W / 2 - colW.left / 2, right: CORRIDOR_W / 2 + colW.right / 2 };
+  const sideSign = { left: -1, right: 1 };
 
   const rooms = [];
   const agents = {};
@@ -101,11 +158,16 @@ export function createScene({ container, departments, onAgentClick }) {
     };
   }
 
-  departments.forEach((department, index) => {
+  const decorRooms = [];
+  function addDecor(opts) {
+    const room = buildDecorRoom(opts);
+    scene.add(room.group);
+    decorRooms.push(room);
+  }
+
+  function buildDepartmentRoom({ department, index, label }, placement) {
     const theme = themeFor(department.id, index);
-    const { width } = sizes[index];
-    const room = buildRoom({ department, theme, centerX: cursor + width / 2 });
-    cursor += width + ROOM_GAP;
+    const room = buildRoom({ department, theme, label, ...placement });
     scene.add(room.group);
     rooms.push({ id: department.id, ...room });
     spotOwners.set(department.id, (room.spots || []).map((pos) => ({ pos, owner: null })));
@@ -149,14 +211,58 @@ export function createScene({ container, departments, onAgentClick }) {
         department: department.id,
       };
     });
+  }
+
+  let zCursor = bounds.minZ;
+  rows.forEach((row, r) => {
+    const depth = rowD[r];
+    zCursor += WALL_T;
+    const centerZ = zCursor + depth / 2;
+    zCursor += depth;
+    ['left', 'right'].forEach((side) => {
+      const slot = row[side];
+      if (!slot) return;
+      const width = colW[side];
+      const centerX = colCenter[side];
+      const sx = sideSign[side];
+      if (slot.decor === 'cafe-bano') {
+        // Café junto al pasillo y baño pequeño hacia el exterior, separados por una partición.
+        const cafeW = width - BANO_W - WALL_T;
+        const inner = centerX - (sx * width) / 2;
+        addDecor({ tipo: 'cafe', label: 'Café', centerX: inner + sx * (cafeW / 2), centerZ, width: cafeW, depth, sideSign: sx });
+        addDecor({ tipo: 'bano', label: 'Baño', centerX: inner + sx * (cafeW + WALL_T + BANO_W / 2), centerZ, width: BANO_W, depth, sideSign: sx });
+      } else if (slot.decor) {
+        addDecor({ tipo: slot.decor, label: slot.label, centerX, centerZ, width, depth, sideSign: sx });
+      } else {
+        buildDepartmentRoom(slot, { centerX, centerZ, width, depth, sideSign: sx });
+      }
+    });
   });
 
-  // Entrada con tapete y tótem de Intelekia
+  // Pasillo central (piso azul claro como en el plano) con un par de plantas
+  const corridor = new THREE.Mesh(new THREE.BoxGeometry(CORRIDOR_W, 0.1, totalDepth), new THREE.MeshStandardMaterial({ color: 0xa9cfee, roughness: 0.6 }));
+  corridor.position.set(0, -0.052, 0);
+  corridor.receiveShadow = true;
+  scene.add(corridor);
+  const corridorRng = seededRandom(0x5a551110);
+  const rowEdges = rowD.map((_, r) => bounds.minZ + rowD.slice(0, r + 1).reduce((acc, d) => acc + d + WALL_T, 0));
+  [
+    [-CORRIDOR_W / 2 + 0.4, bounds.minZ + 0.6, 1.1],
+    [CORRIDOR_W / 2 - 0.4, rowEdges[rows.length - 3] ?? 0, 1.0],
+    [-CORRIDOR_W / 2 + 0.4, rowEdges[rows.length - 2] ?? 0, 0.9],
+  ].forEach(([x, z, s]) => {
+    const plant = createPlant(corridorRng, s);
+    plant.group.position.set(x, 0, z);
+    scene.add(plant.group);
+    decorRooms.push({ update: plant.update });
+  });
+
+  // Entrada con tapete y tótem de Intelekia, al frente del pasillo
   const entrance = createEntrance();
-  entrance.position.set(0, 0, maxDepth / 2 + 2.6);
+  entrance.position.set(0, 0, bounds.maxZ + 1.75);
   scene.add(entrance);
 
-  // Piso exterior / pasillo
+  // Piso exterior
   const ground = new THREE.Mesh(new THREE.CircleGeometry(Math.max(totalWidth, maxDepth) * 1.6 + 20, 64), new THREE.MeshStandardMaterial({ color: 0xcdd8d4, roughness: 0.95 }));
   ground.rotation.x = -Math.PI / 2;
   ground.position.y = -0.11;
@@ -166,11 +272,11 @@ export function createScene({ container, departments, onAgentClick }) {
   // --- Luces ---
   scene.add(new THREE.HemisphereLight(0xffffff, 0xc9b79c, 0.55));
   const sun = new THREE.DirectionalLight(0xfff1dc, 2.4);
-  sun.position.set(-totalWidth * 0.3 - 6, 18, maxDepth + 10);
-  sun.target.position.set(0, 0, 0);
+  sun.position.set(midX - totalWidth * 0.3 - 6, 22, maxDepth * 0.6 + 10);
+  sun.target.position.set(midX, 0, 0);
   sun.castShadow = true;
   sun.shadow.mapSize.set(4096, 4096);
-  const half = Math.max(totalWidth, maxDepth) / 2 + 4;
+  const half = Math.max(totalWidth, maxDepth) / 2 + 6;
   Object.assign(sun.shadow.camera, { left: -half, right: half, top: half, bottom: -half, near: 1, far: 80 });
   sun.shadow.bias = -0.0004;
   sun.shadow.normalBias = 0.02;
@@ -186,15 +292,16 @@ export function createScene({ container, departments, onAgentClick }) {
   controls.maxDistance = 70;
   controls.screenSpacePanning = true;
 
-  const overviewDir = new THREE.Vector3(0.18, 0.78, 1).normalize();
+  const overviewDir = new THREE.Vector3(0.12, 1.05, 1).normalize();
   function overviewDistance() {
     const aspect = camera.aspect;
     const vFov = THREE.MathUtils.degToRad(camera.fov);
-    const fitH = ((maxDepth + 5) * 1.1) / (2 * Math.tan(vFov / 2));
+    // La planta se ve inclinada: su profundidad aparente se reduce con la elevación de la cámara.
+    const fitH = ((maxDepth + 7) * overviewDir.y * 1.15 + 4) / (2 * Math.tan(vFov / 2));
     const fitW = (totalWidth * 1.3) / (2 * Math.tan(vFov / 2) * aspect);
     return Math.max(fitH, fitW, 8);
   }
-  const overviewTarget = new THREE.Vector3(0, 0.6, 1.4);
+  const overviewTarget = new THREE.Vector3(midX, 0.6, 2.2);
   controls.target.copy(overviewTarget);
   camera.position.copy(controls.target).addScaledVector(overviewDir, overviewDistance());
 
@@ -327,10 +434,11 @@ export function createScene({ container, departments, onAgentClick }) {
     if (!room) return;
     const vFov = THREE.MathUtils.degToRad(camera.fov);
     const dist = Math.max(
-      (room.depth * 1.3) / (2 * Math.tan(vFov / 2)),
+      (room.depth * 1.45) / (2 * Math.tan(vFov / 2)),
       (room.width * 1.1) / (2 * Math.tan(vFov / 2) * camera.aspect)
     );
-    flyTo(room.center.clone().setY(0.6), dist, new THREE.Vector3(0.1, 0.85, 1));
+    // Más desde arriba para que el muro de la sala de enfrente no tape el frente de esta.
+    flyTo(room.center.clone().setY(0.6), dist, new THREE.Vector3(0.1, 1.25, 1));
   }
 
   function focusOverview() {
@@ -508,6 +616,7 @@ export function createScene({ container, departments, onAgentClick }) {
       refreshTag(entry);
     });
     rooms.forEach((room) => room.update(t));
+    decorRooms.forEach((room) => room.update(t));
     updateTalks(t);
 
     controls.update();
