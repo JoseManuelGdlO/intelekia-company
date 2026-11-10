@@ -32,19 +32,19 @@
   {
     "id": "idea-1794004361940-0",
     "texto": "Crea un reel mostrando la frustración de un dueño de negocio al recibir múltiples consultas por WhatsApp y cómo la automatización puede ofrecer respuestas instantáneas y liberar su tiempo para tareas importantes.",
-    "estatus": "pendiente",
+    "estatus": "redactada",
     "creadaEn": "2026-11-06T22:32:41.940Z"
   },
   {
     "id": "idea-1794004361940-1",
     "texto": "Presenta un video corto donde se compara el tiempo que se pierde en procesos manuales versus el tiempo ahorrado al implementar un sistema automatizado de gestión de citas.",
-    "estatus": "pendiente",
+    "estatus": "redactada",
     "creadaEn": "2026-11-06T22:32:41.940Z"
   },
   {
     "id": "idea-1794004361940-2",
     "texto": "Haz un post humorístico sobre la experiencia de un cliente esperando por atención en un consultorio, seguido de una solución tecnológica que genere una atención más ágil y eficiente.",
-    "estatus": "pendiente",
+    "estatus": "redactada",
     "creadaEn": "2026-11-06T22:32:41.940Z"
   },
   {
@@ -148,5 +148,179 @@
     "texto": "Haz un post mostrando cómo la integración de un sistema de automatización puede hacer que un negocio se destaque en atención al cliente, con ejemplos concretos de situaciones cotidianas.",
     "estatus": "pendiente",
     "creadaEn": "2026-11-09T02:45:47.824Z"
+  },
+  {
+    "id": "idea-1794255821599-0",
+    "texto": "Crea un reel cómico que muestre a un dueño de negocio lidiando con el desafío de seguir el ritmo de las ventas y cómo un sistema automatizado puede garantizar que no se pierda ninguna oportunidad, resaltando la importancia de dar seguimiento instantáneo a los clientes.",
+    "estatus": "pendiente",
+    "creadaEn": "2026-11-09T20:23:41.599Z"
+  },
+  {
+    "id": "idea-1794255821599-1",
+    "texto": "Desarrolla un post que ilustre de manera visual el proceso que sigue un cliente al hacer una consulta, desde el primer contacto hasta la solución de su problema, y cómo la incorporación de un chatbot puede mejorar la experiencia y reducir el tiempo de respuesta.",
+    "estatus": "pendiente",
+    "creadaEn": "2026-11-09T20:23:41.599Z"
+  },
+  {
+    "id": "idea-1794255821599-2",
+    "texto": "Haz un video donde un empresario se enfrenta a una montaña de correos electrónicos sin responder y muestra cómo un software de gestión automatizada puede convertirse en su mejor aliado para atender a todos sin pérdidas de tiempo.",
+    "estatus": "pendiente",
+    "creadaEn": "2026-11-09T20:23:41.599Z"
+  },
+  {
+    "id": "idea-1794255821599-3",
+    "texto": "Realiza un reel que compare la experiencia de atención al cliente en un negocio que no utiliza tecnología con uno que sí, destacando situaciones cotidianas y el impacto positivo que tiene la automatización en la satisfacción del cliente.",
+    "estatus": "pendiente",
+    "creadaEn": "2026-11-09T20:23:41.599Z"
+  },
+  {
+    "id": "idea-1794255821599-4",
+    "texto": "Crea un post sobre la experiencia de un cliente que pierde una cita crucial por falta de recordatorios, y cómo un sistema automatizado no solo mejoró su experiencia, sino que también aumentó las ventas del negocio.",
+    "estatus": "pendiente",
+    "creadaEn": "2026-11-09T20:23:41.599Z"
+  },
+  {
+    "id": "idea-1794256217044-0",
+    "texto": "Crea un video que muestre cómo la implementación de un asistente virtual puede responder preguntas frecuentes de los clientes mientras el dueño de negocio se enfoca en tareas más importantes.",
+    "estatus": "pendiente",
+    "creadaEn": "2026-11-09T20:30:17.044Z"
+  },
+  {
+    "id": "idea-1794256217044-1",
+    "texto": "Ilustra un día en la vida de un negocio que no utiliza automatización, destacando las tareas repetitivas y el estrés, y cómo una solución de IA simplifica todo, aportando tranquilidad.",
+    "estatus": "pendiente",
+    "creadaEn": "2026-11-09T20:30:17.044Z"
+  },
+  {
+    "id": "idea-1794256217044-2",
+    "texto": "Desarrolla un post que compare la reacción de un cliente al esperar respuestas por WhatsApp con un enfoque tradicional frente a la atención instantánea que proporciona un chatbot.",
+    "estatus": "pendiente",
+    "creadaEn": "2026-11-09T20:30:17.044Z"
+  },
+  {
+    "id": "idea-1794256217044-3",
+    "texto": "Muestra un reel donde se presenta la frustración de un dueño de negocio tratando de organizar una reunión sin tecnología, y cómo una solución automatizada mejora la coordinación y efectividad del equipo.",
+    "estatus": "pendiente",
+    "creadaEn": "2026-11-09T20:30:17.044Z"
+  },
+  {
+    "id": "idea-1794256217044-4",
+    "texto": "Crea un video humorístico en el que un cliente pide ayuda a un empleado abrumado por tareas, seguido de cómo la automatización puede liberar tiempo para que el personal se enfoque en brindar una mejor atención.",
+    "estatus": "pendiente",
+    "creadaEn": "2026-11-09T20:30:17.044Z"
+  },
+  {
+    "id": "idea-1794257438915-0",
+    "texto": "[Reel] La verdad detrás de las citas olvidadas — Gancho: '¿Sabías que el 80% de las citas se pierden por recordatorios no enviados?' — Por qué: los reels relacionados con la automatización han tenido un alto interés entre los seguidores de Intelekia — CTA: Agenda tu cita gratis y evita pérdidas.",
+    "estatus": "pendiente",
+    "creadaEn": "2026-11-09T20:50:38.915Z"
+  },
+  {
+    "id": "idea-1794257438915-1",
+    "texto": "[Carrusel] 5 señales de que tu negocio necesita automatizarse — Gancho: 'Si te identificas con la #3, es hora de actuar' — Por qué: los carruseles con listados generan mucha interacción y compartidos — CTA: Guarda este post y escríbenos para un diagnóstico.",
+    "estatus": "pendiente",
+    "creadaEn": "2026-11-09T20:50:38.915Z"
+  },
+  {
+    "id": "idea-1794257438915-2",
+    "texto": "[Reel] ¿Cuántas horas pierdes al mes organizando tu agenda? — Gancho: 'Imagina lo que podrías hacer con ese tiempo extra...' — Por qué: los reels que hablan de time management son populares en la audiencia — CTA: Múdate a la automatización, DM para más info.",
+    "estatus": "pendiente",
+    "creadaEn": "2026-11-09T20:50:38.915Z"
+  },
+  {
+    "id": "idea-1794257438915-3",
+    "texto": "[Carrusel] ¿Cuánto cuesta tu tiempo? — Gancho: 'Cuando no usas tecnología, cada hora puede ser dinero perdido' — Por qué: el contenido que compara costos ha generado interés en anteriores publicaciones — CTA: Descubre cómo optimizar tu tiempo, contáctanos.",
+    "estatus": "pendiente",
+    "creadaEn": "2026-11-09T20:50:38.915Z"
+  },
+  {
+    "id": "idea-1794257438915-4",
+    "texto": "[Reel] La evolución de tus clientes: de ignorados a atendidos — Gancho: 'Mira cómo un chatbot transforma la atención al cliente en minutos...' — Por qué: el contenido relacionado con el cambio en la atención generó buenas interacciones — CTA: Consulta sobre nuestros chatbots, DM ya.",
+    "estatus": "pendiente",
+    "creadaEn": "2026-11-09T20:50:38.915Z"
+  },
+  {
+    "id": "idea-1794257900076-0",
+    "texto": "[Reel] El dilema de la saturación de mensajes — Tendencia: Muchos dueños de negocio sienten que pierden clientes por la saturación de consultas en WhatsApp (blog del sector, nov 2026) — Gancho: '¿Te sientes abrumado por tantas preguntas en tu WhatsApp?' — Ángulo Intelekia: muestra cómo un chatbot puede gestionar y organizar conversaciones, evitando pérdidas importantes — CTA: DM 'ORGANIZAR' para más info.",
+    "estatus": "pendiente",
+    "creadaEn": "2026-11-09T20:58:20.076Z"
+  },
+  {
+    "id": "idea-1794257900076-1",
+    "texto": "[Carrusel] ¿Cuántos clientes estás perdiendo sin un sistema automatizado? — Tendencia: Creciente preocupación por la gestión ineficiente de citas y atención al cliente (foros de emprendedores, nov 2026) — Gancho: 'La #2 puede dejarte pensando... ¡Es hora de cambiar!' — Ángulo Intelekia: el servicio de automatización de recordatorios para asegurar que tus citas no se pierdan — CTA: Guarda este post y escribe para una consulta gratuita.",
+    "estatus": "pendiente",
+    "creadaEn": "2026-11-09T20:58:20.076Z"
+  },
+  {
+    "id": "idea-1794257900076-2",
+    "texto": "[Reel] El caos de la atención manual: ¡dile adiós! — Tendencia: Cada vez más empresarios buscan soluciones para simplificar la atención al cliente (estudios recientes, nov 2026) — Gancho: 'Imagina que tus clientes nunca más se desesperen por esperarte...' — Ángulo Intelekia: destaca resultados de implementar un sistema automatizado de atención — CTA: Contáctanos y conoce cómo implementarlo.",
+    "estatus": "pendiente",
+    "creadaEn": "2026-11-09T20:58:20.076Z"
+  },
+  {
+    "id": "idea-1794257900076-3",
+    "texto": "[Carrusel] 4 señales de que necesitas modernizar tu atención al cliente — Tendencia: Mayor adopción de herramientas tecnológicas en pequeñas empresas (revista de negocios, nov 2026) — Gancho: 'Si te identificas con la #3, es momento de actuar' — Ángulo Intelekia: cómo la automatización mejora la experiencia del cliente y reduce errores — CTA: Comenta con un emoji si necesitas ayuda.",
+    "estatus": "pendiente",
+    "creadaEn": "2026-11-09T20:58:20.076Z"
+  },
+  {
+    "id": "idea-1794257900076-4",
+    "texto": "[Reel] De consultas perdidas a seguimiento garantizado — Tendencia: Aumento en el uso de IA para mejorar la atención al cliente (encuesta de propietarios de negocios, nov 2026) — Gancho: 'Mira cómo un chatbot puede cambiar la forma en que gestionas tus consultas...' — Ángulo Intelekia: resalta la funcionalidad de un asistente virtual para atención eficaz y control de citas — CTA: Escríbenos para conocer más sobre nuestros chatbots.",
+    "estatus": "pendiente",
+    "creadaEn": "2026-11-09T20:58:20.076Z"
+  },
+  {
+    "id": "idea-1794258098798-0",
+    "texto": "[Instagram · Reel] ¿Sigues dando la misma atención al cliente de siempre? — Tendencia: La atención al cliente en México se equilibra entre canales digitales y humanos, buscando una experiencia confiable (Twilio, nov 2026) — Gancho: '¡Es hora de evolucionar tu atención al cliente!' — Contenido: Muestra cómo conectar la atención digital y humana mejora la experiencia del cliente; comparativa de interacción tradicional vs. automatización y contacto humano. — Ángulo Intelekia: Consultoría para la implementación de sistemas omnicanal. — CTA: ¡Abre la conversación! DM 'EVOLUCIONAR' para más info.",
+    "estatus": "pendiente",
+    "creadaEn": "2026-11-09T21:01:38.798Z"
+  },
+  {
+    "id": "idea-1794258098798-1",
+    "texto": "[Instagram · Carrusel] ¿La IA resuelve o solo responde? — Tendencia: La IA debe resolver problemas, no solo responder preguntas. Las empresas deben integrar sus sistemas internos para brindar un mejor servicio al cliente (Computer Weekly, nov 2026) — Gancho: 'La clave del éxito en CX es poder resolver, no solo responder' — Contenido: 5 puntos sobre por qué la IA debe ser eficaz y cómo una buena implementación mejora la satisfacción del cliente. — Ángulo Intelekia: Servicios de IA para automatizar y resolver consultas. — CTA: Guarda este post y consulta cómo mejorar tu atención con IA.",
+    "estatus": "pendiente",
+    "creadaEn": "2026-11-09T21:01:38.798Z"
+  },
+  {
+    "id": "idea-1794258098798-2",
+    "texto": "[Facebook · Post] La realidad de la atención al cliente en 2026: ¿Has adoptado la IA? — Tendencia: La mayoría de las interacciones con clientes en México se gestionarán mediante IA en 2026, buscando personalización y eficiencia (Computer Weekly, nov 2026) — Gancho: '¡Estamos en la era de la IA en la atención al cliente!’ — Contenido: Pregunta abierta sobre si su negocio ha integrado IA en el servicio al cliente; invita a compartir experiencias y retos en la gestión de atención. — Ángulo Intelekia: Consultoría y soluciones de automatización para atención al cliente. — CTA: Comenta 'IA' si quieres saber cómo implementarla.",
+    "estatus": "pendiente",
+    "creadaEn": "2026-11-09T21:01:38.798Z"
+  },
+  {
+    "id": "idea-1794258098798-3",
+    "texto": "[Facebook · Post] ¿Te sientes abrumado con los mensajes en tu WhatsApp de negocio? — Tendencia: La saturación de consultas en WhatsApp es un problema recurrente para los dueños de negocio en México (blog del sector, nov 2026) — Gancho: 'Es un hecho que muchos clientes se pierden entre tantas preguntas...' — Contenido: Plantea el dilema y pregunta cómo manejan esta saturación; invita a compartir consejos o experiencias sobre el manejo de conversaciones. — Ángulo Intelekia: Conversión a chatbots para facilitar la gestión de consultas. — CTA: Comenta 'MENSAJES' y te compartimos estrategias.",
+    "estatus": "pendiente",
+    "creadaEn": "2026-11-09T21:01:38.798Z"
+  },
+  {
+    "id": "idea-1794334739895-0",
+    "texto": "[Instagram · Reel] Atención automatizada: ¿la clave para nunca perder un cliente? — Tendencia: Crece el uso de chatbots para atención 24/7 en México (blog del sector, nov 2026) — Gancho: '¡Imagina que tus clientes siempre encuentren una respuesta!' — Contenido: Se muestra un propietario de negocio lidiando con clientes ansiosos y cómo un chatbot resuelve sus dudas al instante, incluso durante la noche. — Ángulo Intelekia: Integraciones personalizadas de chatbots para mejorar la disponibilidad. — CTA: DM 'ATENCIÓN' para saber más.",
+    "estatus": "pendiente",
+    "creadaEn": "2026-11-10T18:18:59.895Z"
+  },
+  {
+    "id": "idea-1794334739895-1",
+    "texto": "[Facebook · Post] ¿Tus clientes obtienen respuestas cuando realmente las necesitan? — Tendencia: La atención al cliente con IA se convierte en un must en los negocios (blog de marketing, nov 2026) — Gancho: '¡Cada minuto cuenta para tus clientes!' — Contenido: Se plantea la pregunta sobre la eficacia de sus tiempos de respuesta; invitamos a compartir experiencias sobre cómo una atención oportuna puede cambiar la percepción del cliente. — Ángulo Intelekia: Soluciones de automatización para mejorar tiempos de respuesta. — CTA: Comenta 'TIEMPO' y descubre cómo mejorarlo.",
+    "estatus": "pendiente",
+    "creadaEn": "2026-11-10T18:18:59.895Z"
+  },
+  {
+    "id": "idea-1794334739895-2",
+    "texto": "[Instagram · Carrusel] 5 maneras en que un chatbot puede transformar tu negocio — Tendencia: Uso creciente de IA y automatización en pequeñas empresas para mejorar atención (foros de emprendedores, nov 2026) — Gancho: 'No te quedes atrás, adopta la automatización.' — Contenido: Presenta 5 ventajas de implementar un chatbot, desde la reducción de tiempos de espera hasta la personalización del servicio. — Ángulo Intelekia: Servicios de desarrollo e implementación de chatbots. — CTA: Guarda este post y contáctanos para un diagnóstico gratis.",
+    "estatus": "pendiente",
+    "creadaEn": "2026-11-10T18:18:59.895Z"
+  },
+  {
+    "id": "idea-1794334739895-3",
+    "texto": "[Facebook · Reel] ¿Un cliente feliz significa más ventas? — Tendencia: La experiencia del usuario se da prioridad en la atención al cliente (estudios recientes, nov 2026) — Gancho: '¡Tener clientes felices puede ser tu mejor estrategia de ventas!' — Contenido: Muestra cómo una gestión eficiente y automatizada genera satisfacción y lealtad del cliente; comparamos testimonios antes y después de implementar soluciones de automatización. — Ángulo Intelekia: Consultoría para maximizar la satisfacción del cliente mediante tecnología. — CTA: Escríbenos para conocer nuestras soluciones.",
+    "estatus": "pendiente",
+    "creadaEn": "2026-11-10T18:18:59.895Z"
+  },
+  {
+    "id": "idea-1794334739895-4",
+    "texto": "[Instagram · Reel] Automatización + atención humana: la combinación perfecta — Tendencia: La integración de procesos automatizados con atención personalizada mejora la experiencia del cliente (artículo de tendencias, nov 2026) — Gancho: '¿Por qué elegir entre rapidez y calidad?' — Contenido: Presenta cómo un chatbot resuelve preguntas básicas mientras un agente humano se enfoca en consultas complejas, mostrando casos reales. — Ángulo Intelekia: Servicios de consultoría para implementar sistemas omnicanal. — CTA: DM 'COMBINAR' para saber más.",
+    "estatus": "pendiente",
+    "creadaEn": "2026-11-10T18:18:59.895Z"
   }
 ]

@@ -141,5 +141,137 @@
     "estado": "completada",
     "inicio": "2026-11-09T02:45:54.879Z",
     "actualizado": "2026-11-09T02:45:56.718Z"
+  },
+  {
+    "id": "conv-1794257431139-1",
+    "de": "buscador-tendencias",
+    "para": "publicador",
+    "pregunta": "¿Me puedes proporcionar datos recientes de rendimiento de publicaciones en Instagram y Facebook para Intelekia, como las que tuvieron más alcance y interacción?",
+    "respuesta": "No tengo acceso a datos recientes de rendimiento de publicaciones en Instagram y Facebook para Intelekia. Te recomendaría que revises las métricas directamente en las plataformas de cada red social, donde podrás ver el alcance, interacciones y estadísticas específicas de cada publicación. Si necesitas ayuda para interpretarlas, estaré encantado de apoyarte.",
+    "error": null,
+    "estado": "completada",
+    "inicio": "2026-11-09T20:50:31.139Z",
+    "actualizado": "2026-11-09T20:50:33.759Z"
+  },
+  {
+    "id": "conv-1794257433762-2",
+    "de": "buscador-tendencias",
+    "para": "publicador",
+    "pregunta": "¿Cuáles han sido los formatos que más han funcionado en nuestras publicaciones recientes en redes sociales?",
+    "respuesta": "No tengo acceso a datos específicos de rendimiento de nuestras publicaciones recientes en redes sociales. Sin embargo, te recomendaría revisar métricas en Instagram y Facebook para identificar los formatos que han tenido mejores interacciones, como Reels, testimonios y contenido humorístico. Si necesitas ayuda para analizar esos resultados, estaré encantado de apoyarte.",
+    "error": null,
+    "estado": "completada",
+    "inicio": "2026-11-09T20:50:33.762Z",
+    "actualizado": "2026-11-09T20:50:35.545Z"
+  },
+  {
+    "id": "conv-1794257470626-3",
+    "de": "buscador-tendencias",
+    "para": "publicador",
+    "pregunta": "¿Me puedes proporcionar datos recientes de rendimiento de publicaciones en Instagram y Facebook para Intelekia, como las que tuvieron más alcance y interacción?",
+    "respuesta": "No tengo acceso a datos recientes sobre el rendimiento de nuestras publicaciones en Instagram y Facebook, como alcance e interacción. Te recomiendo revisar las estadísticas directamente en las plataformas. Si necesitas ayuda para analizar esos datos o interpretar las métricas, estaré encantado de apoyarte.",
+    "error": null,
+    "estado": "completada",
+    "inicio": "2026-11-09T20:51:10.626Z",
+    "actualizado": "2026-11-09T20:51:12.812Z"
+  },
+  {
+    "id": "conv-1794257532866-4",
+    "de": "buscador-tendencias",
+    "para": "publicador",
+    "pregunta": "¿Tienes acceso a datos recientes de rendimiento de publicaciones en Instagram y Facebook para Intelekia, como las que tuvieron más alcance e interacciones? Necesito esta información para proponer ideas de contenido.",
+    "respuesta": "No tengo acceso a datos recientes sobre el rendimiento de nuestras publicaciones en Instagram y Facebook, como alcance e interacciones. Te recomendaría revisar las métricas directamente en las plataformas para obtener esa información. Si necesitas ayuda para analizar esos datos o ideas de contenido basadas en lo que funciona, aquí estoy para apoyar.",
+    "error": null,
+    "estado": "completada",
+    "inicio": "2026-11-09T20:52:12.866Z",
+    "actualizado": "2026-11-09T20:52:14.444Z"
+  },
+  {
+    "id": "conv-1794257883747-5",
+    "de": "buscador-tendencias",
+    "para": "publicador",
+    "pregunta": "¿Hay alguna tendencia reciente en la automatización o inteligencia artificial que pueda ser relevante para las publicaciones de Intelekia?",
+    "respuesta": "No tengo acceso a datos recientes sobre tendencias específicas, pero algunas áreas que están ganando relevancia en automatización e inteligencia artificial incluyen:\n\n1. **Automatización de Atención al Cliente**: Los chatbots y asistentes virtuales están mejorando y personalizándose, ofreciendo experiencias más interactuadas.\n   \n2. **Automatización de Flujos de Trabajo**: Herramientas que integran IA para optimizar procesos administrativos y de negocios están en auge. \n\n3. **Análisis Predictivo**: Utilizar IA para abordar patrones y predecir comportamientos del cliente está cobrando fuerza.\n\nTe recomiendo seguir analizando fuentes actualizadas del sector y explorar cómo estas tendencias pueden aplicarse en nuestras publicaciones. Si necesitas más detalles o profundizar en un tema específico, aquí estoy para ayudar.",
+    "error": null,
+    "estado": "completada",
+    "inicio": "2026-11-09T20:58:03.747Z",
+    "actualizado": "2026-11-09T20:58:06.502Z"
+  },
+  {
+    "id": "conv-1794257886505-6",
+    "de": "buscador-tendencias",
+    "para": "publicador",
+    "pregunta": "¿Hay alguna novedad reciente en herramientas de WhatsApp Business que impacte a los dueños de negocio en México?",
+    "respuesta": "No tengo acceso a datos recientes sobre novedades específicas en herramientas de WhatsApp Business que puedan impactar a los dueños de negocio en México. Sin embargo, te sugiero que revises el sitio oficial de WhatsApp Business y sus actualizaciones, ya que suelen anunciar mejoras en funcionalidades como la gestión de catálogos, automatización de mensajes, integración con otras plataformas y optimización de la atención al cliente. Estas mejoras pueden ser relevantes para los negocios que buscan eficientizar sus procesos de comunicación. Si necesitas profundizar en un aspecto específico, estoy aquí para ayudar.",
+    "error": null,
+    "estado": "completada",
+    "inicio": "2026-11-09T20:58:06.505Z",
+    "actualizado": "2026-11-09T20:58:08.901Z"
+  },
+  {
+    "id": "conv-1794257890110-7",
+    "de": "buscador-tendencias",
+    "para": "publicador",
+    "pregunta": "¿Tienes información sobre problemas actuales que enfrenten los dueños de negocio en México relacionados con la gestión de clientes o citas?",
+    "respuesta": "No tengo acceso a información específica y actualizada sobre los problemas que enfrentan los dueños de negocio en México con la gestión de clientes o citas. Sin embargo, algunos problemas comunes suelen incluir:\n\n1. **Falta de tiempo**: Muchos dueños de negocio se sienten abrumados por la gestión manual de citas y atención al cliente.\n2. **Pérdida de clientes**: Las citas olvidadas o mal gestionadas pueden resultar en oportunidades perdidas.\n3. **Saturación de consultas**: La alta demanda a través de canales como WhatsApp puede causar caos en la atención al cliente.\n4. **Inconvenientes administrativos**: La falta de automatización puede llevar a un desorden en la gestión de documentos y seguimiento de clientes.\n\nTe recomendaría investigar en grupos de emprendedores o encuestas del sector para obtener información más detallada y actualizada. Si necesitas más apoyo, aquí estoy.",
+    "error": null,
+    "estado": "completada",
+    "inicio": "2026-11-09T20:58:10.110Z",
+    "actualizado": "2026-11-09T20:58:13.399Z"
+  },
+  {
+    "id": "conv-1794263387719-8",
+    "de": "seguimiento-crm",
+    "para": "pm",
+    "pregunta": "Tickets atrasados para notificar: 6 tickets de 2 responsables:\n- Beto Galaviz: 3\n- Javier Karim: 3",
+    "respuesta": "Listo: 2 correos enviados.\n- Beto Galaviz: enviado\n- Javier Karim: enviado",
+    "error": null,
+    "estado": "completada",
+    "inicio": "2026-11-09T22:29:47.719Z",
+    "actualizado": "2026-11-09T22:29:51.576Z"
+  },
+  {
+    "id": "conv-1794334721170-1",
+    "de": "buscador-tendencias",
+    "para": "respuestas-redes",
+    "pregunta": "¿Cuáles son las tendencias recientes más relevantes sobre atención al cliente y automatización en México?",
+    "respuesta": "Las tendencias recientes en atención al cliente y automatización en México incluyen el uso creciente de chatbots y agentes de IA para mejorar la atención 24/7, la integración de WhatsApp Business para una comunicación más directa y efectiva, y la personalización de experiencias a través del análisis de datos. También se observa un interés por soluciones que combinen la automatización con atención humana, garantizando un equilibrio entre eficiencia y calidad en el servicio.",
+    "error": null,
+    "estado": "completada",
+    "inicio": "2026-11-10T18:18:41.170Z",
+    "actualizado": "2026-11-10T18:18:42.988Z"
+  },
+  {
+    "id": "conv-1794334722991-2",
+    "de": "buscador-tendencias",
+    "para": "respuestas-redes",
+    "pregunta": "¿Qué temas han generado más conversación entre dueños de negocio en redes sociales en las últimas semanas?",
+    "respuesta": "Los temas que han generado más conversación entre dueños de negocio en redes sociales últimamente incluyen la automatización de procesos, el uso de inteligencia artificial para mejorar la atención al cliente, y la importancia de la experiencia del usuario en plataformas digitales. También hay un creciente interés por tendencias de marketing digital y cómo adaptarse a los cambios en el comportamiento del consumidor post-pandemia. Si necesitas más información específica o datos, dime y puedo investigar más.",
+    "error": null,
+    "estado": "completada",
+    "inicio": "2026-11-10T18:18:42.991Z",
+    "actualizado": "2026-11-10T18:18:45.482Z"
+  },
+  {
+    "id": "conv-1794334727698-3",
+    "de": "buscador-tendencias",
+    "para": "publicador",
+    "pregunta": "¿Cuáles son las métricas de engagement más altas en nuestras publicaciones recientes sobre automatización y atención al cliente?",
+    "respuesta": "No tengo acceso directo a las métricas específicas de las publicaciones recientes, pero generalmente, las métricas de engagement más altas suelen incluir la tasa de interacción (likes, comentarios y compartidos), el alcance y el tiempo de visualización en videos. Te recomendaría revisar las estadísticas en nuestras plataformas de redes sociales para obtener datos precisos sobre cada publicación. Si necesitas ayuda con eso, házmelo saber.",
+    "error": null,
+    "estado": "completada",
+    "inicio": "2026-11-10T18:18:47.698Z",
+    "actualizado": "2026-11-10T18:18:50.038Z"
+  },
+  {
+    "id": "conv-1794334730041-4",
+    "de": "buscador-tendencias",
+    "para": "publicador",
+    "pregunta": "¿Qué tipo de contenido ha funcionado mejor en nuestras redes sobre inteligencia artificial y automatización?",
+    "respuesta": "He notado que el contenido que ha funcionado mejor en nuestras redes sobre inteligencia artificial y automatización son los videos cortos que presentan situaciones cotidianas de negocios, especialmente aquellos que destacan historias de éxito genuinas y testimonios de dueños de negocios. También, los reels que muestran transformaciones visibles, como la mejora en la atención al cliente tras implementar soluciones de automatización, han tenido buena recepción. Es importante seguir esa línea, enfocándonos en problemas y soluciones que los empresarios realmente enfrentan. Si necesitas datos más específicos, podemos revisar las métricas juntos.",
+    "error": null,
+    "estado": "completada",
+    "inicio": "2026-11-10T18:18:50.041Z",
+    "actualizado": "2026-11-10T18:18:52.034Z"
   }
 ]

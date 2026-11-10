@@ -40,10 +40,16 @@
     "cc": [],
     "asunto": "Tickets atrasados al 08/11/2026 — 3 pendientes",
     "cuerpo": "Hola Beto Galaviz,\n\nTienes tres tickets atrasados:\n\n1. [Poker de reyes] subir app a playstore — En proceso — venció el 18/08/2026 (82 días de atraso)\n2. [Poker de reyes] Mejorar funcionalidad en mata ases — En proceso — venció el 18/09/2026 (51 días de atraso)\n3. [Obras] Cambios en nominas — En proceso — venció el 22/09/2026 (47 días de atraso)\n\n¿Nos ayudas a ponerlos al día o a compartir una nueva fecha de entrega? Si alguno ya está terminado, muévelo a \"Entregadas\" en el tablero.\n\nGracias.",
-    "estado": "error",
+    "estado": "enviado",
     "motivo": null,
     "creadoEn": "2026-11-08T22:29:28.586Z",
-    "error": "Connection timeout"
+    "error": null,
+    "aprobadoEn": "2026-11-09T20:33:55.511Z",
+    "enviadoEn": "2026-11-09T20:33:57.819Z",
+    "messageId": "<c0f8a6fb-fabb-941f-bc84-3b2c693aa0bc@intelekia.cloud>",
+    "copiaOculta": [
+      "direccion@intelekia.cloud"
+    ]
   },
   {
     "id": "correo-1794177896991-2",
@@ -59,6 +65,44 @@
     "creadoEn": "2026-11-08T22:44:56.991Z",
     "enviadoEn": "2026-11-08T22:44:58.564Z",
     "messageId": "<982e8c4e-9e0a-f9ff-2050-10f1834a10e3@intelekia.cloud>",
+    "error": null,
+    "copiaOculta": [
+      "direccion@intelekia.cloud"
+    ]
+  },
+  {
+    "id": "correo-1794263387730-1",
+    "agentId": "pm",
+    "para": [
+      "albertonico45@gmail.com"
+    ],
+    "cc": [],
+    "asunto": "Tickets atrasados al 09/11/2026 — 3 pendientes",
+    "cuerpo": "Hola Beto Galaviz,\n\nTienes tres tickets atrasados:\n\n1. [Poker de reyes] subir app a playstore — En proceso — venció el 18/08/2026 (83 días de atraso)\n2. [Poker de reyes] Mejorar funcionalidad en mata ases — En proceso — venció el 18/09/2026 (52 días de atraso)\n3. [Obras] Cambios en nominas — En proceso — venció el 22/09/2026 (48 días de atraso)\n\n¿Nos ayudas a ponerlos al día o a compartir una nueva fecha de entrega? Si alguno ya está terminado, muévelo a \"Entregadas\" en el tablero.\n\nGracias.",
+    "estado": "enviado",
+    "motivo": null,
+    "creadoEn": "2026-11-09T22:29:47.730Z",
+    "enviadoEn": "2026-11-09T22:29:49.755Z",
+    "messageId": "<b322d7a9-ac2b-3222-0104-943c063c6ce1@intelekia.cloud>",
+    "error": null,
+    "copiaOculta": [
+      "direccion@intelekia.cloud"
+    ]
+  },
+  {
+    "id": "correo-1794263389756-2",
+    "agentId": "pm",
+    "para": [
+      "chidoreyes7@gmail.com"
+    ],
+    "cc": [],
+    "asunto": "Tickets atrasados al 09/11/2026 — 3 pendientes",
+    "cuerpo": "Hola Javier Karim,\n\nTienes tres tickets atrasados:\n\n1. [TLO] Error al cancelar un timbrado desde el sistema — En proceso — venció el 31/10/2026 (9 días de atraso)\n2. [TLO] Cambios a módulo cuentas por pagar — Por revisar — venció el 31/10/2026 (9 días de atraso)\n3. [Alanna confirmaciones] Cambios generales — En proceso — venció el 31/10/2026 (9 días de atraso)\n\n¿Nos ayudas a ponerlos al día o a compartir una nueva fecha de entrega? Si alguno ya está terminado, muévelo a \"Entregadas\" en el tablero.\n\nGracias.",
+    "estado": "enviado",
+    "motivo": null,
+    "creadoEn": "2026-11-09T22:29:49.756Z",
+    "enviadoEn": "2026-11-09T22:29:51.575Z",
+    "messageId": "<06ee53a6-37e1-12e2-d86f-dec95eb43d5e@intelekia.cloud>",
     "error": null,
     "copiaOculta": [
       "direccion@intelekia.cloud"

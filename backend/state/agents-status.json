@@ -3,41 +3,53 @@
     "estatus": "idle",
     "ultimaAccion": "Encontró 5 idea(s) nueva(s)",
     "error": null,
-    "updatedAt": "2026-11-09T02:45:47.825Z"
+    "updatedAt": "2026-11-10T18:18:59.896Z"
   },
   "publicador": {
     "estatus": "listo_para_revision",
-    "ultimaAccion": "Redactó un draft para: Ilustra el proceso de un cliente que deja de esperar respuestas y, en cambio, recibe atención instantánea gracias a chatbots, resaltando la diferencia del antes y el después.",
+    "ultimaAccion": "Redactó un draft para: Haz un post humorístico sobre la experiencia de un cliente esperando por atención en un consultorio, seguido de una solución tecnológica que genere una atención más ágil y eficiente.",
     "error": null,
-    "updatedAt": "2026-11-09T02:45:50.640Z",
+    "updatedAt": "2026-11-10T18:19:02.840Z",
     "ultimoIdeaId": "idea-1793997400056-0",
-    "ultimoItemId": "idea-1793997400056-4"
+    "ultimoItemId": "idea-1794004361940-2"
   },
   "buscador-prospectos": {
     "estatus": "idle",
-    "ultimaAccion": "Encontró 5 prospecto(s) nuevo(s)",
+    "ultimaAccion": "Encontró 4 prospecto(s) nuevo(s)",
     "error": null,
-    "updatedAt": "2026-11-09T02:46:01.945Z"
+    "updatedAt": "2026-11-10T18:19:06.146Z"
   },
   "seguimiento-crm": {
     "estatus": "listo_para_revision",
-    "ultimaAccion": "Reporte de seguimiento: La operación sigue siendo crítica, con varias tareas vencidas y proyectos sin actividad reciente. Se requieren acciones urgentes para evitar mayores retrasos. · Atrasados al PM: 1 correo enviado, 1 con error",
+    "ultimaAccion": "Reporte de seguimiento: La situación sigue siendo crítica, con varias tareas vencidas y poca actividad reciente en algunos proyectos. Es esencial actuar para evitar mayores retrasos y … · Atrasados al PM: 2 correos enviados",
     "error": null,
-    "updatedAt": "2026-11-08T22:45:21.288Z",
-    "ultimoItemId": "reporte-2026-11-08-1644"
+    "updatedAt": "2026-11-09T22:30:06.827Z",
+    "ultimoItemId": "reporte-2026-11-09-1629"
   },
   "cotizador": {
-    "estatus": "listo_para_revision",
-    "ultimaAccion": "Generó cotización tipo para: Dashboard administrativo",
+    "estatus": "idle",
+    "ultimaAccion": "Biblioteca de cotizaciones tipo completa",
     "error": null,
-    "updatedAt": "2026-11-09T02:46:07.474Z",
+    "updatedAt": "2026-11-10T18:19:06.162Z",
     "ultimoItemId": "dashboard-administrativo"
   },
   "pm": {
-    "ultimaAccion": "Reporte del equipo: El equipo se encuentra activo con algunos agentes en estado de \"listo para revisión\" y un agente que no ha registrado actividad. Desde el último reporte, el Seg…",
-    "updatedAt": "2026-11-09T02:46:18.435Z",
+    "ultimaAccion": "Reporte del equipo: El equipo está operativo, pero hay varios agentes en estado de \"listo para revisión\" y uno que no ha registrado actividad. Desde el último reporte, el Seguimien…",
+    "updatedAt": "2026-11-10T18:19:12.810Z",
     "estatus": "listo_para_revision",
     "error": null,
-    "ultimoItemId": "reporte-equipo-2026-11-08-2046"
+    "ultimoItemId": "reporte-equipo-2026-11-10-1219"
+  },
+  "revisor-prs": {
+    "estatus": "listo_para_revision",
+    "ultimaAccion": "PRs: 5 con cambios pedidos",
+    "error": null,
+    "updatedAt": "2026-11-10T20:03:20.028Z"
+  },
+  "respuestas-redes": {
+    "estatus": "idle",
+    "ultimaAccion": "No revisó comentarios: Falta META_PAGE_TOKEN en backend/.env",
+    "error": null,
+    "updatedAt": "2026-11-10T20:07:59.569Z"
   }
 }

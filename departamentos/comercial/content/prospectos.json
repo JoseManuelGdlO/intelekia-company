@@ -118,5 +118,77 @@
     "razon": "Puede beneficiarse de automatización en la generación de reportes y seguimiento de clientes.",
     "estatus": "nuevo",
     "creadoEn": "2026-11-09T02:46:01.942Z"
+  },
+  {
+    "id": "prospecto-1794255827755-0",
+    "negocio": "Consultorio Oftalmológico Visión Clara",
+    "giro": "Consultorio médico",
+    "razon": "Podría mejorar la atención al paciente mediante recordatorios automáticos de citas y un sistema de gestión de reservas.",
+    "estatus": "nuevo",
+    "creadoEn": "2026-11-09T20:23:47.755Z"
+  },
+  {
+    "id": "prospecto-1794255827755-1",
+    "negocio": "Floristería Aromas Naturales",
+    "giro": "Florería",
+    "razon": "Necesitan una plataforma de comercio electrónico para incrementar las ventas en línea y un sistema de gestión de pedidos automatizado.",
+    "estatus": "nuevo",
+    "creadoEn": "2026-11-09T20:23:47.755Z"
+  },
+  {
+    "id": "prospecto-1794255827755-2",
+    "negocio": "Escuela de Música Notas Musicales",
+    "giro": "Escuela de música",
+    "razon": "Podrían beneficiarse de un sistema de gestión de alumnos y automatización de recordatorios para clases y eventos.",
+    "estatus": "nuevo",
+    "creadoEn": "2026-11-09T20:23:47.755Z"
+  },
+  {
+    "id": "prospecto-1794255827755-3",
+    "negocio": "Estudio de Diseño Gráfico Creativa",
+    "giro": "Diseño gráfico",
+    "razon": "Requieren una CRM para seguimiento de clientes y gestión de proyectos, además de una página web interactiva.",
+    "estatus": "nuevo",
+    "creadoEn": "2026-11-09T20:23:47.755Z"
+  },
+  {
+    "id": "prospecto-1794255827755-4",
+    "negocio": "Spa y Bienestar Relax Total",
+    "giro": "Servicio de spa",
+    "razon": "Podrían mejorar su atención al cliente con un sistema de reservas en línea y recordatorios automáticos.",
+    "estatus": "nuevo",
+    "creadoEn": "2026-11-09T20:23:47.755Z"
+  },
+  {
+    "id": "prospecto-1794334746144-0",
+    "negocio": "Tienda de Electrónica TechZone",
+    "giro": "Comercio electrónico",
+    "razon": "Podrían beneficiarse de una plataforma de comercio electrónico integrada con automatización para gestión de inventarios y atención al cliente.",
+    "estatus": "nuevo",
+    "creadoEn": "2026-11-10T18:19:06.144Z"
+  },
+  {
+    "id": "prospecto-1794334746144-1",
+    "negocio": "Estudio de Video y Producción Creativa",
+    "giro": "Producción audiovisual",
+    "razon": "Necesitan soluciones de automatización para la gestión de proyectos y seguimiento de clientes.",
+    "estatus": "nuevo",
+    "creadoEn": "2026-11-10T18:19:06.144Z"
+  },
+  {
+    "id": "prospecto-1794334746144-2",
+    "negocio": "Clínica Dermatológica Piel Saludable",
+    "giro": "Consultorio médico",
+    "razon": "Podrían implementar recordatorios automáticos para citas y gestión de pacientes mediante un sistema administrativo a la medida.",
+    "estatus": "nuevo",
+    "creadoEn": "2026-11-10T18:19:06.144Z"
+  },
+  {
+    "id": "prospecto-1794334746144-3",
+    "negocio": "Agencia de Publicidad Creativa",
+    "giro": "Marketing y publicidad",
+    "razon": "Requieren herramientas de análisis de datos e inteligencia artificial para optimizar campañas publicitarias.",
+    "estatus": "nuevo",
+    "creadoEn": "2026-11-10T18:19:06.144Z"
   }
 ]

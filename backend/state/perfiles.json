@@ -17,5 +17,14 @@
         "deepwiki"
       ]
     }
+  },
+  "revisor-prs": {
+    "cicloHoras": 4,
+    "instalados": {
+      "skills": [],
+      "plugins": [
+        "github"
+      ]
+    }
   }
 }
