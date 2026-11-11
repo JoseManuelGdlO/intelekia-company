@@ -1,6 +1,6 @@
 import { createScene } from './scene.js';
 import { createPanel } from './ui.js';
-import { fetchStatus, fetchDepartments, sendChat, forzarCiclo, fetchComunicacion, fetchConversaciones, fetchConversacionesPagina, fetchActividad, fetchActividadPagina, fetchCiclos } from './api.js';
+import { fetchAvisosWhatsapp, fetchStatus, fetchDepartments, sendChat, forzarCiclo, fetchComunicacion, fetchConversaciones, fetchConversacionesPagina, fetchActividad, fetchActividadPagina, fetchCiclos } from './api.js';
 import { fechaCorta } from './fechas.js';
 import { createComunicacionEditor } from './comunicacionEditor.js';
 import { createPerfilEditor } from './perfilEditor.js';
@@ -16,6 +16,26 @@ import { createHudMenus } from './hudMenus.js';
 // Íconos de la página (los <i data-icon>) y menús de la barra superior.
 hydrateIcons();
 createHudMenus();
+
+// La lista de Actividad del panel se puede estirar; se recuerda el alto en este navegador.
+(function recordarAltoActividad() {
+  const lista = document.getElementById('panel-activity-list');
+  const CLAVE = 'panel-actividad-alto';
+  try {
+    const guardado = Number(localStorage.getItem(CLAVE));
+    if (guardado >= 90) lista.style.height = `${guardado}px`;
+  } catch {
+    // sin almacenamiento: usa el alto normal
+  }
+  new ResizeObserver(() => {
+    if (!lista.offsetHeight) return; // panel cerrado
+    try {
+      localStorage.setItem(CLAVE, String(lista.offsetHeight));
+    } catch {
+      // nada
+    }
+  }).observe(lista);
+})();
 
 const POLL_INTERVAL_MS = 4000;
 const TALK_POLL_INTERVAL_MS = 2000;
@@ -291,6 +311,40 @@ function showMailInFeed(item) {
   setTimeout(() => node.remove(), 12600);
 }
 
+// --- Aviso: llegó un mensaje por WhatsApp (solo cuándo y para quién; nunca el texto) ---
+let waCursor = null; // null = aún no se lee: lo que ya había no se anuncia
+let waToastTimer = null;
+async function revisarWhatsapp() {
+  let avisos;
+  try {
+    avisos = await fetchAvisosWhatsapp(waCursor);
+  } catch {
+    return; // sin canal de WhatsApp o sin conexión: no pasa nada
+  }
+  const primera = waCursor === null;
+  if (avisos.length) waCursor = avisos[0].fecha;
+  else if (primera) waCursor = new Date(0).toISOString();
+  if (primera) return;
+  avisos.slice().reverse().forEach((a) => {
+    const para = a.agentId ? labelOf(a.agentId) : null;
+    const toast = document.getElementById('wa-toast');
+    toast.querySelector('.wa-toast-para').textContent = para ? `Para ${para}` : 'La recepción lo está leyendo…';
+    toast.classList.add('visible');
+    clearTimeout(waToastTimer);
+    waToastTimer = setTimeout(() => toast.classList.remove('visible'), 7000);
+    const feed = document.getElementById('feed');
+    const node = document.createElement('div');
+    node.className = 'feed-item whatsapp';
+    node.innerHTML = '<span class="tag">WhatsApp</span><div class="who"></div>';
+    node.querySelector('.who').insertAdjacentHTML('beforeend', icon('message-circle', { size: 13 }));
+    node.querySelector('.who').append(` Nuevo mensaje${para ? ` para ${para}` : ''}`);
+    feed.prepend(node);
+    while (feed.children.length > FEED_MAX) feed.lastElementChild.remove();
+    setTimeout(() => node.classList.add('fade'), 12000);
+    setTimeout(() => node.remove(), 12600);
+  });
+}
+
 const correoBandeja = createCorreoBandeja({ labelOf, onCorreo: showMailInFeed });
 const aprobacionesBandeja = createAprobacionesBandeja({ labelOf });
 const oficinaHorario = createOficinaHorario();
@@ -365,6 +419,7 @@ async function refreshStatus() {
     correoBandeja.refresh();
     aprobacionesBandeja.refresh();
     oficinaHorario.refresh();
+    revisarWhatsapp();
   } catch (err) {
     console.error('No se pudo actualizar el estatus', err);
   }

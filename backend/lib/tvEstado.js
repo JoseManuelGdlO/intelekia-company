@@ -64,6 +64,7 @@ function createTvEstado({
   leerProspectos,
   revisiones = null,
   aprobaciones,
+  avisosWhatsapp = null,
   now = () => new Date(),
   timeZone = 'America/Monterrey',
 }) {
@@ -156,7 +157,16 @@ function createTvEstado({
       .sort((a, b) => String(a.fecha).localeCompare(String(b.fecha)))
       .map(({ id, tipo, texto }) => ({ id, tipo, texto }));
 
-    return { oficina, gasto, departamentos: departamentosPublicos, dia, actividad: actividadPublica, celebraciones };
+    // Mensajes de WhatsApp recibidos: solo cuándo y para qué trabajador (nunca número ni texto).
+    const whatsapp = avisosWhatsapp
+      ? lista(seguro(() => avisosWhatsapp.recientes({ limite: 10 }), [])).map((a) => ({
+          id: `wa:${a.id}`,
+          fecha: a.fecha,
+          agente: a.agentId ? etiquetas[a.agentId] || null : null,
+        }))
+      : [];
+
+    return { oficina, gasto, departamentos: departamentosPublicos, dia, actividad: actividadPublica, celebraciones, whatsapp };
   }
 
   return { estado };

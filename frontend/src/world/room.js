@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { letrerosDelDia } from './letreros.js';
 import { mat, box, at, shade, hashString, seededRandom } from './materials.js';
 import {
   woodFloorTexture,
@@ -181,6 +182,11 @@ export function buildRoom({ department, theme, centerX, centerZ = 0, width, dept
   // Rincón de café (fondo, junto al muro exterior)
   put(group, createCoffeeStation(rng, accent), -W / 2 + 1.0, 0, -D / 2 + 0.32);
   put(group, createWaterCooler(), -W / 2 + 0.35, 0, -D / 2 + 1.6);
+
+  // Humor de oficina: letreros de papel del día (junto al café, entre la cafetera y el reloj, y sobre el garrafón)
+  const letreros = letrerosDelDia(department.id);
+  put(group, letreros.cafe, -W / 2 + 2.45, 1.42, -D / 2 + 0.035);
+  put(group, letreros.pared, -W / 2 + 0.035, 1.55, -D / 2 + 1.3, Math.PI / 2);
 
   // Librero y pósters en el muro exterior
   put(group, createBookshelf(rng, accent), -W / 2 + 0.2, 0, Math.min(D / 2 - 2.6, 0.4), Math.PI / 2);

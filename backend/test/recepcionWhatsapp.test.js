@@ -413,3 +413,13 @@ test('crearEnrutadorIA valida la respuesta del modelo', async () => {
   assert.deepEqual(await conRespuesta('{"agentId":"nadie","accion":"chat","duda":["pm","fantasma"]}')('x', AGENTES), { agentId: null, accion: 'chat', duda: ['pm'] });
   assert.deepEqual(await conRespuesta('no sé')('x', AGENTES), { agentId: null, accion: 'chat', duda: [] });
 });
+
+test('avisos para las pantallas: al recibir (solo permitidos) y a quién se le pasó', async () => {
+  const recibidos = [];
+  const ruteados = [];
+  const { r } = setup({ alRecibir: (id) => recibidos.push(id), alRutear: (id, agentId) => ruteados.push([id, agentId]) });
+  await r.procesar({ ...msg('x1', 'PM hola'), de: '5210000000000' });
+  await r.procesar(msg('m1', 'PM hola'));
+  assert.deepEqual(recibidos, ['m1']);
+  assert.deepEqual(ruteados, [['m1', 'pm']]);
+});

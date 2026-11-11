@@ -40,10 +40,14 @@ function createWhatsappWebhookRouter({ whatsapp, recepcion, config, registrar = 
 }
 
 /** Estado del canal para la oficina (se monta en la app principal, nunca en la del webhook). */
-function createWhatsappEstadoRouter({ whatsapp, recepcion }) {
+function createWhatsappEstadoRouter({ whatsapp, recepcion, avisos = null }) {
   const router = express.Router();
   router.get('/api/whatsapp/estado', (req, res) => {
     res.json({ ...whatsapp.estado(), ...recepcion.estadoCanal() });
+  });
+  // Avisos de mensajes recibidos (sin número ni texto) para mostrarlos en la oficina.
+  router.get('/api/whatsapp/avisos', (req, res) => {
+    res.json(avisos ? avisos.recientes({ desde: req.query.desde ? String(req.query.desde) : null, limite: 20 }) : []);
   });
   return router;
 }

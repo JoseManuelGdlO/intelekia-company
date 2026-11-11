@@ -504,7 +504,8 @@ html, body { margin: 0; height: 100%; overflow: hidden; background: #dfe9e6; }
 #panel-activity-count { color: var(--muted); font-weight: 500; }
 .live-badge { font-size: 10px; font-weight: 800; color: #fff; background: var(--c-error); padding: 1px 6px; border-radius: 999px; margin-left: 4px; animation: blink 1.4s infinite; }
 .live-badge[hidden] { display: none; }
-#panel-activity-list { display: flex; flex-direction: column; gap: 4px; max-height: 240px; overflow-y: auto; padding-top: 6px; }
+/* Ajustable: arrastra la esquina inferior derecha (se recuerda el alto). */
+#panel-activity-list { display: flex; flex-direction: column; gap: 4px; height: 240px; min-height: 90px; max-height: 75vh; overflow-y: auto; padding-top: 6px; resize: vertical; }
 /* Paginación de Actividad y Conversaciones del panel */
 .pager { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding-top: 6px; }
 .pager[hidden] { display: none; }
@@ -599,3 +600,34 @@ details.act-row > summary.act-head .act-text::after { content: ' ▾'; color: va
 .com-header h2 .ico { width: 20px; height: 20px; color: var(--intelekia-green); }
 .perfil-tab .ico, .inst-title .ico, .perfil-field > span > .ico { color: var(--intelekia-green); }
 summary .ico { margin-right: 2px; }
+
+/* Globo de cómic (charlas casuales en la pantalla de TV) */
+.agent-tag .comic {
+  position: absolute; bottom: calc(100% + 10px); left: 50%; z-index: 6;
+  width: max-content; max-width: 230px; padding: 9px 13px;
+  background: #fffef7; color: #111; border: 2.5px solid #111; border-radius: 18px;
+  font: 700 13.5px/1.25 'Comic Neue', 'Comic Sans MS', 'Inter', sans-serif; text-align: center;
+  box-shadow: 3px 4px 0 rgba(0, 0, 0, 0.85);
+  opacity: 0; transform: translate(-50%, 8px) scale(.6); transform-origin: 50% 100%; pointer-events: none;
+  transition: opacity .18s, transform .25s cubic-bezier(.34, 1.56, .64, 1);
+}
+.agent-tag .comic::after, .agent-tag .comic::before {
+  content: ''; position: absolute; left: 50%; border-style: solid; border-color: transparent;
+}
+.agent-tag .comic::before { bottom: -15px; margin-left: -9px; border-width: 15px 9px 0; border-top-color: #111; }
+.agent-tag .comic::after { bottom: -10px; margin-left: -6px; border-width: 11px 6px 0; border-top-color: #fffef7; }
+.agent-tag .comic.visible { opacity: 1; transform: translate(-50%, 0) scale(1); }
+.agent-tag.diciendo { z-index: 7; }
+
+/* Aviso: llegó un mensaje por WhatsApp */
+.wa-toast {
+  position: fixed; top: 76px; left: 50%; z-index: 40; display: flex; align-items: center; gap: 12px;
+  padding: 12px 18px 12px 14px; border-radius: 14px; background: #25d366; color: #06301a;
+  font: 500 13px 'Inter', sans-serif; box-shadow: 0 14px 40px rgba(10, 15, 30, 0.3);
+  opacity: 0; transform: translate(-50%, -14px); pointer-events: none; transition: opacity .3s, transform .35s cubic-bezier(.34, 1.56, .64, 1);
+}
+.wa-toast b { font-size: 14px; }
+.wa-toast .ico { background: #fff; color: #128c4a; border-radius: 50%; padding: 6px; box-sizing: content-box; }
+.wa-toast.visible { opacity: 1; transform: translate(-50%, 0); }
+.feed-item.whatsapp { border-left-color: #25d366; }
+.feed-item.whatsapp .tag { color: #25d366; }

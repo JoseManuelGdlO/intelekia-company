@@ -20,8 +20,9 @@ body.tv * { cursor: none !important; }
   height: 100vh;
   display: grid;
   grid-template-columns: 100%;
-  grid-template-rows: auto 45vh minmax(0, 1fr) auto;
-  grid-template-areas: 'top' 'escena' 'panel' 'ticker';
+  /* El alto de la oficina 3D se ajusta arrastrando la barrita (o con ?escena=60 en la dirección). */
+  grid-template-rows: auto var(--tv-escena-h, 45vh) auto minmax(0, 1fr) auto;
+  grid-template-areas: 'top' 'escena' 'divisor' 'panel' 'ticker';
 }
 
 /* ---------- Barra superior ---------- */
@@ -81,21 +82,22 @@ body.tv .label-layer.far .agent-name .name { max-width: calc(var(--u) * 16); }
 .tv-dots span { width: calc(var(--u) * 1.4); height: calc(var(--u) * 1.4); border-radius: 999px; background: rgba(255, 255, 255, 0.22); transition: width .5s, background .5s; }
 .tv-dots span.activo { width: calc(var(--u) * 4); background: var(--intelekia-green-light); }
 
-.tv-panel-body { position: relative; flex: 1; min-height: 0; }
+/* Contenedor medible: el tablero escala con el alto que le deje la barrita ajustable. */
+.tv-panel-body { position: relative; flex: 1; min-height: 0; container-type: size; }
 .tv-vista { position: absolute; inset: 0; opacity: 0; transform: translateY(calc(var(--u) * 1.5)); transition: opacity .8s ease, transform .8s ease; overflow: hidden; }
 .tv-vista.activa { opacity: 1; transform: none; }
 
 /* (a) Tablero del día */
-.tv-tablero { height: 100%; display: grid; grid-template-columns: 1fr 1fr; grid-auto-rows: minmax(0, 1fr); gap: calc(var(--u) * 1.8); }
+.tv-tablero { height: 100%; display: grid; grid-template-columns: 1fr 1fr; grid-auto-rows: minmax(0, 1fr); gap: min(calc(var(--u) * 1.8), 2.4cqh); }
 .tv-card {
   display: flex; flex-direction: column; justify-content: center; min-height: 0;
-  padding: calc(var(--u) * 1.4) calc(var(--u) * 2.4);
+  padding: min(calc(var(--u) * 1.4), 1.6cqh) calc(var(--u) * 2.4);
   background: var(--tv-card); border: 1px solid var(--tv-card-border); border-radius: calc(var(--u) * 2.4);
 }
 .tv-card.ancha { grid-column: 1 / -1; flex-direction: row; align-items: center; justify-content: space-between; }
-.tv-card-num { font-size: calc(var(--u) * 8.5); font-weight: 800; line-height: 1; font-variant-numeric: tabular-nums; color: #fff; }
-.tv-card-label { font-size: calc(var(--u) * 2.5); font-weight: 600; color: var(--muted); margin-top: calc(var(--u) * 0.6); }
-.tv-card.ancha .tv-card-label { margin-top: 0; font-size: calc(var(--u) * 3); }
+.tv-card-num { font-size: min(calc(var(--u) * 8.5), 11cqh); font-weight: 800; line-height: 1; font-variant-numeric: tabular-nums; color: #fff; }
+.tv-card-label { font-size: min(calc(var(--u) * 2.5), 3.6cqh); font-weight: 600; color: var(--muted); margin-top: calc(var(--u) * 0.6); }
+.tv-card.ancha .tv-card-label { margin-top: 0; font-size: min(calc(var(--u) * 3), 4.2cqh); }
 .tv-card.destacada { border-color: rgba(255, 176, 32, 0.55); background: rgba(255, 176, 32, 0.08); }
 .tv-card.destacada .tv-card-num { color: var(--tv-ambar); }
 
@@ -203,16 +205,77 @@ body.tv .label-layer.far .agent-name .name { max-width: calc(var(--u) * 16); }
 
 /* ---------- Horizontal: 3D a la izquierda, panel a la derecha ---------- */
 @media (orientation: landscape) {
+  .tv-divisor { display: none; }
   #tv-app {
     grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr);
     grid-template-rows: auto minmax(0, 1fr) auto;
     grid-template-areas: 'top top' 'escena panel' 'ticker ticker';
   }
   .tv-tablero { gap: calc(var(--u) * 1.4); }
-  .tv-card-num { font-size: calc(var(--u) * 6.5); }
-  .tv-card-label { font-size: calc(var(--u) * 2.1); }
+  .tv-card-num { font-size: min(calc(var(--u) * 6.5), 11cqh); }
+  .tv-card-label { font-size: min(calc(var(--u) * 2.1), 3.6cqh); }
 }
 
 @media (prefers-reduced-motion: reduce) {
   .tv-vista { transition: opacity .3s; transform: none; }
+}
+
+/* ---------- Barrita para ajustar el tamaño (oficina 3D ↕ panel) ---------- */
+.tv-divisor {
+  grid-area: divisor; height: calc(var(--u) * 1.6); cursor: row-resize; touch-action: none;
+  display: grid; place-items: center; background: #0a2a36; position: relative; z-index: 4;
+}
+.tv-divisor span { width: calc(var(--u) * 9); height: calc(var(--u) * 0.5); border-radius: 999px; background: rgba(255,255,255,.18); transition: background .2s, width .2s; }
+.tv-divisor:hover span, .tv-divisor.activo span { background: var(--intelekia-green-light); width: calc(var(--u) * 14); }
+
+/* ---------- Charlas de cómic en la TV (más grandes, legibles a 3 m) ---------- */
+body.tv .agent-tag .comic {
+  max-width: calc(var(--u) * 30); padding: calc(var(--u) * 1.1) calc(var(--u) * 1.6);
+  font-size: calc(var(--u) * 1.95); border-width: calc(var(--u) * 0.3); border-radius: calc(var(--u) * 2.2);
+  box-shadow: calc(var(--u) * 0.35) calc(var(--u) * 0.45) 0 rgba(0,0,0,.85);
+}
+
+/* ---------- Aviso: llegó un mensaje por WhatsApp ---------- */
+.tv-aviso-wa {
+  position: absolute; top: calc(var(--u) * 2.5); left: 50%; z-index: 5;
+  display: flex; align-items: center; gap: calc(var(--u) * 1.6);
+  padding: calc(var(--u) * 1.4) calc(var(--u) * 2.6) calc(var(--u) * 1.4) calc(var(--u) * 1.6);
+  background: #25d366; color: #06301a; border-radius: calc(var(--u) * 2.4);
+  box-shadow: 0 calc(var(--u) * 1) calc(var(--u) * 3) rgba(0,0,0,.35);
+  opacity: 0; transform: translate(-50%, calc(var(--u) * -4)); transition: opacity .35s, transform .45s cubic-bezier(.34,1.56,.64,1);
+  pointer-events: none; white-space: nowrap;
+}
+.tv-aviso-wa.visible { opacity: 1; transform: translate(-50%, 0); animation: wa-pulso 1.4s ease-in-out 3; }
+.tv-aviso-wa-icono {
+  width: calc(var(--u) * 6); height: calc(var(--u) * 6); border-radius: 50%; display: grid; place-items: center;
+  background: #fff; font-size: calc(var(--u) * 3.2);
+}
+.tv-aviso-wa-titulo { font-size: calc(var(--u) * 2.7); font-weight: 800; }
+.tv-aviso-wa-para { font-size: calc(var(--u) * 2.1); font-weight: 600; opacity: .85; }
+@keyframes wa-pulso { 0%, 100% { box-shadow: 0 0 0 0 rgba(37,211,102,.6), 0 calc(var(--u) * 1) calc(var(--u) * 3) rgba(0,0,0,.35); } 50% { box-shadow: 0 0 0 calc(var(--u) * 1.6) rgba(37,211,102,0), 0 calc(var(--u) * 1) calc(var(--u) * 3) rgba(0,0,0,.35); } }
+
+/* ---------- Entrevista a cámara (estilo documental) ---------- */
+/* Placa y frase apiladas abajo, por encima de la etiqueta del lugar. */
+.tv-entrevista {
+  position: absolute; inset: 0; z-index: 4; pointer-events: none; opacity: 0; transition: opacity .6s;
+  display: flex; flex-direction: column; justify-content: flex-end; align-items: flex-start; gap: calc(var(--u) * 1.2);
+  padding: 0 calc(var(--u) * 3) calc(var(--u) * 10);
+}
+.tv-entrevista.visible { opacity: 1; }
+.tv-entrevista-rec {
+  position: absolute; top: calc(var(--u) * 2.5); right: calc(var(--u) * 3);
+  display: flex; align-items: center; gap: calc(var(--u) * 0.8);
+  font: 800 calc(var(--u) * 2.2) 'Inter', sans-serif; color: #fff; letter-spacing: .1em; text-shadow: 0 1px 4px rgba(0,0,0,.6);
+}
+.tv-entrevista-rec span { width: calc(var(--u) * 1.6); height: calc(var(--u) * 1.6); border-radius: 50%; background: #ef4444; animation: blink 1.2s infinite; }
+.tv-entrevista-placa {
+  background: rgba(255,255,255,.95); color: #0b1f27; border-left: calc(var(--u) * 0.8) solid var(--intelekia-green);
+  padding: calc(var(--u) * 1) calc(var(--u) * 2.2);
+}
+.tv-entrevista-nombre { font-size: calc(var(--u) * 3); font-weight: 800; }
+.tv-entrevista-area { font-size: calc(var(--u) * 1.9); font-weight: 600; color: #4b6169; }
+.tv-entrevista-frase {
+  align-self: stretch;
+  font-size: calc(var(--u) * 2.7); font-weight: 700; font-style: italic; color: #fff; line-height: 1.3;
+  background: rgba(6, 22, 30, .78); padding: calc(var(--u) * 1.3) calc(var(--u) * 2); border-radius: calc(var(--u) * 1.2);
 }

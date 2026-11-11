@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Oficina Intelekia — Pantalla</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" />
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Comic+Neue:wght@700&display=swap" />
     <!-- styles.css aporta los colores de marca y el estilo de las etiquetas de los agentes en 3D -->
     <link rel="stylesheet" href="/styles.css" />
     <link rel="stylesheet" href="/tv.css" />
@@ -28,7 +28,23 @@
       <section id="tv-escena">
         <div id="tv-scene-container"></div>
         <div id="tv-escena-lugar" class="tv-escena-lugar"></div>
+        <div id="tv-aviso-wa" class="tv-aviso-wa" aria-live="polite">
+          <div class="tv-aviso-wa-icono">💬</div>
+          <div>
+            <div class="tv-aviso-wa-titulo">Nuevo mensaje por WhatsApp</div>
+            <div id="tv-aviso-wa-para" class="tv-aviso-wa-para"></div>
+          </div>
+        </div>
+        <div id="tv-entrevista" class="tv-entrevista">
+          <div class="tv-entrevista-rec"><span></span>REC</div>
+          <div class="tv-entrevista-placa">
+            <div id="tv-entrevista-nombre" class="tv-entrevista-nombre"></div>
+            <div id="tv-entrevista-area" class="tv-entrevista-area"></div>
+          </div>
+          <div id="tv-entrevista-frase" class="tv-entrevista-frase"></div>
+        </div>
       </section>
+      <div id="tv-divisor" class="tv-divisor" title="Arrastra para cambiar el tamaño · doble clic para el tamaño normal"><span></span></div>
 
       <section id="tv-panel">
         <div class="tv-panel-head">

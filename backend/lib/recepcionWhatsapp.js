@@ -173,6 +173,9 @@ function createRecepcionWhatsapp({
   enrutarConIA,
   labelOf = (id) => id,
   registrar = () => {},
+  // Avisos para las pantallas: llegó un mensaje (sin número ni texto) y a quién se le pasó.
+  alRecibir = () => {},
+  alRutear = () => {},
   plantilla = null,
   now = () => new Date(),
   zonaHoraria = 'America/Mexico_City',
@@ -492,7 +495,10 @@ function createRecepcionWhatsapp({
     if (!texto) return;
     if (await comando(num, texto)) return;
     const ruta = await rutear(num, texto);
-    if (ruta) await ejecutar(num, ruta, fueAudio);
+    if (ruta) {
+      alRutear(m.id, ruta.agentId);
+      await ejecutar(num, ruta, fueAudio);
+    }
   }
 
   function procesar(m) {
@@ -505,6 +511,7 @@ function createRecepcionWhatsapp({
       registrar(null, 'error', `WhatsApp: ignoré un mensaje de un número no permitido (${enmascarar(num)})`);
       return Promise.resolve();
     }
+    alRecibir(m.id);
     // Uno tras otro por número: la respuesta del primero llega antes que el aviso del segundo.
     const cadena = (cadenas[num] || Promise.resolve())
       .then(() => manejar(num, m))

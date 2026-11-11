@@ -2,6 +2,7 @@
 // Su ÚNICA fuente de datos es GET /api/tv/estado (el usuario "tv" no puede leer nada más).
 import { createScene } from './scene.js';
 import { loadBrandAssets } from './world/brand.js';
+import { createCharlas, entrevistaPara } from './charlas.js';
 
 const ESTADO_URL = '/api/tv/estado';
 const POLL_MS = 10000;
@@ -20,6 +21,9 @@ let firmaDeptos = '';
 let modoNoche = null; // null = aún sin decidir
 let tourTimer = null;
 let tourIndice = 0;
+let charlas = null;
+const WA_AVISO_MS = 7000;
+const ENTREVISTA_MS = 16000;
 
 // ---------- Utilidades ----------
 const formatoHora = new Intl.DateTimeFormat('es-MX', { hour: '2-digit', minute: '2-digit', hour12: false });
@@ -106,7 +110,15 @@ function crearEscena(estado) {
     departments: departamentosParaEscena(estado.departamentos),
   });
   scene.updateStatusColors(estatusPorAgente(estado.departamentos));
+  // Vida de oficina: charlas casuales en globos de cómic (guion fijo, sin IA).
+  charlas = createCharlas({ scene, agentes: listaAgentes });
+  charlas.iniciar();
   iniciarRecorrido();
+}
+
+/** [{ id, label, departamento }] de todos los trabajadores, según el último estado. */
+function listaAgentes() {
+  return (ultimoEstado?.departamentos || []).flatMap((d) => (d.agentes || []).map((a) => ({ id: a.id, label: a.label, departamento: d.id })));
 }
 
 /**
@@ -118,6 +130,7 @@ function paradasRecorrido() {
   return [
     { tipo: 'general', label: 'Toda la oficina' },
     ...deptos.map((d) => ({ tipo: 'depto', id: d.id, label: d.label })),
+    { tipo: 'entrevista', label: 'Entrevista' },
     { tipo: 'caminar', label: 'Recorrido virtual' },
   ];
 }
@@ -144,9 +157,74 @@ function siguienteParada() {
     mostrarLugar(`🚶 ${parada.label}`);
     return;
   }
+  if (parada.tipo === 'entrevista') {
+    if (entrevistar()) return;
+    scene.focusOverview();
+    mostrarLugar('📍 Toda la oficina');
+    return;
+  }
   if (parada.tipo === 'general') scene.focusOverview();
   else scene.focusDepartment(parada.id);
   mostrarLugar(`📍 ${parada.label}`);
+}
+
+/** "Entrevista a cámara" estilo documental: acerca la cámara a alguien y muestra su frase abajo. */
+function entrevistar() {
+  const deptos = ultimoEstado?.departamentos || [];
+  const todos = deptos.flatMap((d) => (d.agentes || []).map((a) => ({ ...a, area: d.label })));
+  if (!todos.length) return false;
+  const a = todos[Math.floor(Math.random() * todos.length)];
+  scene.focusAgent(a.id);
+  mostrarLugar('🎥 Entrevista');
+  const caja = $('tv-entrevista');
+  $('tv-entrevista-nombre').textContent = a.label;
+  $('tv-entrevista-area').textContent = a.area;
+  $('tv-entrevista-frase').textContent = `“${entrevistaPara(a.id)}”`;
+  caja.classList.remove('visible');
+  clearTimeout(entrevistar.timer);
+  setTimeout(() => caja.classList.add('visible'), 1200);
+  entrevistar.timer = setTimeout(() => caja.classList.remove('visible'), Math.min(ENTREVISTA_MS, TOUR_MS - 1500));
+  return true;
+}
+
+// ---------- Avisos de WhatsApp ----------
+const waVistos = new Map(); // id → agente (null mientras se rutea)
+const colaWa = [];
+let mostrandoWa = false;
+
+function registrarWhatsapp(avisos, { primeraCarga }) {
+  avisos.forEach((w) => {
+    if (!w?.id) return;
+    const conocido = waVistos.has(w.id);
+    const antes = waVistos.get(w.id);
+    waVistos.set(w.id, w.agente || null);
+    if (primeraCarga) return; // lo que ya había al encender la pantalla no se anuncia
+    if (!conocido) colaWa.push(w);
+    // Ya se sabe para quién era: ese trabajador reacciona en la oficina.
+    if (w.agente && !antes) reaccionarWhatsapp(w.agente);
+  });
+  siguienteAvisoWa();
+}
+
+function reaccionarWhatsapp(label) {
+  const a = listaAgentes().find((x) => x.label === label);
+  if (a && !modoNoche) charlas?.reaccionar('whatsapp', { conId: a.id });
+}
+
+function siguienteAvisoWa() {
+  if (mostrandoWa || !colaWa.length) return;
+  mostrandoWa = true;
+  const w = colaWa.shift();
+  const caja = $('tv-aviso-wa');
+  $('tv-aviso-wa-para').textContent = w.agente ? `Para ${w.agente}` : 'La recepción ya lo está leyendo';
+  caja.classList.add('visible');
+  setTimeout(() => {
+    caja.classList.remove('visible');
+    setTimeout(() => {
+      mostrandoWa = false;
+      siguienteAvisoWa();
+    }, 600);
+  }, WA_AVISO_MS);
 }
 
 function iniciarRecorrido() {
@@ -162,6 +240,7 @@ function aplicarNoche(noche) {
   const veniaDeNoche = modoNoche === true;
   modoNoche = noche;
   $('tv-noche').hidden = !noche;
+  charlas?.pausar(noche);
   if (noche) {
     scene?.pause();
     moverRelojNoche();
@@ -303,7 +382,10 @@ function registrarCelebraciones(celebraciones, { primeraCarga }) {
     if (!c?.id || celebracionesVistas.has(c.id)) return;
     celebracionesVistas.add(c.id);
     // Lo que ya existía al encender la pantalla no se celebra (pueden ser muchas).
-    if (!primeraCarga) colaCelebraciones.push(c);
+    if (!primeraCarga) {
+      colaCelebraciones.push(c);
+      setTimeout(() => charlas?.reaccionar('celebracion'), CELEBRACION_MS + 800);
+    }
   });
   siguienteCelebracion();
 }
@@ -355,6 +437,7 @@ function normalizar(estado) {
     dia: estado?.dia || {},
     actividad: Array.isArray(estado?.actividad) ? estado.actividad : [],
     celebraciones: Array.isArray(estado?.celebraciones) ? estado.celebraciones : [],
+    whatsapp: Array.isArray(estado?.whatsapp) ? estado.whatsapp : [],
   };
 }
 
@@ -389,6 +472,7 @@ function aplicarEstado(estado) {
 
   pintarSeguro('noche', () => aplicarNoche(estado.oficina.puedeTrabajar === false));
   pintarSeguro('celebraciones', () => registrarCelebraciones(estado.celebraciones, { primeraCarga }));
+  pintarSeguro('whatsapp', () => registrarWhatsapp(estado.whatsapp, { primeraCarga }));
 
   if (primeraCarga) $('tv-cargando').classList.add('oculto');
 }
@@ -410,8 +494,62 @@ async function consultar() {
   }
 }
 
+// ---------- Tamaño ajustable de la oficina 3D vs. el panel ----------
+const ESCENA_MIN = 25;
+const ESCENA_MAX = 75;
+const ESCENA_CLAVE = 'tv-escena-vh';
+
+function fijarEscena(vh, { guardar = true } = {}) {
+  const valor = Math.round(Math.min(ESCENA_MAX, Math.max(ESCENA_MIN, Number(vh) || 45)));
+  document.documentElement.style.setProperty('--tv-escena-h', `${valor}vh`);
+  if (guardar) {
+    try {
+      localStorage.setItem(ESCENA_CLAVE, String(valor));
+    } catch {
+      // sin almacenamiento: solo dura mientras la página esté abierta
+    }
+  }
+  window.dispatchEvent(new Event('resize')); // el 3D se ajusta al nuevo tamaño
+}
+
+/**
+ * Arrastra la barrita entre la oficina y el panel para darle más espacio a uno u otro.
+ * También se puede fijar desde la dirección: /tv.html?escena=60 (porcentaje del alto).
+ */
+function iniciarDivisor() {
+  const deUrl = new URLSearchParams(window.location.search).get('escena');
+  let guardado = null;
+  try {
+    guardado = localStorage.getItem(ESCENA_CLAVE);
+  } catch {
+    guardado = null;
+  }
+  if (deUrl || guardado) fijarEscena(deUrl || guardado, { guardar: Boolean(deUrl) });
+
+  const divisor = $('tv-divisor');
+  let arrastrando = false;
+  divisor.addEventListener('pointerdown', (e) => {
+    arrastrando = true;
+    divisor.setPointerCapture(e.pointerId);
+    divisor.classList.add('activo');
+  });
+  divisor.addEventListener('pointermove', (e) => {
+    if (!arrastrando) return;
+    const top = $('tv-escena').getBoundingClientRect().top;
+    fijarEscena(((e.clientY - top) / window.innerHeight) * 100);
+  });
+  const soltar = () => {
+    arrastrando = false;
+    divisor.classList.remove('activo');
+  };
+  divisor.addEventListener('pointerup', soltar);
+  divisor.addEventListener('pointercancel', soltar);
+  divisor.addEventListener('dblclick', () => fijarEscena(45));
+}
+
 // ---------- Arranque ----------
 async function iniciar() {
+  iniciarDivisor();
   tickReloj();
   setInterval(tickReloj, 1000);
   setInterval(() => {

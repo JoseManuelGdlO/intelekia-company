@@ -405,7 +405,7 @@ export function createScene({ container, departments, onAgentClick, onWalkStoppe
     if (entry.bubbleKey === key && tagEl.dataset.status === status) return;
     entry.bubbleKey = key;
     tagEl.dataset.status = status;
-    tagEl.className = `agent-tag status-${status}${tagEl.classList.contains('hover') ? ' hover' : ''}${tagEl.classList.contains('selected') ? ' selected' : ''}${talk ? ' talking' : ''}`;
+    tagEl.className = `agent-tag status-${status}${tagEl.classList.contains('hover') ? ' hover' : ''}${tagEl.classList.contains('selected') ? ' selected' : ''}${talk ? ' talking' : ''}${tagEl.classList.contains('diciendo') ? ' diciendo' : ''}`;
     let stateText = activity === 'coffee' ? 'Por un café' : STATUS_LABELS[status] || status;
     if (talk) stateText = talk.role === 'asks' ? `Consultando a ${talk.other}` : `Respondiendo a ${talk.other}`;
     tagEl.querySelector('.agent-state').textContent = stateText;
@@ -799,6 +799,45 @@ export function createScene({ container, departments, onAgentClick, onWalkStoppe
   }
   animate();
 
+  /**
+   * Globo de cómic sobre un trabajador (charlas casuales de la pantalla de TV).
+   * mirarA: voltea a ver a ese compañero mientras habla.
+   */
+  function say(agentId, texto, { ms = 4500, mirarA = null } = {}) {
+    const entry = agents[agentId];
+    if (!entry) return false;
+    let globo = entry.tagEl.querySelector('.comic');
+    if (!globo) {
+      globo = document.createElement('div');
+      globo.className = 'comic';
+      entry.tagEl.prepend(globo);
+    }
+    globo.textContent = texto;
+    globo.classList.remove('visible');
+    void globo.offsetWidth; // reinicia la animación de entrada
+    globo.classList.add('visible');
+    entry.tagEl.classList.add('diciendo');
+    const otro = mirarA && agents[mirarA];
+    if (otro && !entry.talk) {
+      const punto = new THREE.Vector3();
+      otro.character.focusPoint(punto);
+      punto.y += 0.45;
+      entry.character.setLookAt(punto);
+    }
+    clearTimeout(entry.comicTimer);
+    entry.comicTimer = setTimeout(() => {
+      globo.classList.remove('visible');
+      entry.tagEl.classList.remove('diciendo');
+      if (!entry.talk) entry.character.setLookAt(null);
+    }, ms);
+    return true;
+  }
+
+  /** ¿Está en una conversación real (consulta entre agentes)? */
+  function isBusy(agentId) {
+    return Boolean(agents[agentId]?.talk);
+  }
+
   function setAgentLabel(agentId, label) {
     const entry = agents[agentId];
     if (!entry) return;
@@ -824,5 +863,5 @@ export function createScene({ container, departments, onAgentClick, onWalkStoppe
     }
   }
 
-  return { updateStatusColors, setAgentLabel, setSelected, focusAgent, focusDepartment, focusOverview, startWalk, stopWalk, isWalking: () => Boolean(walk), showNetwork, playConversation, pause, resume };
+  return { updateStatusColors, setAgentLabel, setSelected, focusAgent, focusDepartment, focusOverview, startWalk, stopWalk, isWalking: () => Boolean(walk), say, isBusy, showNetwork, playConversation, pause, resume };
 }

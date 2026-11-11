@@ -83,7 +83,7 @@ test('limpiarTexto quita correos, URLs y teléfonos, colapsa espacios y recorta 
 
 test('estado devuelve exactamente la forma pública', () => {
   const e = createTvEstado(deps()).estado();
-  assert.deepEqual(Object.keys(e).sort(), ['actividad', 'celebraciones', 'departamentos', 'dia', 'gasto', 'oficina']);
+  assert.deepEqual(Object.keys(e).sort(), ['actividad', 'celebraciones', 'departamentos', 'dia', 'gasto', 'oficina', 'whatsapp']);
   assert.deepEqual(e.oficina, { abierta: true, puedeTrabajar: true, motivo: 'Dentro de horario (09:00–18:00).', entrada: '09:00', salida: '18:00' });
   assert.deepEqual(e.gasto, { usd: 1.2, limiteUsd: 5, excedido: false });
   assert.deepEqual(e.departamentos, [
@@ -206,4 +206,29 @@ test('un estatus de agente con datos sucios no se filtra: solo pasa el campo est
   const e = createTvEstado(deps({ estatus: () => ({ cotizador: { estatus: 'error', error: 'Falló con ana@cliente.com' } }) })).estado();
   assert.equal(e.departamentos[1].agentes[0].estatus, 'error');
   assert.doesNotMatch(JSON.stringify(e.departamentos), /ana@/);
+});
+
+test('whatsapp: solo id, fecha y trabajador (nunca número ni texto)', () => {
+  const { createAvisosWhatsapp } = require('../lib/avisosWhatsapp');
+  const avisos = createAvisosWhatsapp();
+  avisos.recibido('wamid.A');
+  avisos.recibido('wamid.B');
+  avisos.asignado('wamid.B', 'cotizador');
+  const { createTvEstado } = require('../lib/tvEstado');
+  const tv = createTvEstado({
+    estadoOficina: () => ({ abierta: true, puedeTrabajar: true, motivo: '', entrada: '09:00', salida: '18:00' }),
+    departamentos: () => [{ id: 'comercial', label: 'Comercial', agents: [{ id: 'cotizador', label: 'Cotizador' }] }],
+    estatus: () => ({}),
+    actividad: { recientes: () => [] },
+    conversaciones: { list: () => [] },
+    leerIdeas: () => [],
+    leerProspectos: () => [],
+    aprobaciones: { list: () => [] },
+    avisosWhatsapp: avisos,
+  });
+  const wa = tv.estado().whatsapp;
+  assert.equal(wa.length, 2);
+  assert.equal(wa[0].agente, 'Cotizador');
+  assert.equal(wa[1].agente, null);
+  wa.forEach((a) => assert.deepEqual(Object.keys(a).sort(), ['agente', 'fecha', 'id']));
 });

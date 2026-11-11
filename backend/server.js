@@ -34,6 +34,7 @@ const { createWhatsapp } = require('./lib/whatsapp');
 const { createVoz } = require('./lib/voz');
 const { createRecepcionWhatsapp, crearEnrutadorIA } = require('./lib/recepcionWhatsapp');
 const { createWhatsappEstadoRouter, createWhatsappWebhookApp } = require('./routes/whatsapp');
+const { createAvisosWhatsapp } = require('./lib/avisosWhatsapp');
 
 const { createAcceso } = require('./lib/acceso');
 const { createHorario } = require('./lib/horario');
@@ -266,6 +267,7 @@ function agentesParaWhatsapp() {
       return { id: a.id, label: a.label, rol };
     });
 }
+const avisosWhatsapp = createAvisosWhatsapp();
 const recepcionWhatsapp = createRecepcionWhatsapp({
   whatsapp,
   voz,
@@ -286,6 +288,8 @@ const recepcionWhatsapp = createRecepcionWhatsapp({
   enrutarConIA: crearEnrutadorIA({ createChatCompletion, apiKey: config.openaiApiKey, model: config.openaiModel }),
   labelOf: (id) => departments.flatMap((d) => d.agents).find((a) => a.id === id)?.label || id,
   registrar: registrarWhatsapp,
+  alRecibir: (mensajeId) => avisosWhatsapp.recibido(mensajeId),
+  alRutear: (mensajeId, agentId) => avisosWhatsapp.asignado(mensajeId, agentId),
   plantilla: config.whatsapp.plantillaAviso ? { nombre: config.whatsapp.plantillaAviso, idioma: config.whatsapp.plantillaIdioma } : null,
 });
 aprobaciones.suscribir((item) => recepcionWhatsapp.avisarAprobacion(item));
@@ -313,6 +317,7 @@ const tvEstado = createTvEstado({
   leerProspectos: () => readProspectos(path.join(ROOT, 'departamentos', 'comercial', 'content', 'prospectos.json')),
   revisiones: revisorPRsAgent ? () => createRevisionesStore({ filePath: revisorPRsAgent.deps.revisionesPath }).lista() : null,
   aprobaciones,
+  avisosWhatsapp,
   timeZone: process.env.TZ || 'America/Monterrey',
 });
 app.use('/api/tv', createTvRouter({ tvEstado }));
@@ -338,7 +343,7 @@ if (revisorPRsAgent) {
   app.use('/api/revisiones-pr', createRevisionesPRRouter({ filePath: revisorPRsAgent.deps.revisionesPath }));
 }
 app.use('/api/comunicacion', createComunicacionRouter({ comunicacion, conversaciones }));
-app.use(createWhatsappEstadoRouter({ whatsapp, recepcion: recepcionWhatsapp }));
+app.use(createWhatsappEstadoRouter({ whatsapp, recepcion: recepcionWhatsapp, avisos: avisosWhatsapp }));
 app.use(express.static(path.join(ROOT, 'frontend')));
 
 app.listen(config.port, () => {
