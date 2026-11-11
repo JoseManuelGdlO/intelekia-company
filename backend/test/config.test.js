@@ -66,6 +66,7 @@ test('loadConfig lee la configuración de WhatsApp', () => {
 });
 
 test('loadConfig lee el usuario y contraseña de la oficina', () => {
-  assert.deepEqual(loadConfig({ OFICINA_USUARIO: 'jose', OFICINA_PASSWORD: 'x' }).acceso, { usuario: 'jose', password: 'x' });
-  assert.deepEqual(loadConfig({}).acceso, { usuario: '', password: '' });
+  assert.deepEqual(loadConfig({ OFICINA_USUARIO: 'jose', OFICINA_PASSWORD: 'x' }).acceso, { usuario: 'jose', password: 'x', tvUsuario: '', tvPassword: '' });
+  assert.deepEqual(loadConfig({}).acceso, { usuario: '', password: '', tvUsuario: '', tvPassword: '' });
+  assert.deepEqual(loadConfig({ OFICINA_TV_USUARIO: 'tele', OFICINA_TV_PASSWORD: 'y' }).acceso, { usuario: '', password: '', tvUsuario: 'tele', tvPassword: 'y' });
 });

@@ -67,3 +67,15 @@ test('list sin límite sigue devolviendo como máximo 150 eventos', () => {
   assert.equal(store.list('pm').length, 150);
   assert.equal(store.list('pm', { limite: 300 }).length, 200);
 });
+
+test('recientes junta a todos los agentes, del más reciente al más antiguo, con agentId', () => {
+  let t = 0;
+  const store = createActividadStore({ now: () => new Date(Date.UTC(2026, 10, 7, 10, 0, t++)) });
+  store.log('pm', 'inicio', 'a');
+  store.log('cotizador', 'nota', 'b');
+  store.log('pm', 'fin', 'c');
+  const todos = store.recientes();
+  assert.deepEqual(todos.map((e) => [e.agentId, e.texto]), [['pm', 'c'], ['cotizador', 'b'], ['pm', 'a']]);
+  assert.deepEqual(store.recientes({ limite: 2 }).map((e) => e.texto), ['c', 'b']);
+  assert.deepEqual(store.recientes({ desde: '2026-11-07T10:00:00.000Z' }).map((e) => e.texto), ['c', 'b']);
+});

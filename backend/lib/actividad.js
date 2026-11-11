@@ -73,12 +73,27 @@ function createActividadStore({ filePath = null, now = () => new Date() } = {}) 
     return { eventos: lista, ...meta };
   }
 
+  /**
+   * Eventos de TODOS los agentes (cada uno con su `agentId`), del más reciente al más antiguo.
+   * `desde` (ISO) descarta los anteriores; `limite` corta la lista (por defecto 50).
+   */
+  function recientes({ limite = 50, desde } = {}) {
+    const todos = [];
+    for (const [agentId, lista] of Object.entries(porAgente)) {
+      for (const e of lista || []) {
+        if (!desde || e.fecha > desde) todos.push({ ...e, agentId });
+      }
+    }
+    todos.sort((a, b) => String(b.fecha).localeCompare(String(a.fecha)));
+    return todos.slice(0, limite);
+  }
+
   /** Para agentes que solo se conocen por id (p. ej. agentes "a la medida" creados en caliente). */
   function forAgent(agentId) {
     return (tipo, texto, detalle) => log(agentId, tipo, texto, detalle);
   }
 
-  return { log, list, pagina, forAgent, TIPOS };
+  return { log, list, pagina, recientes, forAgent, TIPOS };
 }
 
 module.exports = { createActividadStore, TIPOS, MAX_POR_AGENTE };

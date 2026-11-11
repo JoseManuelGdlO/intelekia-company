@@ -38,7 +38,12 @@ const { createWhatsappEstadoRouter, createWhatsappWebhookApp } = require('./rout
 const { createAcceso } = require('./lib/acceso');
 const { createHorario } = require('./lib/horario');
 const { createGasto } = require('./lib/gasto');
-const { createOficinaRouter, crearPuedeTrabajar } = require('./routes/oficina');
+const { createOficinaRouter, crearPuedeTrabajar, estadoOficina } = require('./routes/oficina');
+const { createTvEstado } = require('./lib/tvEstado');
+const { createTvRouter } = require('./routes/tv');
+const { readIdeas } = require('./lib/ideasStore');
+const { readProspectos } = require('./lib/prospectosStore');
+const { createRevisionesStore } = require('./lib/revisionesPR');
 const config = loadConfig();
 const ROOT = path.join(__dirname, '..');
 const STATUS_PATH = path.join(__dirname, 'state', 'agents-status.json');
@@ -291,8 +296,26 @@ const acceso = createAcceso(config.acceso);
 if (!acceso.activo && process.env.NODE_ENV === 'production') {
   console.warn('⚠️  La oficina está SIN contraseña: define OFICINA_USUARIO y OFICINA_PASSWORD.');
 }
+if (!acceso.activo && config.acceso.tvUsuario) {
+  console.warn('⚠️  OFICINA_TV_USUARIO no tiene efecto sin OFICINA_USUARIO/OFICINA_PASSWORD: la oficina sigue abierta.');
+}
 app.use(acceso);
 app.use(express.json());
+// Pantalla (TV) de la oficina: solo lectura y datos limpios. El usuario de TV solo llega aquí y a los estáticos.
+const revisorPRsAgent = allAgents.find((a) => a.id === 'revisor-prs');
+const tvEstado = createTvEstado({
+  estadoOficina: () => estadoOficina({ horario, gasto }),
+  departamentos: () => departments,
+  estatus: () => readStatus(STATUS_PATH),
+  actividad,
+  conversaciones,
+  leerIdeas: () => readIdeas(path.join(ROOT, 'departamentos', 'marketing', 'content', 'ideas.json')),
+  leerProspectos: () => readProspectos(path.join(ROOT, 'departamentos', 'comercial', 'content', 'prospectos.json')),
+  revisiones: revisorPRsAgent ? () => createRevisionesStore({ filePath: revisorPRsAgent.deps.revisionesPath }).lista() : null,
+  aprobaciones,
+  timeZone: process.env.TZ || 'America/Monterrey',
+});
+app.use('/api/tv', createTvRouter({ tvEstado }));
 app.use('/api/agents', createAgentsRouter({ statusPath: STATUS_PATH, readStatus, scheduler, chatHandlers, actividad }));
 app.use(
   '/api/departments',
@@ -311,7 +334,6 @@ app.use('/api/base-datos', createBaseDatosRouter({ database }));
 app.use('/api/correo', createCorreoRouter({ mailer }));
 app.use('/api/oficina', createOficinaRouter({ horario, gasto }));
 app.use('/api/aprobaciones', createAprobacionesRouter({ aprobaciones }));
-const revisorPRsAgent = allAgents.find((a) => a.id === 'revisor-prs');
 if (revisorPRsAgent) {
   app.use('/api/revisiones-pr', createRevisionesPRRouter({ filePath: revisorPRsAgent.deps.revisionesPath }));
 }

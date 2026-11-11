@@ -31,6 +31,9 @@ function loadConfig(env = process.env) {
     acceso: {
       usuario: env.OFICINA_USUARIO || '',
       password: env.OFICINA_PASSWORD || '',
+      // Usuario de solo lectura para las pantallas (TV) de la oficina: solo ve /tv.html y /api/tv.
+      tvUsuario: env.OFICINA_TV_USUARIO || '',
+      tvPassword: env.OFICINA_TV_PASSWORD || '',
     },
     whatsapp: {
       token: env.WHATSAPP_TOKEN || '',
