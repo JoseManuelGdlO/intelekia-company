@@ -213,3 +213,23 @@ export async function fetchAprobaciones(params = {}) {
 
 export const aprobarAprobacion = (id, body) => sendJson(`${APROBACIONES_URL}/${encodeURIComponent(id)}/aprobar`, 'POST', body);
 export const descartarAprobacion = (id) => sendJson(`${APROBACIONES_URL}/${encodeURIComponent(id)}/descartar`, 'POST');
+
+const OFICINA_URL = '/api/oficina';
+
+export async function fetchOficina() {
+  return jsonOrThrow(await fetch(OFICINA_URL));
+}
+
+export async function guardarHorario(cambios) {
+  return jsonOrThrow(
+    await fetch(`${OFICINA_URL}/horario`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(cambios) })
+  );
+}
+
+export async function abrirOficina() {
+  return jsonOrThrow(await fetch(`${OFICINA_URL}/abrir`, { method: 'POST' }));
+}
+
+export async function cerrarOficina() {
+  return jsonOrThrow(await fetch(`${OFICINA_URL}/cerrar`, { method: 'POST' }));
+}

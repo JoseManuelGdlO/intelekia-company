@@ -22,6 +22,8 @@ function createScheduler({
   statePath = null,
   tickMs = DEFAULT_TICK_MS,
   now = () => Date.now(),
+  // Horario / oficina cerrada: si devuelve false no se inicia ningún ciclo automático.
+  puedeTrabajar = () => true,
   onError = (agentId, err) => console.error(`Ciclo de ${agentId} falló:`, err.message),
 }) {
   let timer = null;
@@ -57,6 +59,8 @@ function createScheduler({
     queued.delete(agentId);
     const runner = agentRunners[agentId];
     if (!runner || running.has(agentId)) return;
+    // Si se cerró la oficina mientras esperaba en la cola, ya no arranca (le tocará al reabrir).
+    if (!puedeTrabajar()) return;
     running.add(agentId);
     markRun(agentId);
     try {
@@ -76,6 +80,7 @@ function createScheduler({
 
   /** Revisa qué agentes ya cumplieron su intervalo y los pone en la cola. */
   function tick() {
+    if (!puedeTrabajar()) return queue;
     let changed = false;
     Object.keys(agentRunners).forEach((agentId) => {
       const ms = intervalOf(agentId);

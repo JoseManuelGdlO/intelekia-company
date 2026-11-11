@@ -6,6 +6,7 @@ import { createComunicacionEditor } from './comunicacionEditor.js';
 import { createPerfilEditor } from './perfilEditor.js';
 import { createCorreoBandeja } from './correoBandeja.js';
 import { createAprobacionesBandeja } from './aprobacionesBandeja.js';
+import { createOficinaHorario } from './oficinaHorario.js';
 import { mostrarRevisionesPR } from './revisionesPR.js';
 import { themeFor, hex } from './world/materials.js';
 import { loadBrandAssets } from './world/brand.js';
@@ -188,6 +189,7 @@ function showMailInFeed(item) {
 
 const correoBandeja = createCorreoBandeja({ labelOf, onCorreo: showMailInFeed });
 const aprobacionesBandeja = createAprobacionesBandeja({ labelOf });
+const oficinaHorario = createOficinaHorario();
 
 function mergeConversations(list, { animate }) {
   list.forEach((conv) => {
@@ -254,6 +256,7 @@ async function refreshStatus() {
     updateLegend();
     correoBandeja.refresh();
     aprobacionesBandeja.refresh();
+    oficinaHorario.refresh();
   } catch (err) {
     console.error('No se pudo actualizar el estatus', err);
   }

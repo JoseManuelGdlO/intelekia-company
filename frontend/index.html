@@ -23,7 +23,34 @@
       <nav id="dept-nav"></nav>
       <button id="mail-inbox-btn" class="chip chip-mail" hidden>✉️ Correos <span id="mail-inbox-count" class="count-badge" hidden></span></button>
       <button id="apr-inbox-btn" class="chip chip-mail">✋ Aprobaciones <span id="apr-inbox-count" class="count-badge" hidden></span></button>
+      <button id="oficina-btn" class="chip chip-oficina" title="Abrir o cerrar la oficina (solo frena los ciclos automáticos)">🟢 Oficina abierta</button>
+      <button id="horario-btn" class="chip" title="Horario de trabajo">🕘 Horario</button>
     </header>
+
+    <div id="horario-modal" role="dialog" aria-modal="true" aria-labelledby="horario-modal-title">
+      <div class="com-card horario-card">
+        <div class="com-header">
+          <div>
+            <h2 id="horario-modal-title">🕘 Horario de trabajo</h2>
+            <p>Fuera de horario (o con la oficina cerrada) los trabajadores <b>no inician ciclos automáticos</b>.
+              Lo que tú pidas a mano —chat, WhatsApp, Forzar ciclo, aprobar— siempre funciona.</p>
+          </div>
+          <button id="horario-close" class="icon-btn" title="Cerrar (Esc)">✕</button>
+        </div>
+        <div class="horario-body">
+          <label class="tool-switch"><input type="checkbox" id="horario-respetar" /> Respetar horario</label>
+          <div class="horario-dias" id="horario-dias"></div>
+          <div class="horario-horas">
+            <label>Entrada <input type="time" id="horario-entrada" /></label>
+            <label>Salida <input type="time" id="horario-salida" /></label>
+          </div>
+          <p class="muted horario-nota">Hora de la oficina (Monterrey/Durango). Si la salida es antes que la entrada, el turno cruza la medianoche.</p>
+          <p id="horario-estado" class="horario-estado"></p>
+          <div class="perfil-actions"><button id="horario-save" class="btn primary">Guardar horario</button></div>
+        </div>
+        <div id="horario-toast"></div>
+      </div>
+    </div>
 
     <div id="mail-modal" role="dialog" aria-modal="true" aria-labelledby="mail-modal-title">
       <div class="com-card mail-card">

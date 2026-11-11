@@ -36,6 +36,8 @@ const { createRecepcionWhatsapp, crearEnrutadorIA } = require('./lib/recepcionWh
 const { createWhatsappEstadoRouter, createWhatsappWebhookApp } = require('./routes/whatsapp');
 
 const { createAcceso } = require('./lib/acceso');
+const { createHorario } = require('./lib/horario');
+const { createOficinaRouter } = require('./routes/oficina');
 const config = loadConfig();
 const ROOT = path.join(__dirname, '..');
 const STATUS_PATH = path.join(__dirname, 'state', 'agents-status.json');
@@ -203,6 +205,13 @@ const customAgentsRegistry = createCustomAgentRegistry({
 });
 customAgentsRegistry.loadAllAtStartup();
 
+// Horario de trabajo y botón abrir/cerrar: solo frenan los ciclos automáticos.
+const horario = createHorario({
+  filePath: path.join(__dirname, 'state', 'horario.json'),
+  timeZone: process.env.TZ || 'America/Monterrey',
+  registrar: (texto) => actividad.log('oficina', 'nota', texto),
+});
+
 // Cada agente tiene su propio intervalo (perfil → Rol y contexto → Ciclo automático).
 const scheduler = createScheduler({
   intervalMs: config.agentIntervalHours * 60 * 60 * 1000,
@@ -212,6 +221,7 @@ const scheduler = createScheduler({
     return cadaHoras > 0 ? cadaHoras * 60 * 60 * 1000 : null;
   },
   statePath: CICLOS_PATH,
+  puedeTrabajar: horario.puedeTrabajar,
 });
 
 // Canal de WhatsApp: el fundador le escribe a la oficina (texto o audio).
@@ -288,6 +298,7 @@ app.use('/api/perfiles', createPerfilesRouter({ profiles }));
 app.use('/api/instalables', createInstalablesRouter({ instalables }));
 app.use('/api/base-datos', createBaseDatosRouter({ database }));
 app.use('/api/correo', createCorreoRouter({ mailer }));
+app.use('/api/oficina', createOficinaRouter({ horario }));
 app.use('/api/aprobaciones', createAprobacionesRouter({ aprobaciones }));
 const revisorPRsAgent = allAgents.find((a) => a.id === 'revisor-prs');
 if (revisorPRsAgent) {

@@ -168,3 +168,26 @@ test('runOne rechaza forzar un ciclo que ya está en curso y el tick no lo encim
   assert.equal(await primera, 'listo');
   assert.equal(scheduler.proximos().a.enCurso, false);
 });
+
+test('con la oficina cerrada o fuera de horario no inicia ciclos automáticos, pero Forzar sí corre', async () => {
+  const reloj = relojFalso();
+  let puede = true;
+  const corridas = [];
+  const scheduler = createScheduler({
+    intervalMs: HORA,
+    agentRunners: { a: async () => corridas.push('a') },
+    now: reloj.now,
+    puedeTrabajar: () => puede,
+  });
+  await scheduler.tick(); // primera vez: empieza a contar
+  reloj.avanzar(HORA);
+  puede = false;
+  await scheduler.tick();
+  assert.deepEqual(corridas, []);
+  await scheduler.runOne('a');
+  assert.deepEqual(corridas, ['a']);
+  reloj.avanzar(HORA);
+  puede = true;
+  await scheduler.tick();
+  assert.deepEqual(corridas, ['a', 'a']);
+});

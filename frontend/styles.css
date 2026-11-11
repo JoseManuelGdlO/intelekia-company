@@ -509,3 +509,31 @@ details.act-row > summary.act-head .act-text::after { content: ' ▾'; color: va
 .apr-original { font-size: 12.5px; color: #10232b; background: #f2f7f6; border-radius: 10px; padding: 8px 10px; line-height: 1.45; }
 .apr-original a { color: var(--intelekia-green); font-weight: 600; text-decoration: none; }
 .apr-original a:hover { text-decoration: underline; }
+
+/* ---------- Horario de trabajo / abrir-cerrar oficina ---------- */
+.chip.chip-oficina.cerrada { background: var(--c-error); border-color: transparent; color: #fff; }
+.chip.chip-oficina.fuera { background: #334155; border-color: transparent; color: #e2e8f0; }
+#horario-modal {
+  position: fixed; inset: 0; z-index: 9; display: grid; place-items: center; padding: 16px;
+  background: rgba(6, 33, 44, 0.45); backdrop-filter: blur(4px); opacity: 0; pointer-events: none; transition: opacity .2s;
+}
+#horario-modal.visible { opacity: 1; pointer-events: auto; }
+.horario-card { width: min(520px, 100%); position: relative; }
+.horario-body { padding: 16px 22px 20px; display: flex; flex-direction: column; gap: 14px; }
+.horario-dias { display: flex; gap: 6px; flex-wrap: wrap; }
+.horario-dia {
+  display: flex; align-items: center; gap: 4px; padding: 6px 10px; border: 1px solid #d5e3df; border-radius: 10px;
+  font-weight: 700; font-size: 13px; color: var(--intelekia-navy); cursor: pointer; background: #fff;
+}
+.horario-dia input { accent-color: var(--intelekia-green); }
+.horario-horas { display: flex; gap: 16px; flex-wrap: wrap; }
+.horario-horas label { display: flex; flex-direction: column; gap: 5px; font-size: 12.5px; font-weight: 600; color: #3b5259; }
+.horario-horas input { font: 14px 'Inter', sans-serif; border: 1px solid #d5e3df; border-radius: 10px; padding: 7px 10px; }
+.horario-nota { font-size: 12px; margin: 0; color: #7a8f95; }
+.horario-estado { margin: 0; font-size: 13px; font-weight: 600; color: var(--intelekia-navy); background: #f1f7f5; border-radius: 10px; padding: 9px 12px; }
+#horario-toast {
+  position: absolute; top: 18px; left: 50%; transform: translate(-50%, -8px); background: var(--intelekia-navy); color: #fff; z-index: 2;
+  font-size: 12.5px; font-weight: 600; padding: 9px 14px; border-radius: 10px; opacity: 0; transition: opacity .2s, transform .2s; pointer-events: none;
+}
+#horario-toast.visible { opacity: 1; transform: translate(-50%, 0); }
+#horario-toast.error { background: var(--c-error); }
