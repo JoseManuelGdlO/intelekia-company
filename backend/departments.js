@@ -106,6 +106,8 @@ function buildDepartments({ rootDir, config, createChatCompletion }) {
             rolePath: path.join(COMERCIAL_DIR, 'agentes', 'cotizador.md'),
             serviciosPath: path.join(COMERCIAL_DIR, 'content', 'servicios.json'),
             cotizacionesDir: path.join(COMERCIAL_DIR, 'content', 'cotizaciones-tipo'),
+            // Plantilla del fundador para todas las cotizaciones (se edita en el perfil del Cotizador).
+            plantillaPath: path.join(COMERCIAL_DIR, 'agentes', 'plantilla-cotizacion.md'),
             ...shared,
           },
         },

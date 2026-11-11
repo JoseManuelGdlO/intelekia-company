@@ -178,3 +178,57 @@ test('describeSuccess reports idle when the template library is already complete
   const patch = describeSuccess({ plantillaCreada: null });
   assert.deepEqual(patch, { estatus: 'idle', ultimaAccion: 'Biblioteca de cotizaciones tipo completa' });
 });
+
+function setupPlantilla({ plantilla = 'Plantilla Intelekia\n## Alcance\n{{alcance}}', servicios = ['Servicio A', 'Servicio B'] } = {}) {
+  const contextPath = tempFile('context', '# Intelekia');
+  const rolePath = tempFile('role', 'Eres el cotizador.');
+  const serviciosPath = tempFile('servicios', JSON.stringify(servicios));
+  const plantillaPath = path.join(tempDir('plantilla'), 'plantilla-cotizacion.md');
+  if (plantilla !== null) fs.writeFileSync(plantillaPath, plantilla);
+  const cotizacionesDir = tempDir('cotizaciones');
+  return { contextPath, rolePath, serviciosPath, plantillaPath, cotizacionesDir, apiKey: 'k', model: 'm' };
+}
+
+test('runCycle con plantilla: la manda como formato obligatorio', async () => {
+  const deps = setupPlantilla();
+  let enviado = '';
+  const r = await runCycle({ ...deps, createChatCompletion: async ({ messages }) => { enviado = messages[1].content; return 'Cotización A'; } });
+  assert.equal(r.plantillaCreada.servicio, 'Servicio A');
+  assert.match(enviado, /Plantilla Intelekia/);
+  assert.match(enviado, /\{\{alcance\}\}/);
+  assert.match(enviado, /estructura/i);
+});
+
+test('runCycle regenera las cotizaciones tipo cuando cambia la plantilla, una por ciclo', async () => {
+  const deps = setupPlantilla({ plantilla: null });
+  fs.writeFileSync(path.join(deps.cotizacionesDir, cotizacionFileName('Servicio A')), 'vieja A');
+  fs.writeFileSync(path.join(deps.cotizacionesDir, cotizacionFileName('Servicio B')), 'vieja B');
+  const llamar = async ({ messages }) => `nueva ${messages[1].content.includes('Servicio A') ? 'A' : 'B'}`;
+
+  // Sin plantilla: la biblioteca existente se respeta.
+  assert.equal((await runCycle({ ...deps, createChatCompletion: llamar })).plantillaCreada, null);
+
+  fs.writeFileSync(deps.plantillaPath, 'Plantilla v1');
+  assert.equal((await runCycle({ ...deps, createChatCompletion: llamar })).plantillaCreada.servicio, 'Servicio A');
+  assert.equal((await runCycle({ ...deps, createChatCompletion: llamar })).plantillaCreada.servicio, 'Servicio B');
+  assert.equal((await runCycle({ ...deps, createChatCompletion: llamar })).plantillaCreada, null);
+  assert.equal(fs.readFileSync(path.join(deps.cotizacionesDir, cotizacionFileName('Servicio B')), 'utf-8'), 'nueva B');
+
+  fs.writeFileSync(deps.plantillaPath, 'Plantilla v2');
+  assert.equal((await runCycle({ ...deps, createChatCompletion: llamar })).plantillaCreada.servicio, 'Servicio A');
+});
+
+test('chat con plantilla: siempre la incluye, aunque no venga itemId', async () => {
+  const deps = setupPlantilla();
+  let enviado = '';
+  await chat({ ...deps, message: 'cotiza un bot para la Cafetería Sol', createChatCompletion: async ({ messages }) => { enviado = messages[1].content; return 'ok'; } });
+  assert.match(enviado, /Plantilla Intelekia/);
+  assert.match(enviado, /Cafetería Sol/);
+});
+
+test('plantilla vacía o solo espacios cuenta como sin plantilla', async () => {
+  const deps = setupPlantilla({ plantilla: '   \n' });
+  let enviado = '';
+  await chat({ ...deps, message: 'hola', createChatCompletion: async ({ messages }) => { enviado = messages[1].content; return 'ok'; } });
+  assert.doesNotMatch(enviado, /plantilla/i);
+});

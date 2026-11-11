@@ -191,3 +191,29 @@ test('soportaAutonomia solo es true en agentes con usaAutonomia', () => {
   assert.equal(profiles.getProfile('redes').soportaAutonomia, true);
   assert.equal(profiles.getProfile('otro').soportaAutonomia, false);
 });
+
+test('plantilla: solo la tienen los agentes con plantillaPath; se lee, se guarda y se puede vaciar', () => {
+  const { profiles, dir } = setup();
+  assert.equal(profiles.getProfile('publicador').plantilla, null);
+  assert.throws(() => profiles.updateProfile('publicador', { plantilla: 'x' }), /no usa plantilla/);
+});
+
+test('plantilla del cotizador editable desde el perfil', () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'perfiles-'));
+  const rolePath = path.join(dir, 'cotizador.md');
+  fs.writeFileSync(rolePath, 'Eres el Cotizador.');
+  const plantillaPath = path.join(dir, 'sub', 'plantilla-cotizacion.md');
+  const profiles = createAgentProfiles({
+    profilesPath: path.join(dir, 'perfiles.json'),
+    memoriasDir: path.join(dir, 'memorias'),
+    departments: [{ id: 'comercial', label: 'Comercial', agents: [{ id: 'cotizador', label: 'Cotizador', deps: { rolePath, plantillaPath } }] }],
+    createChatCompletion: async () => '',
+    config: {},
+    updateCustomAgent: () => {},
+  });
+  assert.equal(profiles.getProfile('cotizador').plantilla, '');
+  assert.equal(profiles.updateProfile('cotizador', { plantilla: '# Cotización\n{{cliente}}' }).plantilla, '# Cotización\n{{cliente}}');
+  assert.equal(fs.readFileSync(plantillaPath, 'utf-8'), '# Cotización\n{{cliente}}');
+  assert.equal(profiles.updateProfile('cotizador', { plantilla: '' }).plantilla, '');
+  assert.throws(() => profiles.updateProfile('cotizador', { plantilla: 5 }), /texto/);
+});

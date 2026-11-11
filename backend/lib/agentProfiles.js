@@ -77,6 +77,13 @@ function createAgentProfiles({
     return rolePath && fs.existsSync(rolePath) ? fs.readFileSync(rolePath, 'utf-8') : '';
   }
 
+  /** Plantilla de documentos (p. ej. cotizaciones): null si el agente no usa plantilla. */
+  function plantillaOf(agent) {
+    const plantillaPath = agent.deps?.plantillaPath;
+    if (!plantillaPath) return null;
+    return fs.existsSync(plantillaPath) ? fs.readFileSync(plantillaPath, 'utf-8') : '';
+  }
+
   function skillsOf(agentId) {
     return readAll()[agentId]?.skills || [];
   }
@@ -219,6 +226,7 @@ function createAgentProfiles({
       departmentLabel: department.label,
       tipo: agent.isCustom ? 'custom' : 'base',
       rol: rolOf(agent),
+      plantilla: plantillaOf(agent),
       autonomous: agent.isCustom ? Boolean(agent.autonomous) : null,
       skills: skillsOf(agentId),
       herramientas: herramientasOf(agentId),
@@ -232,10 +240,15 @@ function createAgentProfiles({
     };
   }
 
-  function updateProfile(agentId, { rol, label, autonomous, skills, herramientas, cicloHoras, instalados, autonomia } = {}) {
+  function updateProfile(agentId, { rol, label, autonomous, skills, herramientas, cicloHoras, instalados, autonomia, plantilla } = {}) {
     const { agent } = requireAgent(agentId);
     // Validar todo antes de escribir nada.
     if (rol !== undefined && (typeof rol !== 'string' || !rol.trim())) throw new Error('El rol no puede quedar vacío');
+    if (plantilla !== undefined) {
+      if (!agent.deps?.plantillaPath) throw new Error('Este agente no usa plantilla');
+      if (typeof plantilla !== 'string') throw new Error('La plantilla debe ser texto');
+      if (plantilla.length > MAX_CONTENIDO) throw new Error(`La plantilla no puede pasar de ${MAX_CONTENIDO} caracteres`);
+    }
     if (label !== undefined && (typeof label !== 'string' || !label.trim())) throw new Error('El nombre no puede quedar vacío');
     if (!agent.isCustom && label !== undefined && label.trim() !== agent.label) {
       throw new Error('El nombre de los agentes base se define en el código; solo se puede cambiar en trabajadores a la medida');
@@ -264,6 +277,11 @@ function createAgentProfiles({
       if (Object.keys(patch).length) updateCustomAgent(agentId, patch);
     } else if (rol !== undefined) {
       fs.writeFileSync(agent.deps.rolePath, rol);
+    }
+
+    if (plantilla !== undefined) {
+      fs.mkdirSync(path.dirname(agent.deps.plantillaPath), { recursive: true });
+      fs.writeFileSync(agent.deps.plantillaPath, plantilla);
     }
 
     if (normalizedSkills !== undefined || normalizedHerramientas !== undefined || normalizedInstalados !== undefined || cicloHoras !== undefined || autonomia !== undefined) {

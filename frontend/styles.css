@@ -334,7 +334,9 @@ html, body { margin: 0; height: 100%; overflow: hidden; background: #dfe9e6; }
 .perfil-pane { display: none; flex: 1; min-height: 0; flex-direction: column; gap: 12px; padding: 16px 22px 18px; overflow-y: auto; }
 .perfil-pane.active { display: flex; }
 .perfil-row { display: flex; gap: 18px; flex-wrap: wrap; align-items: flex-end; }
-.perfil-row[hidden] { display: none; }
+.perfil-row[hidden], .perfil-field[hidden] { display: none; }
+/* Con plantilla hay dos textos largos: cada uno con su alto y la pestaña hace scroll. */
+.perfil-pane:has(#perfil-plantilla-field:not([hidden])) .perfil-field { flex: none; }
 .perfil-row label { display: flex; flex-direction: column; gap: 5px; font-size: 12.5px; font-weight: 600; color: #3b5259; }
 .perfil-row input[type='text'] { min-width: 260px; }
 .perfil-check { flex-direction: row !important; align-items: center; gap: 8px !important; padding-bottom: 8px; }
@@ -344,7 +346,7 @@ html, body { margin: 0; height: 100%; overflow: hidden; background: #dfe9e6; }
   font: 13px 'Inter', sans-serif; color: #10232b; border: 1px solid #d5e3df; border-radius: 10px; padding: 9px 11px; background: #fff; outline: none;
 }
 .perfil-card input[type='text']:focus, .perfil-card textarea:focus { border-color: var(--intelekia-green); box-shadow: 0 0 0 3px rgba(25,143,112,.15); }
-#perfil-rol, #perfil-memoria {
+#perfil-rol, #perfil-plantilla, #perfil-memoria {
   flex: 1; min-height: 260px; resize: none; font: 13px/1.55 ui-monospace, 'SF Mono', Menlo, monospace;
 }
 .perfil-help { margin: 0; font-size: 12.5px; color: #4b6169; line-height: 1.5; }
