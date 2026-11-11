@@ -52,3 +52,17 @@ test('recortar quita emojis y los marcadores ✅/⚠️ para que la voz no los l
   assert.equal(voz.recortar('⚠️ Falló el envío'), 'Falló el envío');
   assert.equal(voz.recortar('Listo 👍🏽 #3'), 'Listo #3');
 });
+
+test('onUso recibe el consumo estimado de transcribir y sintetizar (y si falla no rompe)', async () => {
+  const usos = [];
+  const ok = { ok: true, json: async () => ({ text: 'hola' }), arrayBuffer: async () => Buffer.from('OGG') };
+  const voz = createVoz({ apiKey: 'sk', fetchImpl: fakeFetch(ok), onUso: (u) => usos.push(u) });
+  await voz.transcribir(Buffer.alloc(20000));
+  await voz.sintetizar('*Hola* equipo');
+  assert.deepEqual(usos, [
+    { tipo: 'transcripcion', segundos: 10 },
+    { tipo: 'voz', caracteres: 'Hola equipo'.length },
+  ]);
+  const roto = createVoz({ apiKey: 'sk', fetchImpl: fakeFetch(ok), onUso: () => { throw new Error('x'); } });
+  assert.equal(await roto.transcribir(Buffer.from('ogg')), 'hola');
+});

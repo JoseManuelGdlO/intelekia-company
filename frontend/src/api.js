@@ -246,3 +246,10 @@ export async function abrirOficina() {
 export async function cerrarOficina() {
   return jsonOrThrow(await fetch(`${OFICINA_URL}/cerrar`, { method: 'POST' }));
 }
+
+/** Límite de gasto diario en USD (null o 0 lo quitan). Devuelve el estado de la oficina. */
+export async function guardarLimiteGasto(usd) {
+  return jsonOrThrow(
+    await fetch(`${OFICINA_URL}/limite-gasto`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ usd }) })
+  );
+}

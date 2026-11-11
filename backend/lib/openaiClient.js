@@ -1,3 +1,11 @@
+// Escucha global del consumo (medidor de gasto): se llama con (model, usage) en cada respuesta OK.
+let usageListener = null;
+
+/** Define quién recibe el consumo de tokens de cada respuesta (null lo quita). */
+function setUsageListener(fn) {
+  usageListener = typeof fn === 'function' ? fn : null;
+}
+
 /**
  * Llama a Chat Completions y devuelve el mensaje completo del asistente
  * (incluye `tool_calls` cuando el modelo decide usar una herramienta).
@@ -24,6 +32,13 @@ async function createChatCompletionMessage({ apiKey, model, messages, tools, too
   }
 
   const data = await response.json();
+  if (usageListener && data.usage) {
+    try {
+      usageListener(data.model || model, data.usage);
+    } catch {
+      // El medidor de gasto nunca debe romper la llamada.
+    }
+  }
   return data.choices[0].message;
 }
 
@@ -32,4 +47,4 @@ async function createChatCompletion({ apiKey, model, messages, fetchImpl = fetch
   return message.content;
 }
 
-module.exports = { createChatCompletion, createChatCompletionMessage };
+module.exports = { createChatCompletion, createChatCompletionMessage, setUsageListener };

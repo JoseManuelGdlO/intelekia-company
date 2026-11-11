@@ -543,3 +543,10 @@ details.act-row > summary.act-head .act-text::after { content: ' ▾'; color: va
 }
 #horario-toast.visible { opacity: 1; transform: translate(-50%, 0); }
 #horario-toast.error { background: var(--c-error); }
+
+/* ---------- Gasto diario en OpenAI ---------- */
+.chip.chip-gasto[hidden] { display: none; }
+.chip.chip-gasto.alerta { background: #f59e0b; border-color: transparent; color: #1f1300; }
+.chip.chip-gasto.excedido { background: var(--c-error); border-color: transparent; color: #fff; }
+.horario-limite { display: flex; flex-direction: column; gap: 5px; font-size: 12.5px; font-weight: 600; color: #3b5259; }
+.horario-limite input { font: 14px 'Inter', sans-serif; border: 1px solid #d5e3df; border-radius: 10px; padding: 7px 10px; max-width: 160px; }

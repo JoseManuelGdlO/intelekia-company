@@ -4,7 +4,7 @@ const { loadConfig } = require('./config');
 const { createScheduler } = require('./scheduler');
 const { wrapRunCycle } = require('./lib/runWithStatus');
 const { readStatus, updateAgentStatus } = require('./lib/statusStore');
-const { createChatCompletion, createChatCompletionMessage } = require('./lib/openaiClient');
+const { createChatCompletion, createChatCompletionMessage, setUsageListener } = require('./lib/openaiClient');
 const { buildDepartments } = require('./departments');
 const { createCustomAgentRegistry } = require('./lib/customAgentsRegistry');
 const { createAgentsRouter } = require('./routes/agents');
@@ -37,7 +37,8 @@ const { createWhatsappEstadoRouter, createWhatsappWebhookApp } = require('./rout
 
 const { createAcceso } = require('./lib/acceso');
 const { createHorario } = require('./lib/horario');
-const { createOficinaRouter } = require('./routes/oficina');
+const { createGasto } = require('./lib/gasto');
+const { createOficinaRouter, crearPuedeTrabajar } = require('./routes/oficina');
 const config = loadConfig();
 const ROOT = path.join(__dirname, '..');
 const STATUS_PATH = path.join(__dirname, 'state', 'agents-status.json');
@@ -212,6 +213,16 @@ const horario = createHorario({
   registrar: (texto) => actividad.log('oficina', 'nota', texto),
 });
 
+// Medidor del gasto diario en OpenAI: el chat pasa por openaiClient y el audio por voz.
+// Al llegar al límite del día se frenan los ciclos automáticos (el chat y WhatsApp siguen).
+const gasto = createGasto({
+  filePath: path.join(__dirname, 'state', 'gasto.json'),
+  timeZone: process.env.TZ || 'America/Monterrey',
+  alExceder: ({ limiteUsd }) =>
+    actividad.log('oficina', 'nota', `💵 Se alcanzó el límite de gasto del día ($${limiteUsd.toFixed(2)}): los ciclos automáticos se frenan hasta mañana.`),
+});
+setUsageListener(gasto.registrarTokens);
+
 // Cada agente tiene su propio intervalo (perfil → Rol y contexto → Ciclo automático).
 const scheduler = createScheduler({
   intervalMs: config.agentIntervalHours * 60 * 60 * 1000,
@@ -221,12 +232,12 @@ const scheduler = createScheduler({
     return cadaHoras > 0 ? cadaHoras * 60 * 60 * 1000 : null;
   },
   statePath: CICLOS_PATH,
-  puedeTrabajar: horario.puedeTrabajar,
+  puedeTrabajar: crearPuedeTrabajar({ horario, gasto }),
 });
 
 // Canal de WhatsApp: el fundador le escribe a la oficina (texto o audio).
 const whatsapp = createWhatsapp({ config: config.whatsapp });
-const voz = createVoz({ apiKey: config.openaiApiKey, voz: config.whatsapp.voz });
+const voz = createVoz({ apiKey: config.openaiApiKey, voz: config.whatsapp.voz, onUso: gasto.registrarAudio });
 // Los avisos del canal que no son de un trabajador quedan en la bitácora bajo el id 'whatsapp'.
 function registrarWhatsapp(agentId, tipo, texto) {
   if (agentId) {
@@ -298,7 +309,7 @@ app.use('/api/perfiles', createPerfilesRouter({ profiles }));
 app.use('/api/instalables', createInstalablesRouter({ instalables }));
 app.use('/api/base-datos', createBaseDatosRouter({ database }));
 app.use('/api/correo', createCorreoRouter({ mailer }));
-app.use('/api/oficina', createOficinaRouter({ horario }));
+app.use('/api/oficina', createOficinaRouter({ horario, gasto }));
 app.use('/api/aprobaciones', createAprobacionesRouter({ aprobaciones }));
 const revisorPRsAgent = allAgents.find((a) => a.id === 'revisor-prs');
 if (revisorPRsAgent) {

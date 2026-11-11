@@ -25,6 +25,7 @@
       <button id="apr-inbox-btn" class="chip chip-mail">✋ Aprobaciones <span id="apr-inbox-count" class="count-badge" hidden></span></button>
       <button id="oficina-btn" class="chip chip-oficina" title="Abrir o cerrar la oficina (solo frena los ciclos automáticos)">🟢 Oficina abierta</button>
       <button id="horario-btn" class="chip" title="Horario de trabajo">🕘 Horario</button>
+      <button id="gasto-chip" class="chip chip-gasto" title="Gasto de hoy en OpenAI (clic para poner un límite)" hidden>💵 Hoy: $0.00</button>
     </header>
 
     <div id="horario-modal" role="dialog" aria-modal="true" aria-labelledby="horario-modal-title">
@@ -45,8 +46,12 @@
             <label>Salida <input type="time" id="horario-salida" /></label>
           </div>
           <p class="muted horario-nota">Hora de la oficina (Monterrey/Durango). Si la salida es antes que la entrada, el turno cruza la medianoche.</p>
+          <label class="horario-limite">Límite de gasto diario (USD)
+            <input type="number" id="horario-limite" step="0.5" min="0" placeholder="Sin límite" />
+          </label>
+          <p class="muted horario-nota">Al llegarlo, los ciclos automáticos se frenan hasta el día siguiente; el chat y WhatsApp siguen funcionando.</p>
           <p id="horario-estado" class="horario-estado"></p>
-          <div class="perfil-actions"><button id="horario-save" class="btn primary">Guardar horario</button></div>
+          <div class="perfil-actions"><button id="horario-save" class="btn primary">Guardar</button></div>
         </div>
         <div id="horario-toast"></div>
       </div>

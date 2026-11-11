@@ -1,4 +1,4 @@
-import { fetchOficina, guardarHorario, abrirOficina, cerrarOficina } from './api.js';
+import { fetchOficina, guardarHorario, guardarLimiteGasto, abrirOficina, cerrarOficina } from './api.js';
 
 const DIAS = [
   [1, 'L'],
@@ -10,6 +10,8 @@ const DIAS = [
   [0, 'D'],
 ];
 const NOMBRES = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
+const dinero = (n) => `$${Number(n || 0).toFixed(2)}`;
+const miles = (n) => Number(n || 0).toLocaleString('es-MX');
 
 function $(id) {
   return document.getElementById(id);
@@ -19,6 +21,7 @@ function $(id) {
 export function createOficinaHorario() {
   const boton = $('oficina-btn');
   const botonHorario = $('horario-btn');
+  const chipGasto = $('gasto-chip');
   const modal = $('horario-modal');
   const toast = $('horario-toast');
   let estado = null;
@@ -37,9 +40,28 @@ export function createOficinaHorario() {
     if (!estado) return;
     boton.classList.toggle('cerrada', !estado.abierta);
     boton.classList.toggle('fuera', estado.abierta && !estado.puedeTrabajar);
-    boton.textContent = !estado.abierta ? '🔴 Oficina cerrada' : estado.puedeTrabajar ? '🟢 Oficina abierta' : '🌙 Fuera de horario';
+    if (!estado.abierta) boton.textContent = '🔴 Oficina cerrada';
+    else if (estado.puedeTrabajar) boton.textContent = '🟢 Oficina abierta';
+    else boton.textContent = estado.frenadoPorGasto ? '💵 Límite alcanzado' : '🌙 Fuera de horario';
     boton.title = `${estado.motivo}\nClic para ${estado.abierta ? 'cerrar' : 'abrir'} la oficina.`;
     botonHorario.title = estado.respetarHorario ? `Horario: ${estado.entrada}–${estado.salida}` : 'Sin horario (clic para configurarlo)';
+    pintarGasto();
+  }
+
+  /** Chip "💵 Hoy: $1.20 / $5.00": ámbar desde el 80 % del límite y rojo al llegar. */
+  function pintarGasto() {
+    const g = estado.gasto;
+    chipGasto.hidden = !g;
+    if (!g) return;
+    const limite = g.limiteUsd;
+    chipGasto.textContent = `💵 Hoy: ${dinero(g.usd)}${limite ? ` / ${dinero(limite)}` : ''}`;
+    chipGasto.classList.toggle('excedido', !!g.excedido);
+    chipGasto.classList.toggle('alerta', !g.excedido && !!limite && g.usd >= limite * 0.8);
+    chipGasto.title = [
+      `Gasto estimado de hoy en OpenAI: ${dinero(g.usd)}${limite ? ` de ${dinero(limite)}` : ' (sin límite)'}`,
+      `${miles(g.llamadas)} llamadas · ${miles(g.tokensEntrada)} tokens de entrada · ${miles(g.tokensSalida)} de salida`,
+      g.excedido ? 'Límite alcanzado: los ciclos automáticos vuelven mañana.' : 'Clic para poner o cambiar el límite.',
+    ].join('\n');
   }
 
   function pintarModal() {
@@ -47,6 +69,7 @@ export function createOficinaHorario() {
     $('horario-respetar').checked = estado.respetarHorario;
     $('horario-entrada').value = estado.entrada;
     $('horario-salida').value = estado.salida;
+    $('horario-limite').value = estado.gasto?.limiteUsd ?? '';
     const caja = $('horario-dias');
     caja.innerHTML = '';
     DIAS.forEach(([d, letra]) => {
@@ -83,11 +106,13 @@ export function createOficinaHorario() {
     }
   });
 
-  botonHorario.addEventListener('click', async () => {
+  async function abrirModal() {
     await refresh();
     pintarModal();
     modal.classList.add('visible');
-  });
+  }
+  botonHorario.addEventListener('click', abrirModal);
+  chipGasto.addEventListener('click', abrirModal);
 
   const cerrarModal = () => modal.classList.remove('visible');
   $('horario-close').addEventListener('click', cerrarModal);
@@ -105,11 +130,18 @@ export function createOficinaHorario() {
       notify('Marca al menos un día de trabajo', true);
       return;
     }
+    const textoLimite = $('horario-limite').value.trim();
+    const limite = textoLimite === '' ? null : Number(textoLimite);
+    if (limite !== null && (!Number.isFinite(limite) || limite < 0)) {
+      notify('El límite de gasto debe ser 0 o más (vacío = sin límite)', true);
+      return;
+    }
     try {
-      estado = await guardarHorario({ respetarHorario, dias, entrada: $('horario-entrada').value, salida: $('horario-salida').value });
+      await guardarHorario({ respetarHorario, dias, entrada: $('horario-entrada').value, salida: $('horario-salida').value });
+      estado = await guardarLimiteGasto(limite);
       pintarBoton();
       pintarModal();
-      notify('Horario guardado');
+      notify('Horario y límite guardados');
     } catch (err) {
       notify(err.message, true);
     }

@@ -67,3 +67,27 @@ test('createChatCompletion no envía tools cuando no hay', async () => {
   };
   assert.equal(await createChatCompletion({ apiKey: 'k', model: 'm', messages: [], fetchImpl: fakeFetch }), 'ok');
 });
+
+test('setUsageListener recibe el modelo y el consumo de cada respuesta OK', async (t) => {
+  const { setUsageListener } = require('../lib/openaiClient');
+  t.after(() => setUsageListener(null));
+  const recibidos = [];
+  setUsageListener((model, usage) => recibidos.push({ model, usage }));
+  const usage = { prompt_tokens: 10, completion_tokens: 5 };
+  const fakeFetch = async () => ({ ok: true, json: async () => ({ model: 'gpt-4o-mini-2024-07-18', usage, choices: [{ message: { content: 'ok' } }] }) });
+  assert.equal(await createChatCompletion({ apiKey: 'k', model: 'gpt-4o-mini', messages: [], fetchImpl: fakeFetch }), 'ok');
+  assert.deepEqual(recibidos, [{ model: 'gpt-4o-mini-2024-07-18', usage }]);
+  // Sin usage en la respuesta no se llama.
+  await createChatCompletion({ apiKey: 'k', model: 'm', messages: [], fetchImpl: async () => ({ ok: true, json: async () => ({ choices: [{ message: { content: 'x' } }] }) }) });
+  assert.equal(recibidos.length, 1);
+});
+
+test('un listener de consumo que lanza no rompe la llamada', async (t) => {
+  const { setUsageListener } = require('../lib/openaiClient');
+  t.after(() => setUsageListener(null));
+  setUsageListener(() => {
+    throw new Error('medidor roto');
+  });
+  const fakeFetch = async () => ({ ok: true, json: async () => ({ usage: { prompt_tokens: 1 }, choices: [{ message: { content: 'sigue' } }] }) });
+  assert.equal(await createChatCompletion({ apiKey: 'k', model: 'm', messages: [], fetchImpl: fakeFetch }), 'sigue');
+});

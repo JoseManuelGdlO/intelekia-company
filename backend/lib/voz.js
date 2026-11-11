@@ -2,6 +2,8 @@
  * Voz para el canal de WhatsApp con OpenAI: transcribe notas de voz y genera respuestas habladas
  * (Ogg/Opus, el formato de las notas de voz de WhatsApp).
  */
+const { segundosDeAudio } = require('./gasto');
+
 const OPENAI = 'https://api.openai.com/v1';
 const MAX_VOZ = 1500;
 
@@ -12,7 +14,16 @@ function createVoz({
   modeloVoz = 'gpt-4o-mini-tts',
   voz = 'alloy',
   timeoutMs = 60000,
+  onUso = () => {}, // medidor de gasto: recibe { tipo: 'transcripcion', segundos } o { tipo: 'voz', caracteres }
 }) {
+  function usar(uso) {
+    try {
+      onUso(uso);
+    } catch {
+      // El medidor nunca debe romper la voz.
+    }
+  }
+
   async function llamar(ruta, opts) {
     if (!apiKey) throw new Error('Falta OPENAI_API_KEY para la voz');
     let res;
@@ -36,6 +47,8 @@ function createVoz({
     const data = await (await llamar('/audio/transcriptions', { method: 'POST', body: form })).json();
     const texto = String(data.text || '').trim();
     if (!texto) throw new Error('No se entendió el audio');
+    // La API no devuelve la duración: se estima por el tamaño del Ogg/Opus (ver segundosDeAudio).
+    usar({ tipo: 'transcripcion', segundos: segundosDeAudio(buffer?.length ?? buffer?.byteLength) });
     return texto;
   }
 
@@ -54,12 +67,15 @@ function createVoz({
   }
 
   async function sintetizar(texto) {
+    const input = recortar(texto);
     const res = await llamar('/audio/speech', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ model: modeloVoz, voice: voz, input: recortar(texto), response_format: 'opus' }),
+      body: JSON.stringify({ model: modeloVoz, voice: voz, input, response_format: 'opus' }),
     });
-    return Buffer.from(await res.arrayBuffer());
+    const audio = Buffer.from(await res.arrayBuffer());
+    usar({ tipo: 'voz', caracteres: input.length });
+    return audio;
   }
 
   return { transcribir, sintetizar, recortar };
