@@ -10,6 +10,12 @@ import { createOficinaHorario } from './oficinaHorario.js';
 import { mostrarRevisionesPR } from './revisionesPR.js';
 import { themeFor, hex } from './world/materials.js';
 import { loadBrandAssets } from './world/brand.js';
+import { icon, hydrateIcons } from './icons.js';
+import { createHudMenus } from './hudMenus.js';
+
+// Íconos de la página (los <i data-icon>) y menús de la barra superior.
+hydrateIcons();
+createHudMenus();
 
 const POLL_INTERVAL_MS = 4000;
 const TALK_POLL_INTERVAL_MS = 2000;
@@ -267,9 +273,10 @@ function showMailInFeed(item) {
   node.className = `feed-item mail ${item.estado === 'enviado' ? 'done' : item.estado === 'error' ? 'error' : ''}`;
   node.innerHTML = '<span class="tag"></span><div class="who"></div><div class="q"></div>';
   node.querySelector('.tag').textContent =
-    item.estado === 'enviado' ? 'correo enviado ✓' : item.estado === 'error' ? 'correo con error' : '✉️ por aprobar';
+    item.estado === 'enviado' ? 'correo enviado ✓' : item.estado === 'error' ? 'correo con error' : 'correo por aprobar';
   const who = node.querySelector('.who');
-  who.append(`✉️ ${labelOf(item.agentId)}`, Object.assign(document.createElement('span'), { className: 'arrow', textContent: '→' }), item.para.join(', '));
+  who.insertAdjacentHTML('beforeend', icon('mail', { size: 13 }));
+  who.append(` ${labelOf(item.agentId)}`, Object.assign(document.createElement('span'), { className: 'arrow', textContent: '→' }), item.para.join(', '));
   node.querySelector('.q').textContent = item.asunto;
   who.append(Object.assign(document.createElement('span'), { className: 'feed-time', textContent: fechaCorta(item.enviadoEn || item.creadoEn) }));
   if (item.estado === 'por_aprobar') {
@@ -366,30 +373,40 @@ async function refreshStatus() {
 function buildDepartmentNav(departments) {
   const nav = document.getElementById('dept-nav');
   nav.innerHTML = '';
-  const comButton = document.createElement('button');
-  comButton.className = 'chip chip-com';
-  comButton.textContent = '🔗 Comunicación';
-  comButton.title = 'Define quién puede consultar a quién';
-  comButton.addEventListener('click', () => comunicacionEditor.open());
-  nav.appendChild(comButton);
+  const label = document.getElementById('vista-label');
+  const elegir = (item, texto) => {
+    nav.querySelectorAll('.menu-item').forEach((b) => b.classList.toggle('active', b === item));
+    label.textContent = texto;
+  };
 
   const overview = document.createElement('button');
-  overview.className = 'chip';
-  overview.textContent = 'Vista general';
-  overview.addEventListener('click', () => scene.focusOverview());
-  nav.appendChild(overview);
+  overview.className = 'menu-item active';
+  overview.setAttribute('role', 'menuitem');
+  overview.innerHTML = `${icon('layout-grid')}<span>Vista general</span>`;
+  overview.addEventListener('click', () => {
+    scene.focusOverview();
+    elegir(overview, 'Vista general');
+  });
+  nav.append(overview, Object.assign(document.createElement('div'), { className: 'menu-sep' }));
 
   departments.forEach((department, index) => {
-    const chip = document.createElement('button');
-    chip.className = 'chip';
-    chip.style.setProperty('--accent', hex(themeFor(department.id, index).accent));
-    chip.innerHTML = '<span class="swatch"></span><span class="label"></span><span class="count"></span>';
-    chip.querySelector('.label').textContent = department.label;
-    chip.querySelector('.count').textContent = department.agents.length;
-    chip.addEventListener('click', () => scene.focusDepartment(department.id));
-    nav.appendChild(chip);
+    const item = document.createElement('button');
+    item.className = 'menu-item';
+    item.setAttribute('role', 'menuitem');
+    item.style.setProperty('--accent', hex(themeFor(department.id, index).accent));
+    item.innerHTML = '<span class="swatch"></span><span class="label"></span><span class="count"></span>';
+    item.querySelector('.label').textContent = department.label;
+    const n = department.agents.length;
+    item.querySelector('.count').textContent = `${n} agente${n === 1 ? '' : 's'}`;
+    item.addEventListener('click', () => {
+      scene.focusDepartment(department.id);
+      elegir(item, department.label);
+    });
+    nav.appendChild(item);
   });
 }
+
+document.getElementById('com-btn').addEventListener('click', () => comunicacionEditor.open());
 
 async function bootstrap() {
   const loader = document.getElementById('loader');

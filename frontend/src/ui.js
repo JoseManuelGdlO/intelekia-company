@@ -1,4 +1,10 @@
 import { fechaCorta, haceCuanto, enCuanto, fechaLarga } from './fechas.js';
+import { setIconText, icon } from './icons.js';
+
+// Ícono por tipo de evento; el emoji con el que el backend empieza algunos textos se quita al mostrarlos.
+const ICONO_EVENTO = { inicio: 'zap', fin: 'circle-check', error: 'triangle-alert', respuesta: 'bot', chat: 'pen-line', pensando: 'brain', herramienta: 'plug', resultado: 'database', nota: 'notebook-pen' };
+const EMOJI_INICIAL = /^(?:\p{Extended_Pictographic}|\p{Regional_Indicator}|\uFE0F|\u200D|\s)+/u;
+const sinEmojiInicial = (texto) => String(texto ?? '').replace(EMOJI_INICIAL, '');
 
 const STATUS_LABELS = {
   idle: 'Disponible',
@@ -222,10 +228,12 @@ export function createPanel({ onSend, onForzar, onClose, onEdit, onActividadPagi
       cicloEl.textContent = '';
       return;
     }
-    if (info.enCurso) cicloEl.textContent = '⏱️ Ejecutando su ciclo ahora…';
-    else if (info.enCola) cicloEl.textContent = '⏱️ En cola para ejecutar su ciclo…';
-    else if (!info.cadaHoras) cicloEl.textContent = '⏱️ No corre solo (solo chat o Forzar ciclo)';
-    else cicloEl.textContent = `⏱️ Próximo ciclo: ${info.proxima ? `${fechaCorta(info.proxima)} (${enCuanto(info.proxima)})` : 'pronto'} · cada ${info.cadaHoras} h`;
+    let texto;
+    if (info.enCurso) texto = 'Ejecutando su ciclo ahora…';
+    else if (info.enCola) texto = 'En cola para ejecutar su ciclo…';
+    else if (!info.cadaHoras) texto = 'No corre solo (solo chat o Forzar ciclo)';
+    else texto = `Próximo ciclo: ${info.proxima ? `${fechaCorta(info.proxima)} (${enCuanto(info.proxima)})` : 'pronto'} · cada ${info.cadaHoras} h`;
+    setIconText(cicloEl, 'timer', texto);
   }
 
   /** Muestra u oculta el indicador "EN VIVO" sin tocar la lista (útil al ver páginas anteriores). */
@@ -256,8 +264,11 @@ export function createPanel({ onSend, onForzar, onClose, onEdit, onActividadPagi
         head.className = 'act-head';
         const time = Object.assign(document.createElement('span'), { className: 'act-time', textContent: fechaCorta(e.fecha, { segundos: true }) });
         time.title = `${fechaLarga(e.fecha)} (${haceCuanto(e.fecha)})`;
-        const text = Object.assign(document.createElement('span'), { className: 'act-text', textContent: e.texto });
-        head.append(time, text);
+        const text = Object.assign(document.createElement('span'), { className: 'act-text', textContent: sinEmojiInicial(e.texto) });
+        const ico = document.createElement('span');
+        ico.className = 'act-ico';
+        ico.innerHTML = icon(ICONO_EVENTO[e.tipo] || 'activity', { size: 13 });
+        head.append(time, ico, text);
         row.appendChild(head);
         if (e.detalle) row.appendChild(Object.assign(document.createElement('pre'), { className: 'act-detail', textContent: e.detalle }));
         activityList.appendChild(row);

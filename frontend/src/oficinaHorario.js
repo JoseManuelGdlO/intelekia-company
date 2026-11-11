@@ -36,27 +36,36 @@ export function createOficinaHorario() {
     toastTimer = setTimeout(() => toast.classList.remove('visible'), 2600);
   }
 
+  /** Botón del menú "Oficina": punto de color + estado; la opción de abrir/cerrar cambia su texto. */
   function pintarBoton() {
     if (!estado) return;
-    boton.classList.toggle('cerrada', !estado.abierta);
-    boton.classList.toggle('fuera', estado.abierta && !estado.puedeTrabajar);
-    if (!estado.abierta) boton.textContent = '🔴 Oficina cerrada';
-    else if (estado.puedeTrabajar) boton.textContent = '🟢 Oficina abierta';
-    else boton.textContent = estado.frenadoPorGasto ? '💵 Límite alcanzado' : '🌙 Fuera de horario';
-    boton.title = `${estado.motivo}\nClic para ${estado.abierta ? 'cerrar' : 'abrir'} la oficina.`;
+    const menuBtn = $('oficina-menu-btn');
+    const fuera = estado.abierta && !estado.puedeTrabajar;
+    menuBtn.classList.toggle('cerrada', !estado.abierta);
+    menuBtn.classList.toggle('fuera', fuera && !estado.frenadoPorGasto);
+    menuBtn.classList.toggle('sin-gasto', fuera && !!estado.frenadoPorGasto);
+    let etiqueta = 'Oficina abierta';
+    if (!estado.abierta) etiqueta = 'Oficina cerrada';
+    else if (fuera) etiqueta = estado.frenadoPorGasto ? 'Límite de gasto' : 'Fuera de horario';
+    $('oficina-estado-label').textContent = etiqueta;
+    menuBtn.title = estado.motivo;
+    $('oficina-btn-texto').textContent = estado.abierta ? 'Cerrar oficina' : 'Abrir oficina';
+    boton.title = `Clic para ${estado.abierta ? 'cerrar' : 'abrir'} la oficina (solo frena los ciclos automáticos).`;
     botonHorario.title = estado.respetarHorario ? `Horario: ${estado.entrada}–${estado.salida}` : 'Sin horario (clic para configurarlo)';
     pintarGasto();
   }
 
-  /** Chip "💵 Hoy: $1.20 / $5.00": ámbar desde el 80 % del límite y rojo al llegar. */
+  /** Opción "Hoy: $1.20 / $5.00": ámbar desde el 80 % del límite y rojo al llegar (también marca el botón del menú). */
   function pintarGasto() {
     const g = estado.gasto;
     chipGasto.hidden = !g;
     if (!g) return;
     const limite = g.limiteUsd;
-    chipGasto.textContent = `💵 Hoy: ${dinero(g.usd)}${limite ? ` / ${dinero(limite)}` : ''}`;
+    $('gasto-texto').textContent = `Hoy: ${dinero(g.usd)}${limite ? ` / ${dinero(limite)}` : ''}`;
+    const alerta = !g.excedido && !!limite && g.usd >= limite * 0.8;
     chipGasto.classList.toggle('excedido', !!g.excedido);
-    chipGasto.classList.toggle('alerta', !g.excedido && !!limite && g.usd >= limite * 0.8);
+    chipGasto.classList.toggle('alerta', alerta);
+    $('oficina-menu-btn').classList.toggle('gasto-alerta', alerta || !!g.excedido);
     chipGasto.title = [
       `Gasto estimado de hoy en OpenAI: ${dinero(g.usd)}${limite ? ` de ${dinero(limite)}` : ' (sin límite)'}`,
       `${miles(g.llamadas)} llamadas · ${miles(g.tokensEntrada)} tokens de entrada · ${miles(g.tokensSalida)} de salida`,

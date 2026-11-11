@@ -1,13 +1,15 @@
 import { fetchRevisionesPR } from './api.js';
 import { fechaCorta, haceCuanto } from './fechas.js';
+import { icon } from './icons.js';
 
 const ETIQUETAS = {
-  aprobado_mergeado: '✅ Aprobado y mergeado',
-  aprobado_sin_merge: '🕒 Aprobado, esperando merge',
-  cambios_pedidos: '✏️ Cambios pedidos',
-  bloqueado: '⛔ Bloqueado',
-  error: '⚠️ Error (se reintenta)',
+  aprobado_mergeado: 'Aprobado y mergeado',
+  aprobado_sin_merge: 'Aprobado, esperando merge',
+  cambios_pedidos: 'Cambios pedidos',
+  bloqueado: 'Bloqueado',
+  error: 'Error (se reintenta)',
 };
+const ICONOS = { aprobado_mergeado: 'circle-check', aprobado_sin_merge: 'clock', cambios_pedidos: 'pencil', bloqueado: 'ban', error: 'triangle-alert' };
 
 function el(tag, props = {}) {
   return Object.assign(document.createElement(tag), props);
@@ -47,7 +49,9 @@ export async function mostrarRevisionesPR(agentId) {
     const who = el('div', { className: 'who' });
     who.appendChild(el('a', { href: pr.url, target: '_blank', rel: 'noopener', textContent: `${pr.clave} · ${pr.titulo || ''}` }));
     const detalle = `${ETIQUETAS[pr.veredicto] || pr.veredicto} · de ${pr.autor || '?'} · commit ${String(pr.sha || '').slice(0, 7)} · ${fechaCorta(pr.revisadoEn)} (${haceCuanto(pr.revisadoEn)})`;
-    card.append(who, el('div', { className: 'q', textContent: detalle }));
+    const q = el('div', { className: 'q', textContent: ` ${detalle}` });
+    q.insertAdjacentHTML('afterbegin', icon(ICONOS[pr.veredicto] || 'activity', { size: 13 }));
+    card.append(who, q);
     if (pr.motivo) card.appendChild(el('div', { className: 'a', textContent: pr.motivo }));
     list.appendChild(card);
   });

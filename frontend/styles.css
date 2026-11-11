@@ -96,15 +96,62 @@ html, body { margin: 0; height: 100%; overflow: hidden; background: #dfe9e6; }
 }
 .brand-title { font-weight: 800; font-size: 15px; letter-spacing: .2px; }
 .brand-sub { font-size: 11px; color: var(--intelekia-green-light); }
-#dept-nav { display: flex; gap: 8px; flex-wrap: wrap; }
-.chip {
+/* Barra superior: marca + tres menús desplegables (Vista, Bandeja, Oficina). */
+.ico { flex-shrink: 0; vertical-align: -3px; }
+.hud-spacer { display: none; }
+.hud-menu { position: relative; }
+.hud-btn {
   border: 1px solid var(--glass-border); background: var(--glass); color: var(--text);
-  backdrop-filter: blur(12px); padding: 9px 14px; border-radius: 999px; font: 600 13px 'Inter', sans-serif;
-  cursor: pointer; display: flex; align-items: center; gap: 8px; transition: transform .15s, background .15s;
+  backdrop-filter: blur(12px); padding: 0 14px; height: 40px; border-radius: 12px; font: 600 13px 'Inter', sans-serif;
+  cursor: pointer; display: flex; align-items: center; gap: 8px; box-shadow: 0 8px 30px rgba(10, 15, 30, 0.2);
+  transition: background .15s, border-color .15s;
 }
-.chip:hover { transform: translateY(-1px); background: rgba(10, 52, 60, 0.95); border-color: var(--intelekia-green); }
-.chip .swatch { width: 10px; height: 10px; border-radius: 3px; background: var(--accent); }
-.chip .count { color: var(--muted); font-weight: 500; }
+.hud-btn:hover, .hud-menu.open .hud-btn { background: rgba(10, 52, 60, 0.95); border-color: var(--intelekia-green); }
+.hud-btn .ico:last-child { opacity: .7; transition: transform .2s; }
+.hud-menu.open .hud-btn .ico:last-child { transform: rotate(180deg); }
+.hud-btn:focus-visible, .menu-item:focus-visible { outline: 2px solid var(--intelekia-green-light); outline-offset: 2px; }
+.hud-btn.pending { border-color: #f59e0b; animation: mail-pulse 2s ease-in-out infinite; }
+.count-badge { background: #f59e0b; color: #1f1300; border-radius: 999px; padding: 1px 7px; font-size: 11.5px; font-weight: 700; }
+.count-badge[hidden] { display: none; }
+@keyframes mail-pulse { 0%, 100% { box-shadow: 0 0 0 0 rgba(245,158,11,.5); } 50% { box-shadow: 0 0 0 6px rgba(245,158,11,0); } }
+
+/* Estado de la oficina: punto de color */
+.estado-dot { width: 9px; height: 9px; border-radius: 50%; background: var(--c-listo); box-shadow: 0 0 0 3px rgba(34,197,94,.2); }
+.hud-estado.fuera .estado-dot { background: #94a3b8; box-shadow: 0 0 0 3px rgba(148,163,184,.2); }
+.hud-estado.sin-gasto .estado-dot, .hud-estado.gasto-alerta:not(.cerrada):not(.fuera) .estado-dot { background: #f59e0b; box-shadow: 0 0 0 3px rgba(245,158,11,.25); }
+.hud-estado.cerrada .estado-dot { background: var(--c-error); box-shadow: 0 0 0 3px rgba(239,68,68,.25); }
+
+.hud-dropdown {
+  position: absolute; top: calc(100% + 8px); left: 0; min-width: 240px; padding: 6px; z-index: 30;
+  display: flex; flex-direction: column; gap: 2px;
+  background: rgba(6, 33, 44, 0.97); border: 1px solid var(--glass-border); border-radius: 14px;
+  backdrop-filter: blur(16px); box-shadow: 0 18px 50px rgba(10, 15, 30, 0.4);
+  opacity: 0; transform: translateY(-4px); pointer-events: none; visibility: hidden;
+  transition: opacity .14s, transform .14s, visibility .14s;
+}
+.hud-menu.open .hud-dropdown { opacity: 1; transform: none; pointer-events: auto; visibility: visible; }
+.menu-item {
+  display: flex; align-items: center; gap: 10px; width: 100%; padding: 9px 10px; border: 0; border-radius: 9px;
+  background: transparent; color: var(--text); font: 500 13px 'Inter', sans-serif; text-align: left; cursor: pointer;
+}
+.menu-item[hidden] { display: none; }
+.menu-item:hover { background: rgba(95, 211, 173, 0.12); }
+.menu-item.active { background: rgba(25, 143, 112, 0.28); }
+.menu-item .ico { color: var(--intelekia-green-light); }
+.menu-item .count-badge { margin-left: auto; }
+.menu-item .swatch { width: 10px; height: 10px; border-radius: 3px; background: var(--accent); flex-shrink: 0; margin: 0 3px; }
+.menu-item .count { margin-left: auto; color: var(--muted); font-size: 11.5px; }
+.menu-sep { height: 1px; margin: 4px 6px; background: var(--glass-border); }
+.menu-gasto { font-weight: 600; }
+.menu-gasto.alerta, .menu-gasto.alerta .ico { color: #fbbf24; }
+.menu-gasto.excedido, .menu-gasto.excedido .ico { color: #f87171; }
+
+@media (max-width: 640px) {
+  .brand-sub, .hud-btn-text { display: none; }
+  .hud-dropdown-right { left: auto; right: 0; }
+  .hud-dropdown { max-width: calc(100vw - 32px); }
+  #hud { gap: 8px; }
+}
 
 #legend {
   position: fixed; left: 16px; bottom: 16px; display: flex; gap: 6px; flex-wrap: wrap;
@@ -210,8 +257,6 @@ html, body { margin: 0; height: 100%; overflow: hidden; background: #dfe9e6; }
 }
 
 /* ---------- Comunicación entre agentes ---------- */
-.chip.chip-com { background: var(--intelekia-green); border-color: transparent; }
-.chip.chip-com:hover { background: #1fa883; }
 
 #com-modal {
   position: fixed; inset: 0; z-index: 8; display: grid; place-items: center; padding: 16px;
@@ -383,7 +428,7 @@ html, body { margin: 0; height: 100%; overflow: hidden; background: #dfe9e6; }
 /* ---------- Herramientas del agente ---------- */
 .tool-card { border: 1px solid #d5e3df; border-radius: 14px; padding: 14px; display: flex; flex-direction: column; gap: 10px; background: #fbfdfc; }
 .tool-head { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
-.tool-icon { width: 40px; height: 40px; border-radius: 12px; display: grid; place-items: center; font-size: 20px; background: rgba(25,143,112,.12); }
+.tool-icon { width: 40px; height: 40px; border-radius: 12px; display: grid; place-items: center; font-size: 20px; background: rgba(25,143,112,.12); color: var(--intelekia-green); }
 .tool-title { flex: 1; display: flex; flex-direction: column; gap: 3px; font-size: 14px; }
 .tool-title span#bd-nombre { font-weight: 500; color: #5b7178; }
 .tool-badge { align-self: flex-start; font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 999px; background: rgba(34,197,94,.15); color: #15803d; }
@@ -405,10 +450,6 @@ html, body { margin: 0; height: 100%; overflow: hidden; background: #dfe9e6; }
 .bd-error { font-size: 12px; color: #b91c1c; }
 
 /* ---------- Correo ---------- */
-.chip.chip-mail.pending { background: #f59e0b; border-color: transparent; color: #1f1300; animation: mail-pulse 2s ease-in-out infinite; }
-.chip.chip-mail[hidden] { display: none; }
-.chip.chip-mail .count-badge[hidden] { display: none; }
-.chip.chip-mail .count-badge { background: #1f1300; color: #fff; border-radius: 999px; padding: 1px 7px; font-size: 11.5px; }
 @keyframes mail-pulse { 0%, 100% { box-shadow: 0 0 0 0 rgba(245,158,11,.5); } 50% { box-shadow: 0 0 0 6px rgba(245,158,11,0); } }
 .mail-config { display: flex; gap: 14px; align-items: flex-end; flex-wrap: wrap; }
 .mail-config .perfil-field { flex: 1; min-width: 260px; }
@@ -478,6 +519,10 @@ details.act-row > summary.act-head::-webkit-details-marker { display: none; }
 details.act-row > summary.act-head .act-text::after { content: ' ▾'; color: var(--muted); }
 .act-time { flex-shrink: 0; font: 10.5px ui-monospace, 'SF Mono', Menlo, monospace; color: var(--muted); }
 .act-text { color: var(--text); word-break: break-word; }
+.act-ico { flex-shrink: 0; display: inline-flex; color: var(--muted); padding-top: 1px; }
+.act-row.tipo-inicio .act-ico { color: #60a5fa; }
+.act-row.tipo-fin .act-ico { color: #22c55e; }
+.act-row.tipo-error .act-ico { color: #f87171; }
 .act-detail { margin: 6px 0 2px; white-space: pre-wrap; word-break: break-word; font: 11px/1.45 ui-monospace, 'SF Mono', Menlo, monospace; color: #c9dcd6; background: rgba(0,0,0,.25); padding: 8px; border-radius: 6px; max-height: 180px; overflow: auto; }
 .act-row.tipo-inicio { border-left-color: #60a5fa; }
 .act-row.tipo-pensando { border-left-color: #a78bfa; }
@@ -519,8 +564,6 @@ details.act-row > summary.act-head .act-text::after { content: ' ▾'; color: va
 .apr-original a:hover { text-decoration: underline; }
 
 /* ---------- Horario de trabajo / abrir-cerrar oficina ---------- */
-.chip.chip-oficina.cerrada { background: var(--c-error); border-color: transparent; color: #fff; }
-.chip.chip-oficina.fuera { background: #334155; border-color: transparent; color: #e2e8f0; }
 #horario-modal {
   position: fixed; inset: 0; z-index: 9; display: grid; place-items: center; padding: 16px;
   background: rgba(6, 33, 44, 0.45); backdrop-filter: blur(4px); opacity: 0; pointer-events: none; transition: opacity .2s;
@@ -547,8 +590,12 @@ details.act-row > summary.act-head .act-text::after { content: ' ▾'; color: va
 #horario-toast.error { background: var(--c-error); }
 
 /* ---------- Gasto diario en OpenAI ---------- */
-.chip.chip-gasto[hidden] { display: none; }
-.chip.chip-gasto.alerta { background: #f59e0b; border-color: transparent; color: #1f1300; }
-.chip.chip-gasto.excedido { background: var(--c-error); border-color: transparent; color: #fff; }
 .horario-limite { display: flex; flex-direction: column; gap: 5px; font-size: 12.5px; font-weight: 600; color: #3b5259; }
 .horario-limite input { font: 14px 'Inter', sans-serif; border: 1px solid #d5e3df; border-radius: 10px; padding: 7px 10px; max-width: 160px; }
+
+/* Íconos de línea dentro de botones, pestañas y títulos */
+.btn, .icon-btn, .edit-btn, .perfil-tab { display: inline-flex; align-items: center; justify-content: center; gap: 6px; }
+.com-header h2 { display: flex; align-items: center; gap: 8px; }
+.com-header h2 .ico { width: 20px; height: 20px; color: var(--intelekia-green); }
+.perfil-tab .ico, .inst-title .ico, .perfil-field > span > .ico { color: var(--intelekia-green); }
+summary .ico { margin-right: 2px; }

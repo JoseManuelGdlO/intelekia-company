@@ -1,5 +1,6 @@
 import { fetchPerfil, savePerfil, fetchMemoria, saveMemoria, comprimirMemoria, fetchBaseDatosEstado, probarBaseDatos, fetchConsultasBD, fetchCorreoEstado, saveCorreoConfig, probarCorreo, fetchCorreos, fetchCiclos, fetchInstalables, instalarSkill, quitarSkillInstalada, instalarPlugin, probarPlugin, quitarPlugin } from './api.js';
 import { fechaCorta } from './fechas.js';
+import { icon } from './icons.js';
 
 const TIPO_LABELS = { skill: 'Skill', plugin: 'Plugin', documento: 'Documento' };
 
@@ -77,7 +78,7 @@ export function createPerfilEditor({ accentOf, onSaved }) {
           <input class="skill-nombre" type="text" placeholder="Nombre (ej. Manejo de objeciones)" maxlength="80" />
           <label class="skill-switch" title="Activa: se le entrega al agente"><input type="checkbox" class="skill-activo" /> Activa</label>
           <button class="icon-btn skill-toggle" title="Mostrar / ocultar">▾</button>
-          <button class="icon-btn skill-delete" title="Eliminar">🗑</button>
+          <button class="icon-btn skill-delete" title="Eliminar">${icon('trash-2', { size: 15 })}</button>
         </div>
         <textarea class="skill-contenido" rows="7" spellcheck="false" placeholder="Pega aquí el contenido del skill, las instrucciones del plugin o el documento…"></textarea>
         <div class="skill-foot"></div>`;
@@ -131,7 +132,7 @@ export function createPerfilEditor({ accentOf, onSaved }) {
           del.textContent = '¿Eliminar?';
           setTimeout(() => {
             del.classList.remove('armed');
-            del.textContent = '🗑';
+            del.innerHTML = icon('trash-2', { size: 15 });
           }, 2500);
           return;
         }
@@ -179,8 +180,8 @@ export function createPerfilEditor({ accentOf, onSaved }) {
 
   function fillAutonomiaHint() {
     $('perfil-autonomia-hint').textContent = $('perfil-autonomia').checked
-      ? 'Ejecuta sus acciones sin pedirte permiso (lo delicado igual te lo pasa a ✋ Aprobaciones).'
-      : '✋ Supervisado: todo lo que quiera hacer llega a ✋ Aprobaciones para que tú decidas.';
+      ? 'Ejecuta sus acciones sin pedirte permiso (lo delicado igual te lo pasa a Bandeja → Aprobaciones).'
+      : 'Supervisado: todo lo que quiera hacer llega a Bandeja → Aprobaciones para que tú decidas.';
   }
 
   async function fillCiclo() {
@@ -320,7 +321,7 @@ export function createPerfilEditor({ accentOf, onSaved }) {
       button.textContent = '¿Comprimir? Clic de nuevo';
       setTimeout(() => {
         compressArmed = false;
-        button.textContent = '🗜️ Comprimir';
+        button.innerHTML = `${icon('minimize-2')} Comprimir`;
       }, 3000);
       return;
     }
@@ -334,7 +335,7 @@ export function createPerfilEditor({ accentOf, onSaved }) {
     } catch (err) {
       notify(err.message, true);
     } finally {
-      button.textContent = '🗜️ Comprimir';
+      button.innerHTML = `${icon('minimize-2')} Comprimir`;
       setBusy(button, false);
     }
   }
@@ -509,7 +510,7 @@ export function createPerfilEditor({ accentOf, onSaved }) {
     $('inst-count').textContent = catalogo.skills.length + catalogo.plugins.length ? `(${n} en uso)` : '';
   }
 
-  function instRow({ tipo, item, titulo, sub, detalle, fuente }) {
+  function instRow({ tipo, item, titulo, icono, sub, detalle, fuente }) {
     const row = document.createElement('div');
     row.className = 'inst-item';
     const set = asignados[tipo];
@@ -525,7 +526,9 @@ export function createPerfilEditor({ accentOf, onSaved }) {
       dirty.instalados = true;
       instCount();
     });
-    row.querySelector('.inst-name').textContent = titulo;
+    const nombre = row.querySelector('.inst-name');
+    nombre.innerHTML = icono ? `${icon(icono, { size: 14 })} ` : '';
+    nombre.append(document.createTextNode(titulo));
     row.querySelector('.inst-sub').textContent = sub;
     if (detalle) row.querySelector('.inst-sub').title = detalle;
     const actions = row.querySelector('.inst-actions');
@@ -568,7 +571,8 @@ export function createPerfilEditor({ accentOf, onSaved }) {
       const { row, actions } = instRow({
         tipo: 'skills',
         item: s,
-        titulo: `🧩 ${s.nombre}`,
+        titulo: s.nombre,
+        icono: 'puzzle',
         sub: `${s.descripcion || 'Sin descripción'} · ${s.archivos.length} archivo(s)`,
         detalle: s.archivos.join('\n'),
         fuente: s.fuente,
@@ -592,7 +596,8 @@ export function createPerfilEditor({ accentOf, onSaved }) {
       const { row, actions } = instRow({
         tipo: 'plugins',
         item: p,
-        titulo: `🔌 ${p.nombre}`,
+        titulo: p.nombre,
+        icono: 'plug',
         sub: `${p.transporte === 'http' ? p.url : `npm: ${p.paquete}`} · ${herramientas.length} herramienta(s): ${herramientas.join(', ')}`,
         detalle: (p.herramientas || []).map((h) => `${h.nombre}: ${h.descripcion}`).join('\n'),
         fuente: p.transporte === 'npm' ? `https://www.npmjs.com/package/${p.paquete}` : null,

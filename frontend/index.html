@@ -20,23 +20,57 @@
           <div class="brand-sub">Oficina virtual · Consultoría</div>
         </div>
       </div>
-      <nav id="dept-nav"></nav>
-      <button id="mail-inbox-btn" class="chip chip-mail" hidden>✉️ Correos <span id="mail-inbox-count" class="count-badge" hidden></span></button>
-      <button id="apr-inbox-btn" class="chip chip-mail">✋ Aprobaciones <span id="apr-inbox-count" class="count-badge" hidden></span></button>
-      <button id="oficina-btn" class="chip chip-oficina" title="Abrir o cerrar la oficina (solo frena los ciclos automáticos)">🟢 Oficina abierta</button>
-      <button id="horario-btn" class="chip" title="Horario de trabajo">🕘 Horario</button>
-      <button id="gasto-chip" class="chip chip-gasto" title="Gasto de hoy en OpenAI (clic para poner un límite)" hidden>💵 Hoy: $0.00</button>
+      <div class="hud-menu" data-menu="vista">
+        <button class="hud-btn" id="vista-btn" aria-haspopup="menu" aria-expanded="false" title="Elegir qué área ver">
+          <i data-icon="layout-grid"></i><span id="vista-label">Vista general</span><i data-icon="chevron-down" data-size="14"></i>
+        </button>
+        <div class="hud-dropdown" role="menu" id="dept-nav"></div>
+      </div>
+      <div class="hud-spacer"></div>
+      <div class="hud-menu" data-menu="bandeja">
+        <button class="hud-btn" id="bandeja-btn" aria-haspopup="menu" aria-expanded="false" title="Lo que espera tu decisión">
+          <i data-icon="inbox"></i><span class="hud-btn-text">Bandeja</span><span id="bandeja-count" class="count-badge" hidden></span><i data-icon="chevron-down" data-size="14"></i>
+        </button>
+        <div class="hud-dropdown hud-dropdown-right" role="menu">
+          <button id="apr-inbox-btn" class="menu-item" role="menuitem">
+            <i data-icon="clipboard-check"></i><span>Aprobaciones</span><span id="apr-inbox-count" class="count-badge" hidden></span>
+          </button>
+          <button id="mail-inbox-btn" class="menu-item" role="menuitem" hidden>
+            <i data-icon="mail"></i><span>Correos</span><span id="mail-inbox-count" class="count-badge" hidden></span>
+          </button>
+        </div>
+      </div>
+      <div class="hud-menu" data-menu="oficina">
+        <button class="hud-btn hud-estado" id="oficina-menu-btn" aria-haspopup="menu" aria-expanded="false">
+          <span class="estado-dot"></span><span id="oficina-estado-label" class="hud-btn-text">Oficina</span><i data-icon="chevron-down" data-size="14"></i>
+        </button>
+        <div class="hud-dropdown hud-dropdown-right" role="menu">
+          <button id="gasto-chip" class="menu-item menu-gasto" role="menuitem" title="Gasto de hoy en OpenAI (clic para poner un límite)" hidden>
+            <i data-icon="circle-dollar-sign"></i><span id="gasto-texto">Hoy: $0.00</span>
+          </button>
+          <button id="oficina-btn" class="menu-item" role="menuitem">
+            <i data-icon="power"></i><span id="oficina-btn-texto">Cerrar oficina</span>
+          </button>
+          <button id="horario-btn" class="menu-item" role="menuitem">
+            <i data-icon="clock"></i><span>Horario y límite de gasto</span>
+          </button>
+          <div class="menu-sep" role="separator"></div>
+          <button id="com-btn" class="menu-item" role="menuitem" title="Define quién puede consultar a quién">
+            <i data-icon="network"></i><span>Comunicación entre agentes</span>
+          </button>
+        </div>
+      </div>
     </header>
 
     <div id="horario-modal" role="dialog" aria-modal="true" aria-labelledby="horario-modal-title">
       <div class="com-card horario-card">
         <div class="com-header">
           <div>
-            <h2 id="horario-modal-title">🕘 Horario de trabajo</h2>
+            <h2 id="horario-modal-title"><i data-icon="clock"></i> Horario de trabajo</h2>
             <p>Fuera de horario (o con la oficina cerrada) los trabajadores <b>no inician ciclos automáticos</b>.
               Lo que tú pidas a mano —chat, WhatsApp, Forzar ciclo, aprobar— siempre funciona.</p>
           </div>
-          <button id="horario-close" class="icon-btn" title="Cerrar (Esc)">✕</button>
+          <button id="horario-close" class="icon-btn" title="Cerrar (Esc)"><i data-icon="x" data-size="18"></i></button>
         </div>
         <div class="horario-body">
           <label class="tool-switch"><input type="checkbox" id="horario-respetar" /> Respetar horario</label>
@@ -61,12 +95,12 @@
       <div class="com-card mail-card">
         <div class="com-header">
           <div>
-            <h2 id="mail-modal-title">✉️ Correos de los agentes</h2>
+            <h2 id="mail-modal-title"><i data-icon="mail"></i> Correos de los agentes</h2>
             <p>Arriba, los que esperan tu aprobación (destinatarios fuera de tu lista o por encima del límite diario):
               revísalos y decide <b>Enviar</b> o <b>Descartar</b>. Abajo, todo lo que ya salió.
               Nota: los correos que envían los agentes no se guardan en la carpeta "Enviados" de tu buzón.</p>
           </div>
-          <button id="mail-modal-close" class="icon-btn" title="Cerrar (Esc)">✕</button>
+          <button id="mail-modal-close" class="icon-btn" title="Cerrar (Esc)"><i data-icon="x" data-size="18"></i></button>
         </div>
         <div class="mail-list">
           <h3 class="mail-section">Por aprobar <span id="mail-pending-count"></span></h3>
@@ -82,11 +116,11 @@
       <div class="com-card mail-card">
         <div class="com-header">
           <div>
-            <h2 id="apr-modal-title">✋ Aprobaciones</h2>
+            <h2 id="apr-modal-title"><i data-icon="clipboard-check"></i> Aprobaciones</h2>
             <p>Lo que tus trabajadores supervisados quieren hacer, y lo delicado que te escalaron.
               Revisa, edita si quieres y decide <b>Aprobar</b> o <b>Descartar</b>.</p>
           </div>
-          <button id="apr-modal-close" class="icon-btn" title="Cerrar (Esc)">✕</button>
+          <button id="apr-modal-close" class="icon-btn" title="Cerrar (Esc)"><i data-icon="x" data-size="18"></i></button>
         </div>
         <div class="mail-list">
           <h3 class="mail-section">Por aprobar <span id="apr-pending-count"></span></h3>
@@ -116,7 +150,7 @@
               Es en un solo sentido: que A pueda consultar a B no significa que B pueda consultar a A.
               Las casillas sombreadas son compañeros de la misma área.</p>
           </div>
-          <button id="com-close" class="icon-btn" title="Cerrar (Esc)">✕</button>
+          <button id="com-close" class="icon-btn" title="Cerrar (Esc)"><i data-icon="x" data-size="18"></i></button>
         </div>
         <div class="com-toolbar">
           <div class="com-group">
@@ -147,13 +181,13 @@
             <h2 id="perfil-title">Perfil</h2>
             <p id="perfil-sub"></p>
           </div>
-          <button id="perfil-close" class="icon-btn" title="Cerrar (Esc)">✕</button>
+          <button id="perfil-close" class="icon-btn" title="Cerrar (Esc)"><i data-icon="x" data-size="18"></i></button>
         </div>
         <div class="perfil-tabs" role="tablist">
-          <button class="perfil-tab active" data-tab="rol" role="tab">🧠 Rol y contexto</button>
-          <button class="perfil-tab" data-tab="skills" role="tab">🧩 Skills y plugins <span id="perfil-skills-count"></span></button>
-          <button class="perfil-tab" data-tab="herramientas" role="tab">🔌 Herramientas <span id="perfil-tools-count"></span></button>
-          <button class="perfil-tab" data-tab="memoria" role="tab">📓 Memoria <span id="perfil-mem-count"></span></button>
+          <button class="perfil-tab active" data-tab="rol" role="tab"><i data-icon="brain"></i> Rol y contexto</button>
+          <button class="perfil-tab" data-tab="skills" role="tab"><i data-icon="puzzle"></i> Skills y plugins <span id="perfil-skills-count"></span></button>
+          <button class="perfil-tab" data-tab="herramientas" role="tab"><i data-icon="plug"></i> Herramientas <span id="perfil-tools-count"></span></button>
+          <button class="perfil-tab" data-tab="memoria" role="tab"><i data-icon="notebook-pen"></i> Memoria <span id="perfil-mem-count"></span></button>
         </div>
 
         <section class="perfil-pane active" data-pane="rol">
@@ -162,13 +196,13 @@
             <label class="perfil-check"><input id="perfil-autonomous" type="checkbox" /> Trabaja solo (ciclo autónomo)</label>
           </div>
           <div id="perfil-ciclo-row" class="perfil-row ciclo-row">
-            <label class="ciclo-field">⏱️ Ciclo automático: cada
+            <label class="ciclo-field"><i data-icon="timer"></i> Ciclo automático: cada
               <input id="perfil-ciclo" type="number" min="0" max="720" step="0.5" /> horas</label>
             <button id="perfil-ciclo-default" class="btn ghost small" type="button">Usar valor por defecto</button>
             <span id="perfil-ciclo-hint" class="muted"></span>
           </div>
           <div id="perfil-autonomia-row" class="perfil-row ciclo-row">
-            <label class="tool-switch"><input type="checkbox" id="perfil-autonomia" /> <span>🤖 Autónomo: actúa solo</span></label>
+            <label class="tool-switch"><input type="checkbox" id="perfil-autonomia" /> <span><i data-icon="bot"></i> Autónomo: actúa solo</span></label>
             <span id="perfil-autonomia-hint" class="muted"></span>
           </div>
           <label class="perfil-field">
@@ -176,7 +210,7 @@
             <textarea id="perfil-rol" spellcheck="false"></textarea>
           </label>
           <label class="perfil-field" id="perfil-plantilla-field" hidden>
-            <span>📄 Plantilla de documentos <small>La usa SIEMPRE para redactar (ciclo, chat y WhatsApp). Deja campos como {{cliente}} o [PRECIO]; lo que no sepa lo marca [POR DEFINIR]. Vacía = sin plantilla.</small></span>
+            <span><i data-icon="file-text"></i> Plantilla de documentos <small>La usa SIEMPRE para redactar (ciclo, chat y WhatsApp). Deja campos como {{cliente}} o [PRECIO]; lo que no sepa lo marca [POR DEFINIR]. Vacía = sin plantilla.</small></span>
             <textarea id="perfil-plantilla" spellcheck="false" placeholder="Pega aquí tu plantilla (Markdown o texto)…"></textarea>
           </label>
           <div class="perfil-actions"><span id="perfil-rol-count" class="muted"></span><button id="perfil-rol-save" class="btn primary">Guardar rol</button></div>
@@ -184,18 +218,18 @@
 
         <section class="perfil-pane" data-pane="skills">
           <div class="inst-box">
-            <h3 class="inst-title">📦 Instalados desde internet <span id="inst-count" class="muted"></span></h3>
+            <h3 class="inst-title"><i data-icon="package"></i> Instalados desde internet <span id="inst-count" class="muted"></span></h3>
             <p class="perfil-help">Skills de GitHub (carpetas con <code>SKILL.md</code>, p. ej. <code>anthropics/skills</code>) y plugins
               (servidores MCP). Se instalan una vez para toda la oficina; marca los que usa este trabajador y guarda.</p>
             <div id="inst-list"></div>
             <div class="inst-forms">
               <div class="inst-form">
-                <b>🧩 Instalar skill</b>
+                <b><i data-icon="puzzle"></i> Instalar skill</b>
                 <input id="inst-skill-url" type="url" placeholder="https://github.com/anthropics/skills/tree/main/skills/internal-comms" />
                 <button id="inst-skill-btn" class="btn ghost small" type="button">Instalar skill</button>
               </div>
               <div class="inst-form">
-                <b>🔌 Instalar plugin (MCP)</b>
+                <b><i data-icon="plug"></i> Instalar plugin (MCP)</b>
                 <input id="inst-plugin-nombre" type="text" placeholder="Nombre (opcional), ej. DeepWiki" />
                 <input id="inst-plugin-url" type="text" placeholder="URL https://… o paquete npm, ej. @modelcontextprotocol/server-memory" />
                 <input id="inst-plugin-token" type="text" placeholder="Variable del token en .env (opcional), ej. GITHUB_TOKEN" />
@@ -206,7 +240,7 @@
             </div>
             <div class="perfil-actions"><span id="inst-result" class="muted"></span><button id="inst-save" class="btn primary">Guardar asignación</button></div>
           </div>
-          <h3 class="inst-title">✍️ Instrucciones propias</h3>
+          <h3 class="inst-title"><i data-icon="pen-line"></i> Instrucciones propias</h3>
           <p class="perfil-help">Pega aquí skills, instrucciones de plugins, documentación de un repo o cualquier conocimiento
             que quieras que este trabajador use. Se le entregan como referencia en cada tarea y chat
             (son texto: el agente las sigue, no ejecuta código). Puedes apagarlas sin borrarlas.</p>
@@ -214,7 +248,7 @@
             <button class="btn ghost" data-add="skill">＋ Skill</button>
             <button class="btn ghost" data-add="plugin">＋ Plugin</button>
             <button class="btn ghost" data-add="documento">＋ Documento</button>
-            <label class="btn ghost file-btn">📄 Cargar archivo (.md, .txt, .json)<input id="perfil-file" type="file" accept=".md,.txt,.json,.markdown,.yaml,.yml" multiple hidden /></label>
+            <label class="btn ghost file-btn"><i data-icon="upload"></i> Cargar archivo (.md, .txt, .json)<input id="perfil-file" type="file" accept=".md,.txt,.json,.markdown,.yaml,.yml" multiple hidden /></label>
           </div>
           <div id="perfil-skills"></div>
           <div class="perfil-actions"><span id="perfil-skills-total" class="muted"></span><button id="perfil-skills-save" class="btn primary">Guardar skills y plugins</button></div>
@@ -225,7 +259,7 @@
             en su ciclo automático y en el chat contigo.</p>
           <div class="tool-card">
             <div class="tool-head">
-              <div class="tool-icon">🗄️</div>
+              <div class="tool-icon"><i data-icon="database" data-size="22"></i></div>
               <div class="tool-title">
                 <b>Base de datos <span id="bd-nombre"></span></b>
                 <span id="bd-estado" class="tool-badge"></span>
@@ -238,7 +272,7 @@
               <li><b>Nunca ve:</b> <span id="bd-bloqueadas"></span></li>
               <li>Máximo 200 filas y 8 segundos por consulta. Todo queda registrado abajo.</li>
             </ul>
-            <div id="bd-root-warning" class="tool-warning" hidden>⚠️ La conexión usa el usuario <b>root</b>. Crea un usuario MySQL de solo lectura y ponlo en <code>DB_USER</code> / <code>DB_PASSWORD</code> del archivo <code>backend/.env</code>.</div>
+            <div id="bd-root-warning" class="tool-warning" hidden><i data-icon="triangle-alert"></i> La conexión usa el usuario <b>root</b>. Crea un usuario MySQL de solo lectura y ponlo en <code>DB_USER</code> / <code>DB_PASSWORD</code> del archivo <code>backend/.env</code>.</div>
             <div id="bd-config-help" class="tool-warning" hidden>Falta configurar la conexión: agrega <code>DB_HOST</code>, <code>DB_NAME</code>, <code>DB_USER</code> y <code>DB_PASSWORD</code> en <code>backend/.env</code> y reinicia el servidor.</div>
             <div class="perfil-actions">
               <span id="bd-test-result" class="muted"></span>
@@ -248,7 +282,7 @@
 
           <div class="tool-card">
             <div class="tool-head">
-              <div class="tool-icon">✉️</div>
+              <div class="tool-icon"><i data-icon="mail" data-size="22"></i></div>
               <div class="tool-title">
                 <b>Correo <span id="mail-remitente"></span></b>
                 <span id="mail-estado" class="tool-badge"></span>
@@ -256,7 +290,7 @@
               <label class="tool-switch"><input type="checkbox" id="mail-activo" /> <span>Permitir enviar correos</span></label>
             </div>
             <ul class="tool-rules">
-              <li><b>Envío directo</b> solo si todos los destinatarios están en la lista permitida. Cualquier otro queda en <b>✉️ Por aprobar</b> (arriba) para que tú decidas.</li>
+              <li><b>Envío directo</b> solo si todos los destinatarios están en la lista permitida. Cualquier otro queda en <b>Bandeja → Correos</b> para que tú decidas.</li>
               <li>Máximo <b id="mail-limite-txt"></b> correos directos al día (hoy van <b id="mail-hoy"></b>). Nunca repite el mismo correo en 12 h.</li>
               <li>Cada correo lleva la firma configurada en <code>SMTP_FIRMA</code> (por defecto aclara que lo envía un asistente de IA).</li>
               <li id="mail-bcc-line">Copia oculta (CCO) de cada envío a: <b id="mail-bcc"></b></li>
@@ -294,7 +328,7 @@
           <div class="perfil-actions">
             <span id="perfil-mem-chars" class="muted"></span>
             <button id="perfil-mem-reload" class="btn ghost">↻ Recargar</button>
-            <button id="perfil-mem-compress" class="btn ghost">🗜️ Comprimir</button>
+            <button id="perfil-mem-compress" class="btn ghost"><i data-icon="minimize-2"></i> Comprimir</button>
             <button id="perfil-mem-save" class="btn primary">Guardar memoria</button>
           </div>
         </section>
@@ -311,13 +345,13 @@
           <h2 id="panel-title"></h2>
           <div id="panel-status"></div>
         </div>
-        <button id="panel-edit" class="icon-btn edit-btn" title="Editar contexto, skills y memoria">✏️ Editar</button>
-        <button id="panel-close" class="icon-btn" title="Cerrar (Esc)">✕</button>
+        <button id="panel-edit" class="icon-btn edit-btn" title="Editar contexto, skills y memoria"><i data-icon="pencil"></i> Editar</button>
+        <button id="panel-close" class="icon-btn" title="Cerrar (Esc)"><i data-icon="x" data-size="18"></i></button>
       </div>
       <div id="panel-last-action"></div>
       <div id="panel-ciclo"></div>
       <details id="panel-activity" open>
-        <summary>🧠 Actividad <span id="panel-activity-live" class="live-badge" hidden>● EN VIVO</span> <span id="panel-activity-count"></span></summary>
+        <summary><i data-icon="activity"></i> Actividad <span id="panel-activity-live" class="live-badge" hidden>● EN VIVO</span> <span id="panel-activity-count"></span></summary>
         <div id="panel-activity-list"></div>
         <div id="panel-activity-pager" class="pager" hidden>
           <button class="btn ghost small" data-dir="-1" type="button">‹ Más recientes</button>
@@ -335,7 +369,7 @@
         </div>
       </details>
       <details id="panel-prs" hidden open>
-        <summary>🔍 Pull Requests revisados <span id="panel-prs-count"></span></summary>
+        <summary><i data-icon="git-pull-request"></i> Pull Requests revisados <span id="panel-prs-count"></span></summary>
         <div id="panel-prs-list"></div>
       </details>
       <div id="panel-chat-log"></div>
@@ -345,7 +379,7 @@
           <input type="checkbox" id="panel-save-idea" /> Guardar esta respuesta
         </label>
         <div class="panel-actions">
-          <button id="panel-forzar" class="btn ghost">⚡ Forzar ciclo ahora</button>
+          <button id="panel-forzar" class="btn ghost"><i data-icon="zap"></i> Forzar ciclo ahora</button>
           <button id="panel-send" class="btn primary">Enviar</button>
         </div>
       </div>
