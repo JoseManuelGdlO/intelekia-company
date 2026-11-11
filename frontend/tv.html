@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Oficina Intelekia — Pantalla</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" />
+    <!-- styles.css aporta los colores de marca y el estilo de las etiquetas de los agentes en 3D -->
+    <link rel="stylesheet" href="/styles.css" />
+    <link rel="stylesheet" href="/tv.css" />
+    <link rel="icon" type="image/png" href="/assets/logo-icon.png" />
+  </head>
+  <body class="tv">
+    <div id="tv-app">
+      <header id="tv-top">
+        <img class="tv-logo" src="/assets/logo-icon.png" alt="" />
+        <div class="tv-brand">
+          <div class="tv-brand-title">Oficina Intelekia</div>
+          <div id="tv-fecha" class="tv-brand-sub"></div>
+        </div>
+        <div class="tv-top-right">
+          <div id="tv-reloj" class="tv-reloj">--:--</div>
+          <div id="tv-estado" class="tv-pill">Conectando…</div>
+        </div>
+      </header>
+
+      <section id="tv-escena">
+        <div id="tv-scene-container"></div>
+        <div id="tv-escena-lugar" class="tv-escena-lugar"></div>
+      </section>
+
+      <section id="tv-panel">
+        <div class="tv-panel-head">
+          <h2 id="tv-panel-titulo"></h2>
+          <div id="tv-dots" class="tv-dots"></div>
+        </div>
+        <div class="tv-panel-body">
+          <div class="tv-vista" data-vista="tablero">
+            <div id="tv-tablero" class="tv-tablero"></div>
+          </div>
+          <div class="tv-vista" data-vista="actividad">
+            <ol id="tv-actividad" class="tv-actividad"></ol>
+          </div>
+          <div class="tv-vista" data-vista="gasto">
+            <div id="tv-gasto" class="tv-gasto"></div>
+          </div>
+        </div>
+      </section>
+
+      <footer id="tv-ticker">
+        <div id="tv-ticker-track" class="tv-ticker-track"></div>
+      </footer>
+    </div>
+
+    <div id="tv-reconectando" class="tv-reconectando" hidden>Reconectando…</div>
+
+    <div id="tv-noche" class="tv-noche" hidden>
+      <div id="tv-noche-caja" class="tv-noche-caja">
+        <img class="tv-noche-logo" src="/assets/logo-white.png" alt="Intelekia" />
+        <div id="tv-noche-reloj" class="tv-noche-reloj">--:--</div>
+        <div id="tv-noche-fecha" class="tv-noche-fecha"></div>
+        <div id="tv-noche-motivo" class="tv-noche-motivo"></div>
+      </div>
+    </div>
+
+    <div id="tv-cargando" class="tv-cargando">
+      <img src="/assets/logo-white.png" alt="Intelekia" />
+      <div id="tv-cargando-texto">Conectando con la oficina…</div>
+    </div>
+
+    <div id="tv-celebracion" class="tv-celebracion" hidden>
+      <div id="tv-confeti" class="tv-confeti"></div>
+      <div class="tv-celebracion-caja">
+        <div id="tv-celebracion-emoji" class="tv-celebracion-emoji"></div>
+        <div class="tv-celebracion-titulo">¡Bien hecho, equipo!</div>
+        <div id="tv-celebracion-texto" class="tv-celebracion-texto"></div>
+      </div>
+    </div>
+
+    <script type="importmap">
+      {
+        "imports": {
+          "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+          "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+        }
+      }
+    </script>
+    <script type="module" src="/src/tv.js"></script>
+  </body>
+</html>

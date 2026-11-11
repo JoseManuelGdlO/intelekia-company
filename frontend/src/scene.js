@@ -209,7 +209,7 @@ export function createScene({ container, departments, onAgentClick }) {
       const tagEl = createAgentTag(agent.label, theme.accent);
       tagEl.addEventListener('click', (e) => {
         e.stopPropagation();
-        onAgentClick(agent.id);
+        onAgentClick?.(agent.id);
       });
       tagEl.addEventListener('pointerenter', () => setHovered(agent.id));
       tagEl.addEventListener('pointerleave', () => setHovered(null));
@@ -387,7 +387,7 @@ export function createScene({ container, departments, onAgentClick }) {
     downPos = null;
     if (moved > CLICK_DRAG_TOLERANCE || e.button !== 0) return;
     const agentId = pick(e);
-    if (agentId) onAgentClick(agentId);
+    if (agentId) onAgentClick?.(agentId);
   });
 
   function onResize() {
@@ -646,11 +646,13 @@ export function createScene({ container, departments, onAgentClick }) {
     perf.since = performance.now();
   }
 
+  let paused = false; // pausa explícita (p. ej. la pantalla de TV de noche)
+
   document.addEventListener('visibilitychange', () => {
     if (document.hidden) {
       if (rafId !== null) cancelAnimationFrame(rafId);
       rafId = null;
-    } else if (rafId === null) {
+    } else if (rafId === null && !paused) {
       clock.getDelta(); // no "saltar" el tiempo acumulado mientras estuvo oculta
       resetPerfWindow();
       animate();
@@ -711,5 +713,23 @@ export function createScene({ container, departments, onAgentClick }) {
     entry.tagEl.querySelector('.name').textContent = label;
   }
 
-  return { updateStatusColors, setAgentLabel, setSelected, focusAgent, focusDepartment, focusOverview, showNetwork, playConversation };
+  /** Detiene el dibujo por completo (no consume GPU) hasta llamar a resume(). */
+  function pause() {
+    paused = true;
+    if (rafId !== null) cancelAnimationFrame(rafId);
+    rafId = null;
+  }
+
+  function resume() {
+    if (!paused) return;
+    paused = false;
+    if (rafId === null && !document.hidden) {
+      clock.getDelta();
+      resetPerfWindow();
+      onResize(); // el contenedor pudo cambiar de tamaño mientras estaba oculto
+      animate();
+    }
+  }
+
+  return { updateStatusColors, setAgentLabel, setSelected, focusAgent, focusDepartment, focusOverview, showNetwork, playConversation, pause, resume };
 }
