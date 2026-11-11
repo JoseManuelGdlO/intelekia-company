@@ -123,18 +123,30 @@ test('cruce de medianoche: a las 00:30 locales lo de las 23:30 de ayer ya no cue
   assert.equal(tv.estado().dia.ideas, 1);
 });
 
-test('actividad: excluye chat y respuesta, sanitiza, usa el nombre del agente y es la más reciente primero', () => {
+test('actividad: solo inicios/fines/errores, sanitiza, usa el nombre del agente y es la más reciente primero', () => {
   const { actividad } = createTvEstado(deps()).estado();
-  assert.ok(actividad.every((a) => a.tipo !== 'chat' && a.tipo !== 'respuesta'));
-  assert.doesNotMatch(JSON.stringify(actividad), /secreto|privada|ana@|1234-5678|https/);
+  assert.ok(actividad.every((a) => ['inicio', 'fin', 'error'].includes(a.tipo)));
+  assert.doesNotMatch(JSON.stringify(actividad), /secreto|privada|ana@|1234-5678|https|cotización/);
   assert.equal(actividad[0].agente, 'Cotizador');
-  assert.equal(actividad[0].tipo, 'nota');
-  assert.match(actividad[0].texto, /^Envió cotización a/);
-  assert.equal(actividad.length, 4);
+  assert.equal(actividad[0].tipo, 'inicio');
+  assert.equal(actividad.length, 3);
+});
+
+test('actividad: oculta herramientas/resultados (nombres y comentarios) y muestra avisos de la oficina', () => {
+  const eventos = [
+    { agentId: 'respuestas-redes', tipo: 'herramienta', fecha: hace(0.5), texto: '💬 Instagram · Juan Pérez: "mi pedido"' },
+    { agentId: 'cotizador', tipo: 'resultado', fecha: hace(0.4), texto: 'Fila: Clínica X, deuda 5000' },
+    { agentId: 'pm', tipo: 'pensando', fecha: hace(0.3), texto: 'pensando en Juan' },
+    { agentId: 'oficina', tipo: 'nota', fecha: hace(0.2), texto: '🔴 Cerraste la oficina' },
+    { agentId: 'cotizador', tipo: 'error', fecha: hace(0.1), texto: '❌ El ciclo falló' },
+  ];
+  const { actividad } = createTvEstado(deps({ actividad: actividadCon(eventos) })).estado();
+  assert.doesNotMatch(JSON.stringify(actividad), /Juan|Clínica|deuda/);
+  assert.deepEqual(actividad.map((a) => a.tipo), ['error', 'nota']);
 });
 
 test('actividad: como máximo 30 eventos', () => {
-  const eventos = Array.from({ length: 50 }, (_, i) => ({ agentId: 'pm', tipo: 'nota', fecha: hace(50 - i), texto: `paso ${i}` }));
+  const eventos = Array.from({ length: 50 }, (_, i) => ({ agentId: 'pm', tipo: 'inicio', fecha: hace(50 - i), texto: `paso ${i}` }));
   const { actividad } = createTvEstado(deps({ actividad: actividadCon(eventos) })).estado();
   assert.equal(actividad.length, 30);
   assert.equal(actividad[0].texto, 'paso 49');

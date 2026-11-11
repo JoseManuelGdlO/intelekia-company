@@ -7,7 +7,11 @@ const MAX_ACTIVIDAD = 30;
 const MAX_TEXTO = 120;
 const DIA_MS = 24 * 60 * 60 * 1000;
 // Conversaciones privadas del fundador con cada agente: nunca salen en la TV.
-const TIPOS_PRIVADOS = ['chat', 'respuesta'];
+// La TV la ve cualquiera que pase: solo se muestran inicios, fines y errores de ciclo (y avisos de la
+// propia oficina). Los pasos intermedios (herramientas, resultados, notas, chat) pueden traer nombres,
+// comentarios de clientes o filas de la base de datos.
+const TIPOS_PUBLICOS = ['inicio', 'fin', 'error'];
+const esPublico = (e) => TIPOS_PUBLICOS.includes(e.tipo) || (e.agentId === 'oficina' && e.tipo === 'nota');
 const ESTADOS_PENDIENTES = ['por_aprobar', 'error'];
 const VEREDICTOS_APROBADOS = ['aprobado_mergeado', 'aprobado_sin_merge'];
 const ETIQUETAS_EXTRA = { oficina: 'Oficina', whatsapp: 'WhatsApp' };
@@ -110,7 +114,7 @@ function createTvEstado({
     const eventosHoy = lista(seguro(() => actividad.recientes({ desde: desdeHoy, limite: Infinity }), []));
     const ultimos = lista(seguro(() => actividad.recientes({ limite: 1000 }), []));
     const actividadPublica = ultimos
-      .filter((e) => !TIPOS_PRIVADOS.includes(e.tipo))
+      .filter(esPublico)
       .slice(0, MAX_ACTIVIDAD)
       .map((e) => ({ fecha: e.fecha, agente: etiquetas[e.agentId] || String(e.agentId || ''), tipo: e.tipo, texto: limpiarTexto(e.texto) }));
 
