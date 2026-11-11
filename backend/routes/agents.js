@@ -39,7 +39,12 @@ function createForzarHandler({ scheduler }) {
 
 function createActividadHandler({ actividad }) {
   return (req, res) => {
-    const { desde, limite } = req.query;
+    const { desde, limite, pagina, porPagina } = req.query;
+    // Con `pagina` responde paginado (más reciente primero); sin ella, como siempre.
+    if (pagina !== undefined) {
+      res.json(actividad ? actividad.pagina(req.params.id, { pagina, porPagina }) : { eventos: [], total: 0, pagina: 1, paginas: 1 });
+      return;
+    }
     res.json(actividad ? actividad.list(req.params.id, { desde, limite: limite ? Number(limite) : undefined }) : []);
   };
 }

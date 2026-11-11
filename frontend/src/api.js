@@ -81,6 +81,13 @@ export async function fetchConversaciones({ desde, agentId, limite } = {}) {
   return jsonOrThrow(await fetch(`${COMUNICACION_URL}/conversaciones?${params}`));
 }
 
+/** Página de conversaciones (del agente, si se indica), más reciente primero: { items, total, pagina, paginas }. */
+export async function fetchConversacionesPagina({ agentId, pagina = 1, porPagina = 20 } = {}) {
+  const params = new URLSearchParams({ pagina: String(pagina), porPagina: String(porPagina) });
+  if (agentId) params.set('agentId', agentId);
+  return jsonOrThrow(await fetch(`${COMUNICACION_URL}/conversaciones?${params}`));
+}
+
 const PERFILES_URL = '/api/perfiles';
 
 export async function fetchPerfil(agentId) {
@@ -172,6 +179,12 @@ export async function aprobarCorreo(id, cambios = {}) {
 
 export async function descartarCorreo(id) {
   return jsonOrThrow(await fetch(`${CORREO_URL}/correos/${encodeURIComponent(id)}/descartar`, { method: 'POST' }));
+}
+
+/** Página de la bitácora del agente (más reciente primero): { eventos, total, pagina, paginas }. */
+export async function fetchActividadPagina(agentId, { pagina = 1, porPagina = 20 } = {}) {
+  const params = new URLSearchParams({ pagina: String(pagina), porPagina: String(porPagina) });
+  return jsonOrThrow(await fetch(`${BASE_URL}/${encodeURIComponent(agentId)}/actividad?${params}`));
 }
 
 export async function fetchActividad(agentId, { desde, limite } = {}) {

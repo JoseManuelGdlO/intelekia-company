@@ -462,6 +462,12 @@ html, body { margin: 0; height: 100%; overflow: hidden; background: #dfe9e6; }
 .live-badge { font-size: 10px; font-weight: 800; color: #fff; background: var(--c-error); padding: 1px 6px; border-radius: 999px; margin-left: 4px; animation: blink 1.4s infinite; }
 .live-badge[hidden] { display: none; }
 #panel-activity-list { display: flex; flex-direction: column; gap: 4px; max-height: 240px; overflow-y: auto; padding-top: 6px; }
+/* Paginación de Actividad y Conversaciones del panel */
+.pager { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding-top: 6px; }
+.pager[hidden] { display: none; }
+.pager .btn.small { font-size: 11.5px; padding: 3px 8px; }
+.pager .btn:disabled { cursor: default; }
+.pager-info { color: var(--muted); font-size: 11.5px; white-space: nowrap; }
 .act-row { border-left: 3px solid rgba(255,255,255,.15); padding: 4px 8px; border-radius: 0 8px 8px 0; background: rgba(255,255,255,.04); }
 .act-row.latest { background: rgba(95, 211, 173, .12); }
 .act-head { display: flex; gap: 8px; align-items: baseline; line-height: 1.4; cursor: default; }

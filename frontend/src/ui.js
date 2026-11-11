@@ -79,7 +79,30 @@ function habilitarRedimension(panel) {
   });
 }
 
-export function createPanel({ onSend, onForzar, onClose, onEdit }) {
+/**
+ * Controles `‹ Más recientes · Página X de Y · Más antiguas ›` bajo una lista del panel.
+ * `onCambio(pagina)` se llama con la página pedida.
+ */
+function createPager(el, onCambio) {
+  const [recientes, antiguas] = el.querySelectorAll('button');
+  const info = el.querySelector('.pager-info');
+  let actual = 1;
+  let total = 1;
+  recientes.addEventListener('click', () => actual > 1 && onCambio?.(actual - 1));
+  antiguas.addEventListener('click', () => actual < total && onCambio?.(actual + 1));
+  return {
+    set({ pagina = 1, paginas = 1 } = {}) {
+      actual = pagina;
+      total = Math.max(1, paginas);
+      el.hidden = false;
+      info.textContent = `Página ${actual} de ${total}`;
+      recientes.disabled = actual <= 1;
+      antiguas.disabled = actual >= total;
+    },
+  };
+}
+
+export function createPanel({ onSend, onForzar, onClose, onEdit, onActividadPagina, onTeamPagina }) {
   const panel = document.getElementById('panel');
   const title = document.getElementById('panel-title');
   const avatar = document.getElementById('panel-avatar');
@@ -98,6 +121,8 @@ export function createPanel({ onSend, onForzar, onClose, onEdit }) {
   const activityLive = document.getElementById('panel-activity-live');
   const activityCount = document.getElementById('panel-activity-count');
   const teamCount = document.getElementById('panel-team-count');
+  const activityPager = createPager(document.getElementById('panel-activity-pager'), (n) => onActividadPagina?.(n));
+  const teamPager = createPager(document.getElementById('panel-team-pager'), (n) => onTeamPagina?.(n));
 
   let currentAgentId = null;
   let currentLabel = '';
@@ -115,10 +140,14 @@ export function createPanel({ onSend, onForzar, onClose, onEdit }) {
     setTimeout(() => messageInput.focus(), 300);
   }
 
-  /** Conversaciones del agente con sus compañeros: [{ de, para, pregunta, respuesta, estado }] con labels ya resueltos. */
-  function renderTeam(items) {
+  /**
+   * Conversaciones del agente con sus compañeros: [{ de, para, pregunta, respuesta, estado }] con labels ya
+   * resueltos, de la más vieja a la más nueva. `pagina`/`paginas`/`total` alimentan el paginador.
+   */
+  function renderTeam(items, { pagina = 1, paginas = 1, total = items.length } = {}) {
     teamList.innerHTML = '';
-    teamCount.textContent = items.length ? `(${items.length})` : '';
+    teamCount.textContent = total ? `(${total})` : '';
+    teamPager.set({ pagina, paginas });
     if (!items.length) {
       teamList.appendChild(Object.assign(document.createElement('div'), { className: 'team-empty', textContent: 'Todavía no ha conversado con nadie.' }));
       return;
@@ -199,10 +228,19 @@ export function createPanel({ onSend, onForzar, onClose, onEdit }) {
     else cicloEl.textContent = `⏱️ Próximo ciclo: ${info.proxima ? `${fechaCorta(info.proxima)} (${enCuanto(info.proxima)})` : 'pronto'} · cada ${info.cadaHoras} h`;
   }
 
-  /** Bitácora de actividad del agente, lo más reciente arriba. */
-  function renderActividad(eventos, { enVivo = false } = {}) {
+  /** Muestra u oculta el indicador "EN VIVO" sin tocar la lista (útil al ver páginas anteriores). */
+  function setActividadEnVivo(enVivo) {
     activityLive.hidden = !enVivo;
-    activityCount.textContent = eventos.length ? `(${eventos.length})` : '';
+  }
+
+  /**
+   * Bitácora de actividad del agente (recibe los eventos del más viejo al más nuevo), lo más reciente arriba.
+   * `pagina`/`paginas`/`total` alimentan el paginador.
+   */
+  function renderActividad(eventos, { enVivo = false, pagina = 1, paginas = 1, total = eventos.length } = {}) {
+    activityLive.hidden = !enVivo;
+    activityCount.textContent = total ? `(${total})` : '';
+    activityPager.set({ pagina, paginas });
     activityList.innerHTML = '';
     if (!eventos.length) {
       activityList.appendChild(Object.assign(document.createElement('div'), { className: 'team-empty', textContent: 'Todavía no hay actividad registrada. Fuerza un ciclo o escríbele para verlo trabajar.' }));
@@ -213,7 +251,7 @@ export function createPanel({ onSend, onForzar, onClose, onEdit }) {
       .reverse()
       .forEach((e, i) => {
         const row = document.createElement(e.detalle ? 'details' : 'div');
-        row.className = `act-row ${ICONOS_TIPO[e.tipo] || ''}${i === 0 && enVivo ? ' latest' : ''}`;
+        row.className = `act-row ${ICONOS_TIPO[e.tipo] || ''}${i === 0 && enVivo && pagina === 1 ? ' latest' : ''}`;
         const head = document.createElement(e.detalle ? 'summary' : 'div');
         head.className = 'act-head';
         const time = Object.assign(document.createElement('span'), { className: 'act-time', textContent: fechaCorta(e.fecha, { segundos: true }) });
@@ -286,5 +324,5 @@ export function createPanel({ onSend, onForzar, onClose, onEdit }) {
     if (e.key === 'Escape' && currentAgentId && !document.querySelector('#perfil-modal.visible, #com-modal.visible, #mail-modal.visible, #apr-modal.visible')) close();
   });
 
-  return { open, close, setTitle, renderStatus, renderTeam, renderActividad, renderCiclo, appendMessage, getCurrentAgentId: () => currentAgentId };
+  return { open, close, setTitle, renderStatus, renderTeam, renderActividad, setActividadEnVivo, renderCiclo, appendMessage, getCurrentAgentId: () => currentAgentId };
 }

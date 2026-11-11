@@ -1,7 +1,8 @@
 const fs = require('fs');
 const path = require('path');
+const { paginar } = require('./paginar');
 
-const MAX_CONVERSACIONES = 200;
+const MAX_CONVERSACIONES = 2000;
 
 /**
  * Bitácora de conversaciones entre agentes (quién preguntó qué a quién y qué le respondieron).
@@ -21,7 +22,7 @@ function createConversacionesStore({ filePath, now = () => new Date() }) {
   function persist() {
     items = items.slice(-MAX_CONVERSACIONES);
     fs.mkdirSync(path.dirname(filePath), { recursive: true });
-    fs.writeFileSync(filePath, JSON.stringify(items, null, 2));
+    fs.writeFileSync(filePath, JSON.stringify(items));
   }
 
   function start({ de, para, pregunta }) {
@@ -64,7 +65,14 @@ function createConversacionesStore({ filePath, now = () => new Date() }) {
     return result.slice(-limite);
   }
 
-  return { start, finish, list };
+  /** Página de conversaciones (del agente, si se indica), de la más reciente a la más antigua: { items, total, pagina, paginas }. */
+  function pagina({ agentId, pagina: num = 1, porPagina = 20 } = {}) {
+    const lista = agentId ? items.filter((i) => i.de === agentId || i.para === agentId) : items;
+    const { lista: recortada, ...meta } = paginar(lista, { pagina: num, porPagina });
+    return { items: recortada, ...meta };
+  }
+
+  return { start, finish, list, pagina };
 }
 
 module.exports = { createConversacionesStore, MAX_CONVERSACIONES };

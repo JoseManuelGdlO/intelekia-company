@@ -310,10 +310,20 @@
       <details id="panel-activity" open>
         <summary>🧠 Actividad <span id="panel-activity-live" class="live-badge" hidden>● EN VIVO</span> <span id="panel-activity-count"></span></summary>
         <div id="panel-activity-list"></div>
+        <div id="panel-activity-pager" class="pager" hidden>
+          <button class="btn ghost small" data-dir="-1" type="button">‹ Más recientes</button>
+          <span class="pager-info"></span>
+          <button class="btn ghost small" data-dir="1" type="button">Más antiguas ›</button>
+        </div>
       </details>
       <details id="panel-team">
         <summary>Conversaciones con compañeros <span id="panel-team-count"></span></summary>
         <div id="panel-team-list"></div>
+        <div id="panel-team-pager" class="pager" hidden>
+          <button class="btn ghost small" data-dir="-1" type="button">‹ Más recientes</button>
+          <span class="pager-info"></span>
+          <button class="btn ghost small" data-dir="1" type="button">Más antiguas ›</button>
+        </div>
       </details>
       <details id="panel-prs" hidden open>
         <summary>🔍 Pull Requests revisados <span id="panel-prs-count"></span></summary>

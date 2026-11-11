@@ -1,6 +1,6 @@
 import { createScene } from './scene.js';
 import { createPanel } from './ui.js';
-import { fetchStatus, fetchDepartments, sendChat, forzarCiclo, fetchComunicacion, fetchConversaciones, fetchActividad, fetchCiclos } from './api.js';
+import { fetchStatus, fetchDepartments, sendChat, forzarCiclo, fetchComunicacion, fetchConversaciones, fetchConversacionesPagina, fetchActividad, fetchActividadPagina, fetchCiclos } from './api.js';
 import { fechaCorta } from './fechas.js';
 import { createComunicacionEditor } from './comunicacionEditor.js';
 import { createPerfilEditor } from './perfilEditor.js';
@@ -15,6 +15,7 @@ const POLL_INTERVAL_MS = 4000;
 const TALK_POLL_INTERVAL_MS = 2000;
 const FEED_MAX = 4;
 const ACTIVIDAD_POLL_MS = 1500;
+const POR_PAGINA = 20;
 
 let latestStatus = {};
 const agentLabels = {};
@@ -52,8 +53,11 @@ const panel = createPanel({
   onClose: () => {
     if (scene) scene.setSelected(null);
     seguirActividad(null);
+    seguirTeam(null);
   },
   onEdit: (agentId) => perfilEditor.open(agentId),
+  onActividadPagina: (pagina) => irActividadPagina(pagina),
+  onTeamPagina: (pagina) => irTeamPagina(pagina),
 });
 
 const perfilEditor = createPerfilEditor({
@@ -78,7 +82,8 @@ function updateLegend() {
 }
 
 // --- Bitácora de actividad del agente abierto en el panel (en vivo) ---
-const actividadState = { agentId: null, eventos: [], cursor: null, timer: null, cargando: false };
+// `pagina` 1 = en vivo; páginas > 1 se muestran fijas (el sondeo sigue, pero no repinta la lista).
+const actividadState = { agentId: null, eventos: [], cursor: null, timer: null, cargando: false, pagina: 1, paginas: 1, total: 0, navegacion: 0 };
 const TIPOS_CIERRE = new Set(['fin', 'respuesta', 'error']);
 
 function agenteEnVivo() {
@@ -94,13 +99,27 @@ async function pollActividad() {
   if (!agentId || actividadState.cargando) return;
   actividadState.cargando = true;
   try {
-    const nuevos = await fetchActividad(agentId, actividadState.cursor ? { desde: actividadState.cursor } : { limite: 80 });
-    if (agentId !== actividadState.agentId) return; // se cambió de agente mientras cargaba
-    if (nuevos.length) {
-      actividadState.eventos = [...actividadState.eventos, ...nuevos].slice(-150);
-      actividadState.cursor = nuevos[nuevos.length - 1].fecha;
+    if (!actividadState.cursor) {
+      // Primera carga: la página 1 del servidor trae los eventos recientes y el total de páginas.
+      const primera = await fetchActividadPagina(agentId, { pagina: 1, porPagina: POR_PAGINA });
+      if (agentId !== actividadState.agentId) return; // se cambió de agente mientras cargaba
+      actividadState.eventos = primera.eventos.slice().reverse();
+      actividadState.cursor = primera.eventos[0]?.fecha || null;
+      Object.assign(actividadState, { total: primera.total, paginas: primera.paginas });
+    } else {
+      const nuevos = await fetchActividad(agentId, { desde: actividadState.cursor });
+      if (agentId !== actividadState.agentId) return;
+      if (nuevos.length) {
+        actividadState.eventos = [...actividadState.eventos, ...nuevos].slice(-150);
+        actividadState.cursor = nuevos[nuevos.length - 1].fecha;
+        // Llegaron eventos: se actualiza el total de páginas con una consulta ligera a la página 1.
+        const meta = await fetchActividadPagina(agentId, { pagina: 1, porPagina: 1 });
+        if (agentId !== actividadState.agentId) return;
+        Object.assign(actividadState, { total: meta.total, paginas: Math.max(1, Math.ceil(meta.total / POR_PAGINA)) });
+      }
     }
-    panel.renderActividad(actividadState.eventos, { enVivo: agenteEnVivo() });
+    if (actividadState.pagina === 1) renderActividadEnVivo();
+    else panel.setActividadEnVivo(agenteEnVivo());
   } catch (err) {
     console.error('No se pudo leer la actividad', err);
   } finally {
@@ -108,9 +127,36 @@ async function pollActividad() {
   }
 }
 
+/** Página 1 (en vivo): los eventos más recientes que ya se tienen en memoria. */
+function renderActividadEnVivo() {
+  const { eventos, total, paginas } = actividadState;
+  panel.renderActividad(eventos.slice(-POR_PAGINA), { enVivo: agenteEnVivo(), pagina: 1, paginas, total: Math.max(total, eventos.length) });
+}
+
+/** Cambia de página en la Actividad. La 1 vuelve al modo en vivo; las demás se piden al servidor y quedan fijas. */
+async function irActividadPagina(pagina) {
+  const { agentId } = actividadState;
+  if (!agentId) return;
+  const navegacion = ++actividadState.navegacion;
+  if (pagina <= 1) {
+    actividadState.pagina = 1;
+    renderActividadEnVivo();
+    return;
+  }
+  try {
+    const res = await fetchActividadPagina(agentId, { pagina, porPagina: POR_PAGINA });
+    if (agentId !== actividadState.agentId || navegacion !== actividadState.navegacion) return;
+    Object.assign(actividadState, { pagina: res.pagina, total: res.total, paginas: res.paginas });
+    panel.renderActividad(res.eventos.slice().reverse(), { enVivo: agenteEnVivo(), pagina: res.pagina, paginas: res.paginas, total: res.total });
+  } catch (err) {
+    console.error('No se pudo leer la página de actividad', err);
+  }
+}
+
 function seguirActividad(agentId) {
   clearInterval(actividadState.timer);
-  Object.assign(actividadState, { agentId, eventos: [], cursor: null, timer: null });
+  Object.assign(actividadState, { agentId, eventos: [], cursor: null, timer: null, pagina: 1, paginas: 1, total: 0 });
+  actividadState.navegacion += 1;
   if (!agentId) return;
   panel.renderActividad([], {});
   pollActividad();
@@ -122,15 +168,66 @@ function labelOf(agentId) {
   return agentLabels[agentId] || agentId;
 }
 
+// Conversaciones del agente abierto. `base` = página 1 traída del servidor (de la más vieja a la más nueva);
+// en la página 1 se le mezclan las que llegan en vivo. Páginas > 1 se muestran fijas.
+const teamState = { agentId: null, base: [], pagina: 1, paginas: 1, total: 0, navegacion: 0 };
+
+function participa(conv, agentId) {
+  return conv.de === agentId || conv.para === agentId;
+}
+
+function conLabels(conv) {
+  return { ...conv, deLabel: labelOf(conv.de), paraLabel: labelOf(conv.para) };
+}
+
 function renderPanelTeam() {
   const agentId = panel.getCurrentAgentId();
+  if (!agentId || teamState.agentId !== agentId || teamState.pagina !== 1) return;
+  const porId = new Map(teamState.base.map((c) => [c.id, c]));
+  conversations.filter((c) => participa(c, agentId)).forEach((c) => porId.set(c.id, c));
+  const items = [...porId.values()].sort((a, b) => (a.inicio < b.inicio ? -1 : a.inicio > b.inicio ? 1 : 0)).slice(-POR_PAGINA);
+  panel.renderTeam(items.map(conLabels), { pagina: 1, paginas: teamState.paginas, total: Math.max(teamState.total, items.length) });
+}
+
+/** Trae la página 1 del agente (últimas conversaciones y total de páginas) y repinta si sigue en la página 1. */
+async function cargarTeamPagina1(agentId) {
+  try {
+    const res = await fetchConversacionesPagina({ agentId, pagina: 1, porPagina: POR_PAGINA });
+    if (teamState.agentId !== agentId) return;
+    Object.assign(teamState, { base: res.items.slice().reverse(), total: res.total, paginas: res.paginas });
+    renderPanelTeam();
+  } catch (err) {
+    console.error('No se pudieron leer las conversaciones del agente', err);
+  }
+}
+
+function seguirTeam(agentId) {
+  Object.assign(teamState, { agentId, base: [], pagina: 1, paginas: 1, total: 0 });
+  teamState.navegacion += 1;
   if (!agentId) return;
-  panel.renderTeam(
-    conversations
-      .filter((c) => c.de === agentId || c.para === agentId)
-      .slice(-15)
-      .map((c) => ({ ...c, deLabel: labelOf(c.de), paraLabel: labelOf(c.para) }))
-  );
+  renderPanelTeam();
+  cargarTeamPagina1(agentId);
+}
+
+/** Cambia de página en las conversaciones con compañeros. La 1 vuelve al modo en vivo. */
+async function irTeamPagina(pagina) {
+  const { agentId } = teamState;
+  if (!agentId) return;
+  const navegacion = ++teamState.navegacion;
+  if (pagina <= 1) {
+    teamState.pagina = 1;
+    renderPanelTeam();
+    cargarTeamPagina1(agentId);
+    return;
+  }
+  try {
+    const res = await fetchConversacionesPagina({ agentId, pagina, porPagina: POR_PAGINA });
+    if (agentId !== teamState.agentId || navegacion !== teamState.navegacion) return;
+    Object.assign(teamState, { pagina: res.pagina, total: res.total, paginas: res.paginas });
+    panel.renderTeam(res.items.slice().reverse().map(conLabels), { pagina: res.pagina, paginas: res.paginas, total: res.total });
+  } catch (err) {
+    console.error('No se pudo leer la página de conversaciones', err);
+  }
 }
 
 function showInFeed(conv) {
@@ -192,6 +289,9 @@ const aprobacionesBandeja = createAprobacionesBandeja({ labelOf });
 const oficinaHorario = createOficinaHorario();
 
 function mergeConversations(list, { animate }) {
+  // ¿Llegó una conversación nueva del agente abierto? Entonces cambia el total de páginas.
+  const abierto = teamState.agentId;
+  const nuevaDelAbierto = Boolean(abierto) && list.some((conv) => participa(conv, abierto) && !conversations.some((c) => c.id === conv.id) && !teamState.base.some((c) => c.id === conv.id));
   list.forEach((conv) => {
     const index = conversations.findIndex((c) => c.id === conv.id);
     if (index >= 0) conversations[index] = conv;
@@ -204,6 +304,7 @@ function mergeConversations(list, { animate }) {
   });
   conversations = conversations.slice(-200);
   if (list.length) renderPanelTeam();
+  if (nuevaDelAbierto) cargarTeamPagina1(abierto);
 }
 
 async function pollConversations() {
@@ -317,7 +418,7 @@ async function bootstrap() {
       scene.setSelected(agentId);
       scene.focusAgent(agentId);
       panel.open(agentId, agentLabels[agentId] || agentId, latestStatus[agentId], agentAccents[agentId]);
-      renderPanelTeam();
+      seguirTeam(agentId);
       seguirActividad(agentId);
       mostrarRevisionesPR(agentId);
     },

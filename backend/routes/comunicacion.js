@@ -37,7 +37,12 @@ function createSetDefaultHandler({ comunicacion }) {
 
 function createListConversacionesHandler({ conversaciones }) {
   return (req, res) => {
-    const { desde, agentId, limite } = req.query;
+    const { desde, agentId, limite, pagina, porPagina } = req.query;
+    // Con `pagina` responde paginado (más reciente primero); sin ella, como siempre.
+    if (pagina !== undefined) {
+      res.json(conversaciones.pagina({ agentId, pagina, porPagina }));
+      return;
+    }
     res.json(conversaciones.list({ desde, agentId, limite: limite ? Number(limite) : undefined }));
   };
 }

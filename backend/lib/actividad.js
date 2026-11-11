@@ -1,5 +1,6 @@
 const fs = require('fs');
 const path = require('path');
+const { paginar } = require('./paginar');
 
 /**
  * Bitácora de actividad por agente: cada paso que da mientras trabaja (inicio de ciclo,
@@ -9,7 +10,9 @@ const path = require('path');
  * Tipos: inicio | pensando | nota | herramienta | resultado | chat | respuesta | fin | error
  */
 const TIPOS = ['inicio', 'pensando', 'nota', 'herramienta', 'resultado', 'chat', 'respuesta', 'fin', 'error'];
-const MAX_POR_AGENTE = 150;
+const MAX_POR_AGENTE = 1000;
+// Lo que devuelve list() sin `limite` (el panel en vivo no necesita más).
+const LIMITE_LIST_DEFECTO = 150;
 const MAX_TEXTO = 1500;
 const PERSIST_DEBOUNCE_MS = 500;
 
@@ -58,10 +61,16 @@ function createActividadStore({ filePath = null, now = () => new Date() } = {}) 
   }
 
   /** Eventos de un agente creados después de `desde` (ISO), del más viejo al más nuevo. */
-  function list(agentId, { desde, limite = MAX_POR_AGENTE } = {}) {
+  function list(agentId, { desde, limite = LIMITE_LIST_DEFECTO } = {}) {
     let lista = porAgente[agentId] || [];
     if (desde) lista = lista.filter((e) => e.fecha > desde);
     return lista.slice(-limite);
+  }
+
+  /** Página de la bitácora de un agente, del más reciente al más antiguo: { eventos, total, pagina, paginas }. */
+  function pagina(agentId, opciones = {}) {
+    const { lista, ...meta } = paginar(porAgente[agentId] || [], opciones);
+    return { eventos: lista, ...meta };
   }
 
   /** Para agentes que solo se conocen por id (p. ej. agentes "a la medida" creados en caliente). */
@@ -69,7 +78,7 @@ function createActividadStore({ filePath = null, now = () => new Date() } = {}) 
     return (tipo, texto, detalle) => log(agentId, tipo, texto, detalle);
   }
 
-  return { log, list, forAgent, TIPOS };
+  return { log, list, pagina, forAgent, TIPOS };
 }
 
 module.exports = { createActividadStore, TIPOS, MAX_POR_AGENTE };
