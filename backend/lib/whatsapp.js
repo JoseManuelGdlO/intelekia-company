@@ -95,7 +95,15 @@ function createWhatsapp({ config, fetchImpl = (...a) => fetch(...a), timeoutMs =
   async function json(url, opts) {
     const res = await llamar(url, opts);
     const data = await res.json().catch(() => ({}));
-    if (!res.ok || data.error) throw new Error(`WhatsApp: ${data.error?.message || `respuesta ${res.status}`}`);
+    if (!res.ok || data.error) {
+      const e = data.error || {};
+      const extra = [
+        e.code != null && `código ${e.code}${e.error_subcode != null ? `/${e.error_subcode}` : ''}`,
+        e.error_data?.details,
+        e.fbtrace_id && `fbtrace ${e.fbtrace_id}`,
+      ].filter(Boolean);
+      throw new Error(`WhatsApp: ${e.message || `respuesta ${res.status}`}${extra.length ? ` [${extra.join(' · ')}]` : ''}`);
+    }
     return data;
   }
 
