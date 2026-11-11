@@ -387,7 +387,16 @@ function buildDepartmentNav(departments) {
     scene.focusOverview();
     elegir(overview, 'Vista general');
   });
-  nav.append(overview, Object.assign(document.createElement('div'), { className: 'menu-sep' }));
+  const paseo = document.createElement('button');
+  paseo.className = 'menu-item';
+  paseo.setAttribute('role', 'menuitem');
+  paseo.title = 'La cámara camina por los pasillos y se asoma a cada sala. Clic en la oficina para detenerlo.';
+  paseo.innerHTML = `${icon('footprints')}<span>Recorrido virtual</span>`;
+  paseo.addEventListener('click', () => {
+    scene.startWalk();
+    elegir(paseo, 'Recorrido virtual');
+  });
+  nav.append(overview, paseo, Object.assign(document.createElement('div'), { className: 'menu-sep' }));
 
   departments.forEach((department, index) => {
     const item = document.createElement('button');
@@ -431,6 +440,8 @@ async function bootstrap() {
   scene = createScene({
     container: document.getElementById('scene-container'),
     departments,
+    // Al tocar la oficina durante el recorrido virtual, vuelve a la vista general.
+    onWalkStopped: () => document.querySelector('#dept-nav .menu-item')?.click(),
     onAgentClick: (agentId) => {
       scene.setSelected(agentId);
       scene.focusAgent(agentId);

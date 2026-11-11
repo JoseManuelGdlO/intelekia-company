@@ -27,8 +27,6 @@ export const STATUS_LABELS = {
 const CORRIDOR_W = 3.0;
 const MIN_ROOM_W = 9.5;
 const MIN_ROW_D = 7.0;
-const BANO_W = 3.8;
-const CAFE_MIN_W = 7.0;
 const CLICK_DRAG_TOLERANCE = 6;
 
 function easeInOutCubic(x) {
@@ -39,14 +37,12 @@ function easeInOutCubic(x) {
  * Planta de la oficina (vista desde arriba, el frente/entrada es +Z):
  *   Desarrollo | pasillo | Diseño
  *   Ventas     | pasillo | Dirección y Reuniones
- *   Recepción  | pasillo | Café · Baño
  *                ENTRADA
  * Los departamentos que no estén en el plano se agregan en filas extra al fondo.
  */
 const PLANTA = [
   { left: { dept: 'desarrollo', label: 'Desarrollo' }, right: { dept: 'marketing', label: 'Diseño' } },
   { left: { dept: 'comercial', label: 'Ventas' }, right: { dept: 'administracion', label: 'Dirección y Reuniones' } },
-  { left: { decor: 'recepcion', label: 'Recepción' }, right: { decor: 'cafe-bano' } },
 ];
 
 /** Arma la cuadrícula de filas (del fondo al frente) con lo que cada lugar contiene. */
@@ -68,7 +64,6 @@ function planLayout(departments) {
 /** Tamaño mínimo que pide un lugar de la cuadrícula. */
 function slotSize(slot) {
   if (!slot) return { width: 0, depth: 0 };
-  if (slot.decor === 'cafe-bano') return { width: CAFE_MIN_W + BANO_W + WALL_T, depth: MIN_ROW_D };
   if (slot.decor) return { width: MIN_ROOM_W, depth: MIN_ROW_D };
   return computeRoomSize(slot.department.agents.length);
 }
@@ -114,7 +109,7 @@ const BUBBLES = {
   coffee: '☕',
 };
 
-export function createScene({ container, departments, onAgentClick }) {
+export function createScene({ container, departments, onAgentClick, onWalkStopped }) {
   const scene = new THREE.Scene();
   scene.background = new THREE.Color(0xdfe9e6);
   scene.fog = new THREE.Fog(0xdfe9e6, 45, 110);
@@ -237,24 +232,20 @@ export function createScene({ container, departments, onAgentClick }) {
   }
 
   let zCursor = bounds.minZ;
+  const rowInfo = []; // para el recorrido virtual: centro de cada fila y qué hay a cada lado
   rows.forEach((row, r) => {
     const depth = rowD[r];
     zCursor += WALL_T;
     const centerZ = zCursor + depth / 2;
     zCursor += depth;
+    rowInfo.push({ centerZ, left: Boolean(row.left), right: Boolean(row.right) });
     ['left', 'right'].forEach((side) => {
       const slot = row[side];
       if (!slot) return;
       const width = colW[side];
       const centerX = colCenter[side];
       const sx = sideSign[side];
-      if (slot.decor === 'cafe-bano') {
-        // Café junto al pasillo y baño pequeño hacia el exterior, separados por una partición.
-        const cafeW = width - BANO_W - WALL_T;
-        const inner = centerX - (sx * width) / 2;
-        addDecor({ tipo: 'cafe', label: 'Café', centerX: inner + sx * (cafeW / 2), centerZ, width: cafeW, depth, sideSign: sx });
-        addDecor({ tipo: 'bano', label: 'Baño', centerX: inner + sx * (cafeW + WALL_T + BANO_W / 2), centerZ, width: BANO_W, depth, sideSign: sx });
-      } else if (slot.decor) {
+      if (slot.decor) {
         addDecor({ tipo: slot.decor, label: slot.label, centerX, centerZ, width, depth, sideSign: sx });
       } else {
         buildDepartmentRoom(slot, { centerX, centerZ, width, depth, sideSign: sx });
@@ -271,8 +262,8 @@ export function createScene({ container, departments, onAgentClick }) {
   const rowEdges = rowD.map((_, r) => bounds.minZ + rowD.slice(0, r + 1).reduce((acc, d) => acc + d + WALL_T, 0));
   [
     [-CORRIDOR_W / 2 + 0.4, bounds.minZ + 0.6, 1.1],
-    [CORRIDOR_W / 2 - 0.4, rowEdges[rows.length - 3] ?? 0, 1.0],
-    [-CORRIDOR_W / 2 + 0.4, rowEdges[rows.length - 2] ?? 0, 0.9],
+    [CORRIDOR_W / 2 - 0.4, rowEdges[rows.length - 2] ?? 0, 1.0],
+    [-CORRIDOR_W / 2 + 0.4, bounds.maxZ - 0.6, 0.9],
   ].forEach(([x, z, s]) => {
     const plant = createPlant(corridorRng, s);
     plant.group.position.set(x, 0, z);
@@ -374,6 +365,11 @@ export function createScene({ container, departments, onAgentClick }) {
   }
 
   renderer.domElement.addEventListener('pointerdown', (e) => {
+    // Tocar la oficina durante el recorrido virtual lo detiene y devuelve el control.
+    if (walk) {
+      stopWalk();
+      onWalkStopped?.();
+    }
     downPos = { x: e.clientX, y: e.clientY };
   });
   renderer.domElement.addEventListener('pointermove', (e) => {
@@ -444,6 +440,7 @@ export function createScene({ container, departments, onAgentClick }) {
 
   const tmp = new THREE.Vector3();
   function focusAgent(agentId) {
+    stopWalk();
     const entry = agents[agentId];
     if (!entry) return;
     entry.character.focusPoint(tmp);
@@ -452,6 +449,7 @@ export function createScene({ container, departments, onAgentClick }) {
   }
 
   function focusDepartment(departmentId) {
+    stopWalk();
     const room = rooms.find((r) => r.id === departmentId);
     if (!room) return;
     const vFov = THREE.MathUtils.degToRad(camera.fov);
@@ -464,7 +462,100 @@ export function createScene({ container, departments, onAgentClick }) {
   }
 
   function focusOverview() {
+    stopWalk();
     flyTo(overviewTarget, overviewDistance(), overviewDir);
+  }
+
+  // --- Recorrido virtual: cámara a la altura de los ojos caminando por el pasillo ---
+  const EYE = 1.62;
+  const WALK_SPEED = 1.15; // m/s, paso tranquilo
+  const TURN_SECONDS = 1.6;
+  const WALK_FOV = 62;
+  let walk = null;
+
+  /** Ruta: entra por el frente, se asoma a cada sala (izquierda y derecha), llega al fondo y regresa. */
+  function walkRoute() {
+    const ahead = (z, dir) => new THREE.Vector3(0, EYE - 0.05, z + dir * 6);
+    const into = (side, z) => new THREE.Vector3(colCenter[side], 0.9, z);
+    const steps = [];
+    const go = (z, dir) => steps.push({ pos: new THREE.Vector3(0, EYE, z), look: ahead(z, dir), walk: true });
+    const turn = (look, hold) => steps.push({ look, hold });
+    const entrada = bounds.maxZ + 2.6;
+    const fondo = bounds.minZ + 1.6;
+    steps.push({ pos: new THREE.Vector3(0, EYE, entrada), look: ahead(entrada, -1), hold: 1.5, snap: true });
+    // Del frente hacia el fondo: filas en orden inverso (rowInfo va del fondo al frente).
+    [...rowInfo].reverse().forEach((row) => {
+      const z = row.centerZ + 1.2; // un poco antes del marco de la puerta
+      go(z, -1);
+      if (row.left) turn(into('left', row.centerZ), 4.5);
+      if (row.right) turn(into('right', row.centerZ), 4.5);
+      turn(ahead(z, -1), 0.2);
+    });
+    go(fondo, -1);
+    turn(ahead(fondo, 1), 1.2); // media vuelta
+    go(entrada, 1);
+    turn(ahead(entrada, -1), 0.5);
+    return steps;
+  }
+
+  /**
+   * Inicia el recorrido (en bucle). onVuelta se llama cada vez que completa una vuelta.
+   * Cualquier otro movimiento de cámara (focusDepartment, focusOverview, arrastrar) lo detiene.
+   */
+  function startWalk({ onVuelta } = {}) {
+    tween = null;
+    controls.enabled = false;
+    camera.fov = WALK_FOV;
+    camera.updateProjectionMatrix();
+    walk = { steps: walkRoute(), i: 0, t: 0, from: null, pos: camera.position.clone(), look: controls.target.clone(), dist: 0, onVuelta };
+    labelRenderer.domElement.classList.add('walking');
+  }
+
+  function stopWalk() {
+    if (!walk) return;
+    walk = null;
+    controls.enabled = true;
+    camera.fov = 45;
+    camera.updateProjectionMatrix();
+    labelRenderer.domElement.classList.remove('walking');
+  }
+
+  function updateWalk(dt) {
+    let step = walk.steps[walk.i];
+    if (!walk.from) {
+      // Empieza un tramo: calcula su duración (caminar = distancia / velocidad; girar = tiempo fijo).
+      const pos = step.pos || walk.pos;
+      const metros = walk.pos.distanceTo(pos);
+      walk.from = { pos: walk.pos.clone(), look: walk.look.clone() };
+      walk.dur = step.snap ? 0.001 : step.walk ? Math.max(metros / WALK_SPEED, 0.6) : TURN_SECONDS;
+      walk.t = 0;
+    }
+    walk.t += dt;
+    const k = Math.min(walk.t / walk.dur, 1);
+    // Caminar: arranque y frenado suaves; girar: curva más marcada, como mover la cabeza.
+    const e = step.walk ? k * k * (3 - 2 * k) : easeInOutCubic(k);
+    const prev = walk.pos.clone();
+    if (step.pos) walk.pos.lerpVectors(walk.from.pos, step.pos, e);
+    walk.look.lerpVectors(walk.from.look, step.look, e);
+    walk.dist += walk.pos.distanceTo(prev);
+    if (k >= 1 && walk.t >= walk.dur + (step.hold || 0)) {
+      walk.i += 1;
+      walk.from = null;
+      if (walk.i >= walk.steps.length) {
+        walk.i = 0;
+        walk.onVuelta?.();
+        if (!walk) return; // onVuelta pudo detenerlo
+      }
+      step = walk.steps[walk.i];
+    }
+    // Balanceo de los pasos: arriba/abajo y un poco de lado, solo mientras camina.
+    const moving = step.walk && k < 1;
+    const fase = (walk.dist / 0.75) * Math.PI;
+    const bob = moving ? Math.abs(Math.sin(fase)) * 0.045 - 0.02 : 0;
+    const sway = moving ? Math.sin(fase) * 0.025 : 0;
+    camera.position.set(walk.pos.x + sway, walk.pos.y + bob, walk.pos.z);
+    camera.lookAt(walk.look);
+    controls.target.copy(walk.look);
   }
 
   // --- Red de comunicación (quién puede consultar a quién) ---
@@ -682,7 +773,9 @@ export function createScene({ container, departments, onAgentClick }) {
     const dt = Math.min(rawDt, 0.05);
     const t = clock.elapsedTime;
 
-    if (tween) {
+    // El recorrido usa el tiempo real (con tope) para caminar a la misma velocidad aunque haya pocos cuadros por segundo.
+    if (walk) updateWalk(Math.min(rawDt, 0.5));
+    else if (tween) {
       tween.t += rawDt / tween.dur;
       const e = easeInOutCubic(Math.min(tween.t, 1));
       controls.target.lerpVectors(tween.fromT, tween.toT, e);
@@ -699,8 +792,8 @@ export function createScene({ container, departments, onAgentClick }) {
     decorRooms.forEach((room) => room.update(t));
     updateTalks(t);
 
-    controls.update();
-    labelRenderer.domElement.classList.toggle('far', camera.position.distanceTo(controls.target) > 15);
+    if (!walk) controls.update();
+    labelRenderer.domElement.classList.toggle('far', !walk && camera.position.distanceTo(controls.target) > 15);
     renderer.render(scene, camera);
     labelRenderer.render(scene, camera);
   }
@@ -731,5 +824,5 @@ export function createScene({ container, departments, onAgentClick }) {
     }
   }
 
-  return { updateStatusColors, setAgentLabel, setSelected, focusAgent, focusDepartment, focusOverview, showNetwork, playConversation, pause, resume };
+  return { updateStatusColors, setAgentLabel, setSelected, focusAgent, focusDepartment, focusOverview, startWalk, stopWalk, isWalking: () => Boolean(walk), showNetwork, playConversation, pause, resume };
 }

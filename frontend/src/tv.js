@@ -109,10 +109,26 @@ function crearEscena(estado) {
   iniciarRecorrido();
 }
 
-/** Recorrido de cámara: vista general y luego cada departamento, uno cada ~20 s. */
+/**
+ * Recorrido de cámara: vista general, cada departamento (~20 s cada uno) y al final un
+ * recorrido virtual caminando por los pasillos (una vuelta completa, ~1 min).
+ */
 function paradasRecorrido() {
   const deptos = ultimoEstado?.departamentos || [];
-  return [{ tipo: 'general', label: 'Toda la oficina' }, ...deptos.map((d) => ({ tipo: 'depto', id: d.id, label: d.label }))];
+  return [
+    { tipo: 'general', label: 'Toda la oficina' },
+    ...deptos.map((d) => ({ tipo: 'depto', id: d.id, label: d.label })),
+    { tipo: 'caminar', label: 'Recorrido virtual' },
+  ];
+}
+
+function mostrarLugar(texto) {
+  const lugar = $('tv-escena-lugar');
+  lugar.classList.remove('visible');
+  setTimeout(() => {
+    lugar.textContent = texto;
+    lugar.classList.add('visible');
+  }, 600);
 }
 
 function siguienteParada() {
@@ -120,20 +136,24 @@ function siguienteParada() {
   const paradas = paradasRecorrido();
   const parada = paradas[tourIndice % paradas.length];
   tourIndice += 1;
+  if (parada.tipo === 'caminar') {
+    // Mientras camina no corre el temporizador: al terminar la vuelta sigue con la siguiente parada.
+    clearInterval(tourTimer);
+    tourTimer = null;
+    scene.startWalk({ onVuelta: () => iniciarRecorrido() });
+    mostrarLugar(`🚶 ${parada.label}`);
+    return;
+  }
   if (parada.tipo === 'general') scene.focusOverview();
   else scene.focusDepartment(parada.id);
-  const lugar = $('tv-escena-lugar');
-  lugar.classList.remove('visible');
-  setTimeout(() => {
-    lugar.textContent = `📍 ${parada.label}`;
-    lugar.classList.add('visible');
-  }, 600);
+  mostrarLugar(`📍 ${parada.label}`);
 }
 
 function iniciarRecorrido() {
   clearInterval(tourTimer);
+  tourTimer = null;
   siguienteParada();
-  tourTimer = setInterval(siguienteParada, TOUR_MS);
+  if (!scene?.isWalking()) tourTimer = setInterval(siguienteParada, TOUR_MS);
 }
 
 // ---------- Pantalla de noche ----------
