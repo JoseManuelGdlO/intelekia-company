@@ -107,12 +107,12 @@ async function reintentarMerge({ pr, github }) {
   }
 }
 
-async function runCycle({ contextPath, rolePath, revisionesPath, github, apiKey, model, createChatCompletion, now = () => new Date() }) {
+async function runCycle({ contextPath, rolePath, revisionesPath, github, diasRecientes, apiKey, model, createChatCompletion, now = () => new Date() }) {
   const estado = github ? github.estado() : { ok: false, motivo: 'El plugin de GitHub no está conectado' };
   if (!estado.ok) return { omitido: true, motivo: estado.motivo, revisados: [] };
 
   const store = createRevisionesStore({ filePath: revisionesPath, now });
-  const pendientes = await detectar({ github, store });
+  const pendientes = await detectar({ github, store, diasRecientes, now });
   if (!pendientes.length) return { omitido: false, revisados: [] };
 
   let role = null;

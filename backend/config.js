@@ -4,6 +4,12 @@ const { normalizarNumero } = require('./lib/whatsapp');
 const DEFAULT_DB_TABLES = 'Projects,Tasks,BoardColumns,TaskActivities,Notes,ProjectMembers,Users,FinanceItems';
 const DEFAULT_DB_BLOCKED_COLUMNS = 'passwordHash,email';
 
+/** Número de días ≥ 0; vacío o inválido → el valor por defecto. */
+function diasValidos(valor, porDefecto) {
+  const n = Number(valor);
+  return valor !== undefined && valor !== '' && Number.isFinite(n) && n >= 0 ? n : porDefecto;
+}
+
 function list(value) {
   return String(value)
     .split(',')
@@ -19,6 +25,8 @@ function loadConfig(env = process.env) {
     agentIntervalHours: Number(env.AGENT_INTERVAL_HOURS || 6),
     // Revisor de PRs: cuenta de GitHub cuyos repos vigila (el token va en GITHUB_TOKEN, lo usa el plugin).
     githubOwner: env.GITHUB_OWNER || '',
+    // Solo revisa PRs creados en los últimos N días (0 = también el histórico).
+    revisorPrsDias: diasValidos(env.REVISOR_PRS_DIAS, 7),
     // Respuestas en Redes: Graph API de Meta (token de página de larga duración).
     meta: {
       pageToken: env.META_PAGE_TOKEN || '',

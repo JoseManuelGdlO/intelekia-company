@@ -148,6 +148,7 @@ function buildDepartments({ rootDir, config, createChatCompletion }) {
             revisionesPath: path.join(rootDir, 'backend', 'state', 'revisiones-pr.json'),
             // server.js conecta aquí el acceso al plugin de GitHub (lib/githubPlugin.js).
             github: null,
+            diasRecientes: config.revisorPrsDias,
             ...shared,
           },
         },

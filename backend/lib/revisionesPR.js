@@ -6,6 +6,9 @@ const path = require('path');
  * (Las restricciones de herramientas y el candado del merge se agregan en este mismo archivo.)
  */
 const MAX_POR_CICLO = 5;
+// Solo se revisan PRs creados en los últimos N días (0 = todo el histórico). Los ya registrados se siguen atendiendo.
+const DIAS_RECIENTES = 7;
+const DIA_MS = 24 * 60 * 60 * 1000;
 
 // Herramientas del plugin de GitHub que puede usar el modelo (el resto se le quita).
 const REVISION_LECTURA = ['pull_request_read', 'get_file_contents'];
@@ -76,11 +79,25 @@ function createRevisionesStore({ filePath, now = () => new Date() }) {
  *  - `aprobado_sin_merge`: mismo commit → solo reintentar el merge (`soloMerge`, sin IA); commit nuevo → revisión completa;
  *  - `bloqueado` solo si llegó un commit nuevo;
  *  - se salta (sin registrar) el PR cuyo mergeable_state aún es "unknown";
- *  - `cambios_pedidos` solo si llegó un commit nuevo Y no quedan hilos sin resolver.
+ *  - `cambios_pedidos` solo si llegó un commit nuevo Y no quedan hilos sin resolver;
+ *  - un PR que nunca se ha revisado solo entra si se creó en los últimos `diasRecientes` días (no el histórico).
  */
-async function detectar({ github, store, max = MAX_POR_CICLO }) {
+/** PR creado antes del límite (si no trae fecha se considera reciente, para no dejar de revisarlo). */
+function esDelHistorico(item, limite) {
+  const creado = Date.parse(item.created_at);
+  return limite !== null && Number.isFinite(creado) && creado < limite;
+}
+
+async function detectar({ github, store, max = MAX_POR_CICLO, diasRecientes = DIAS_RECIENTES, now = () => new Date() }) {
   const owner = String(github.owner);
-  const busqueda = await github.llamar('search_pull_requests', { query: `is:pr is:open draft:false user:${owner}`, perPage: 50 });
+  const busqueda = await github.llamar('search_pull_requests', {
+    query: `is:pr is:open draft:false user:${owner}`,
+    sort: 'created',
+    order: 'desc',
+    perPage: 50,
+  });
+  const dias = Number(diasRecientes);
+  const limite = dias > 0 ? now().getTime() - dias * DIA_MS : null;
   const items = Array.isArray(busqueda?.items) ? busqueda.items : [];
   const pendientes = [];
 
@@ -92,6 +109,7 @@ async function detectar({ github, store, max = MAX_POR_CICLO }) {
     if (autor.toLowerCase() === owner.toLowerCase()) continue;
 
     const clave = claveDe(ref);
+    if (esDelHistorico(item, limite) && !store.get(clave)) continue;
     try {
       const candidato = await evaluar({ github, store, ref, clave, item, autor });
       if (candidato) pendientes.push(candidato);
@@ -214,4 +232,5 @@ module.exports = {
   hilosAbiertos,
   claveDe,
   MAX_POR_CICLO,
+  DIAS_RECIENTES,
 };

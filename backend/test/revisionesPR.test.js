@@ -257,3 +257,28 @@ test('detectar: un PR que falla no impide devolver los demás', async () => {
   }
   assert.match(avisos.join('\n'), /jose\/app#1/);
 });
+
+test('detectar: solo PRs recientes; los viejos ya registrados se siguen atendiendo', async () => {
+  const ahora = new Date(Date.UTC(2026, 10, 11, 12));
+  const hace = (dias) => new Date(ahora.getTime() - dias * 86400000).toISOString();
+  const nuevo = { ...item(1), created_at: hace(2) };
+  const viejo = { ...item(2), created_at: hace(30) };
+  const viejoConocido = { ...item(3), created_at: hace(40) };
+  const sinFecha = item(4);
+  const store = createRevisionesStore({ filePath: tmpFile() });
+  store.registrar('jose/app#3', { sha: 'viejo', veredicto: 'bloqueado' });
+  const github = fakeGithub({ items: [nuevo, viejo, viejoConocido, sinFecha], shas: { 3: 'nuevo' } });
+  const pendientes = await detectar({ github, store, diasRecientes: 7, now: () => ahora });
+  assert.deepEqual(pendientes.map((p) => p.numero).sort(), [1, 3, 4]);
+  const busqueda = github.llamadas.find((l) => l.tool === 'search_pull_requests');
+  assert.equal(busqueda.args.sort, 'created');
+  assert.equal(busqueda.args.order, 'desc');
+});
+
+test('detectar: diasRecientes 0 revisa todo el histórico', async () => {
+  const ahora = new Date(Date.UTC(2026, 10, 11, 12));
+  const viejo = { ...item(2), created_at: new Date(Date.UTC(2025, 0, 1)).toISOString() };
+  const store = createRevisionesStore({ filePath: tmpFile() });
+  const pendientes = await detectar({ github: fakeGithub({ items: [viejo] }), store, diasRecientes: 0, now: () => ahora });
+  assert.deepEqual(pendientes.map((p) => p.numero), [2]);
+});
